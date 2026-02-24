@@ -17,7 +17,9 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateAccount, onLogin 
       <div className="flex items-center justify-center px-6 py-2 z-10 animate-slide-up">
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary text-white shadow-lg shadow-primary/30">
-            <span className="material-symbols-outlined text-xl">directions_car</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M7 4V20M7 4H12C15.3137 4 18 6.68629 18 10C18 11.6569 17.3284 13.1569 16.2426 14.2426C15.1569 15.3284 13.6569 16 12 16H7M7 20H12C15.3137 20 18 17.3137 18 14C18 12.3431 17.3284 10.8431 16.2426 9.75736" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </div>
           <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Bicadriver</span>
         </div>
