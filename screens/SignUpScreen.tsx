@@ -74,6 +74,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
       name: formData.fullName,
       email: formData.email,
       phone: formData.phone,
+      password: formData.password,
       carType: formData.carType,
       licenseImage: formData.licenseImage,
       selfieImage: formData.selfieImage,

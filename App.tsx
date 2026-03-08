@@ -98,10 +98,43 @@ const INITIAL_PAYOUTS: Payout[] = [
 ];
 
 const App: React.FC = () => {
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOADING);
+  const [allUsers, setAllUsers] = useState<UserProfile[]>(() => {
+    const saved = localStorage.getItem('bicadriver_users');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse users from local storage", e);
+      }
+    }
+    return MOCK_USERS;
+  });
+
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    const saved = localStorage.getItem('bicadriver_current_user');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse current user from local storage", e);
+      }
+    }
+    return null;
+  });
+
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
+    const savedUser = localStorage.getItem('bicadriver_current_user');
+    if (savedUser) {
+        try {
+            const user = JSON.parse(savedUser);
+            if (user.id === 'admin_preview') return AppScreen.ADMIN_DASHBOARD;
+            return user.role === UserRole.DRIVER ? AppScreen.DRIVER_DASHBOARD : AppScreen.MAIN_REQUEST;
+        } catch (e) {}
+    }
+    return AppScreen.LOADING;
+  });
+
   const [selectedSignupRole, setSelectedSignupRole] = useState<UserRole>(UserRole.UNSET);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
-  const [allUsers, setAllUsers] = useState<UserProfile[]>(MOCK_USERS);
   
   // Global State for Real-time features
   const [trips, setTrips] = useState<Trip[]>(INITIAL_TRIPS);
@@ -112,6 +145,18 @@ const App: React.FC = () => {
     commission: 15,
     autoApprove: false
   });
+
+  useEffect(() => {
+    localStorage.setItem('bicadriver_users', JSON.stringify(allUsers));
+  }, [allUsers]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('bicadriver_current_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('bicadriver_current_user');
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     CapacitorService.initStatusBar();
@@ -180,6 +225,11 @@ const App: React.FC = () => {
     const user = allUsers.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
 
     if (user) {
+      if (user.password && user.password !== password) {
+        alert("Invalid credentials. Please try again.");
+        return;
+      }
+
       if (user.isBlocked) {
          alert("Account Suspended: Please contact support.");
          return;
