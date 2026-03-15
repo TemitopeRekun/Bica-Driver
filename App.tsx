@@ -9,6 +9,7 @@ import RequestRideScreen from './screens/RequestRideScreen';
 import DriverMainScreen from './screens/DriverMainScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import AdminDashboardScreen from './screens/AdminDashboardScreen';
+import SupportChatbot from './components/SupportChatbot';
 import { IMAGES } from './constants';
 import { CapacitorService } from './services/CapacitorService';
 import LoadingScreen from './screens/LoadingScreen';
@@ -436,6 +437,11 @@ const App: React.FC = () => {
         <div key={currentScreen} className="h-full w-full screen-transition overflow-hidden">
           {renderScreen()}
         </div>
+        
+        {/* Render Chatbot for logged-in users (excluding admin dashboard) */}
+        {currentUser && currentScreen !== AppScreen.ADMIN_DASHBOARD && (
+          <SupportChatbot user={currentUser} />
+        )}
       </div>
     </div>
   );
