@@ -50,6 +50,7 @@ const LAGOS_LOCATIONS: SearchResult[] = [
 ];
 
 import { LocationService, LocationData } from '../services/LocationService';
+import { api } from '@/services/api.service';
 
 // ... existing interfaces ...
 
@@ -67,6 +68,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const [mapCenter, setMapCenter] = useState<[number, number]>([6.4549, 3.4246]); // Lagos default
   const [estimatedPrice, setEstimatedPrice] = useState<number>(0);
   const [estimatedDistance, setEstimatedDistance] = useState<string>('');
+  const [currentTripId, setCurrentTripId] = useState<string | null>(null);
   
   // Search States
   const [isSearchingPickup, setIsSearchingPickup] = useState(false);
@@ -93,59 +95,31 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const timerRefs = useRef<any[]>([]);
 
   const [isLocating, setIsLocating] = useState(false);
+ 
 
-  const handleUseMyLocation = async () => {
-    setIsLocating(true);
-    try {
-      const position = await CapacitorService.getCurrentLocation();
-      if (position) {
-        const { latitude, longitude, accuracy } = position.coords;
-        
-        try {
-          // Reverse geocode using our Lagos database
-          const location = LocationService.reverseGeocode(latitude, longitude);
-          
-          // Add accuracy info
-          const locationWithAccuracy = {
-            ...location,
-            accuracy: accuracy || 0
-          };
-          
-          setPickup(locationWithAccuracy);
-          setMapCenter([latitude, longitude]);
-          setIsSearchingPickup(false);
-          
-          // Show confirmation
-          alert(`Your live location is set: ${location.display_name}`);
-        } catch (err: any) {
-           alert(err.message || "Location outside Lagos boundaries.");
-        }
-      } else {
-        alert("Could not retrieve location. Please enter pickup manually.");
-      }
-    } catch (error) {
-      console.error("Location error:", error);
-      alert("Location permission denied. Please enter pickup manually.");
-    } finally {
-      setIsLocating(false);
+ const handleUseMyLocation = async () => {
+  setIsLocating(true);
+  try {
+    const position = await CapacitorService.getCurrentLocation();
+    if (position) {
+      const { latitude, longitude, accuracy } = position.coords;
+      const location = await LocationService.reverseGeocode(latitude, longitude);
+      setPickup({ ...location, accuracy: accuracy || 0 });
+      setMapCenter([latitude, longitude]);
+      setIsSearchingPickup(false);
     }
-  };
-
-  const handleMarkerDragEnd = (id: string, newPos: [number, number]) => {
-    if (id === 'pickup' && pickup) {
-      try {
-        const newLocation = LocationService.reverseGeocode(newPos[0], newPos[1]);
-        setPickup({
-          ...newLocation,
-          accuracy: 0 // Reset accuracy on manual move
-        });
-      } catch (e) {
-        // If dragged outside Lagos, snap back or alert
-        // For now, we just don't update or show alert
-        alert("Location outside Lagos State boundaries");
-      }
-    }
-  };
+  } catch (error) {
+    alert('Location permission denied. Please enter pickup manually.');
+  } finally {
+    setIsLocating(false);
+  }
+};
+ const handleMarkerDragEnd = async (id: string, newPos: [number, number]) => {
+  if (id === 'pickup') {
+    const newLocation = await LocationService.reverseGeocode(newPos[0], newPos[1]);
+    setPickup({ ...newLocation, accuracy: 0 });
+  }
+};
 
   useEffect(() => {
     // Get initial location
@@ -261,83 +235,68 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     setRideState('SCHEDULED');
   };
 
-  const startRideRequest = () => {
-    if (!pickup) return;
+  const startRideRequest = async () => {
+  if (!pickup || !destination) return;
 
-    setRideState('SEARCHING');
-    setNoDriversFound(false);
-    
-    // Find closest driver
-    const availableDrivers = allUsers.filter(u => 
-      u.role === UserRole.DRIVER && 
-      u.approvalStatus === 'APPROVED' && 
-      !u.isBlocked &&
-      u.id !== currentUser?.id &&
-      u.currentLocation
-    );
+  setRideState('SEARCHING');
+  setNoDriversFound(false);
 
-    const driversWithDistance = availableDrivers.map(driver => {
-      const dist = calculateDistance(
-        pickup.lat, 
-        pickup.lon, 
-        driver.currentLocation!.lat, 
-        driver.currentLocation!.lng
-      );
-      return { ...driver, distanceToPickup: dist };
+  try {
+    const trip = await api.post<any>('/rides', {
+      pickupAddress: pickup.display_name,
+      pickupLat: pickup.lat,
+      pickupLng: pickup.lon,
+      destAddress: destination.display_name,
+      destLat: destination.lat,
+      destLng: destination.lon,
+      distanceKm: parseFloat(estimatedDistance),
+      vehicleMake: vehicleData.make,
+      vehicleModel: vehicleData.model,
+      vehicleYear: vehicleData.year,
+      transmission: vehicleData.transmission,
     });
 
-    // Sort by distance
-    driversWithDistance.sort((a, b) => a.distanceToPickup - b.distanceToPickup);
-    
-    const closestDriver = driversWithDistance.length > 0 ? driversWithDistance[0] : null;
-
-    // Simulate searching delay
-    const t1 = setTimeout(() => {
-      if (closestDriver && closestDriver.distanceToPickup < 50) { // Only assign if within 50km
-        setDriverInfo({
-          name: closestDriver.name,
-          car: 'Professional Driver',
-          plate: `ID-${closestDriver.id.substr(0, 4).toUpperCase()}`,
-          rating: closestDriver.rating,
-          trips: closestDriver.trips,
-          avatar: closestDriver.avatar,
-          timeAway: Math.max(Math.round((closestDriver.distanceToPickup / 40) * 60), 2) // Avg speed 40km/h, min 2 mins
-        });
-        setRideState('ASSIGNED');
-        
-        // Simulate Arrival (Time depends on distance in reality, simplified here)
-        const t2 = setTimeout(() => {
-          setRideState('IN_PROGRESS');
-          // Manual completion is now required by the user clicking "I have arrived"
-        }, 5000); // 5 seconds arrival
-        timerRefs.current.push(t2);
-      } else {
-        setNoDriversFound(true);
-        // Reset state after showing error
-        const tError = setTimeout(() => {
-           setRideState('IDLE');
-           setNoDriversFound(false);
-        }, 3000);
-        timerRefs.current.push(tError);
-      }
-    }, 3000); // 3 seconds searching
-    timerRefs.current.push(t1);
-  };
-
-  const handleArrivedAtDestination = () => {
-      setRideState('COMPLETED');
-      // Add to Global History
-      onRideComplete({
-        id: `t_${Math.random().toString(36).substr(2, 6)}`,
-        ownerId: currentUser?.id,
-        ownerName: currentUser?.name || 'Me',
-        driverName: driverInfo?.name || 'Unknown Driver',
-        location: `${pickup?.display_name?.split(',')[0] || 'Unknown'} -> ${destination?.display_name?.split(',')[0] || 'Unknown'}`,
-        status: 'COMPLETED',
-        date: new Date().toLocaleString(),
-        amount: estimatedPrice
+    if (trip.driver) {
+      setDriverInfo({
+        id: trip.driverId,
+        name: trip.driver.name,
+        car: 'Professional Driver',
+        plate: `ID-${trip.driverId?.substr(0, 4).toUpperCase()}`,
+        rating: trip.driver.rating,
+        trips: 0,
+        avatar: trip.driver.avatarUrl || IMAGES.DRIVER_CARD,
+        timeAway: trip.estimatedArrivalMins || 5,
+        tripId: trip.id,
       });
-  };
+      setCurrentTripId(trip.id);
+      setRideState('ASSIGNED');
+    } else {
+      setNoDriversFound(true);
+      setTimeout(() => {
+        setRideState('IDLE');
+        setNoDriversFound(false);
+      }, 3000);
+    }
+  } catch (error: any) {
+    alert(error.message || 'Could not book ride. Please try again.');
+    setRideState('IDLE');
+  }
+};
+
+  const handleArrivedAtDestination = async () => {
+  setRideState('COMPLETED');
+  if (currentTripId) {
+    try {
+      // Initiate Monnify payment
+      const payment = await api.post<any>(`/payments/initiate/${currentTripId}`);
+      if (payment.checkoutUrl) {
+        window.open(payment.checkoutUrl, '_blank');
+      }
+    } catch (error) {
+      console.error('Payment initiation failed:', error);
+    }
+  }
+};
 
   const resetRide = () => {
     clearTimers();
@@ -370,7 +329,22 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(val).replace('NGN', '₦');
   };
 
-  const filteredLocations = LocationService.search(searchQuery);
+ const [searchResults, setSearchResults] = useState<LocationData[]>([]);
+const [isSearching, setIsSearching] = useState(false);
+
+useEffect(() => {
+  if (searchQuery.length < 2) {
+    setSearchResults([]);
+    return;
+  }
+  setIsSearching(true);
+  const timer = setTimeout(async () => {
+    const results = await LocationService.search(searchQuery);
+    setSearchResults(results);
+    setIsSearching(false);
+  }, 300); // 300ms debounce
+  return () => clearTimeout(timer);
+}, [searchQuery]);
 
   const renderSearchModal = (type: 'pickup' | 'dest') => (
     <div className="fixed inset-0 z-50 bg-background-light dark:bg-background-dark flex flex-col animate-slide-up">
@@ -441,7 +415,12 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Locations</h3>
         <div className="space-y-2">
-          {filteredLocations.map(loc => (
+          {isSearching && (
+            <div className="flex items-center justify-center py-8">
+             <span className="material-symbols-outlined animate-spin text-primary">refresh</span>
+             </div>
+          )}
+          {!isSearching && searchResults.map(loc => (
             <button 
               key={loc.id}
               onClick={() => handleSelectLocation(loc, type)}
