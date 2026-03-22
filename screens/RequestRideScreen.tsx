@@ -32,23 +32,6 @@ const DISCOVERY_CATEGORIES = [
   { label: 'Malls', icon: 'shopping_cart', type: 'Shopping' }
 ];
 
-// Comprehensive Lagos Database
-const LAGOS_LOCATIONS: SearchResult[] = [
-  { id: 'lm_mmia', display_name: 'Murtala Muhammed Int. Airport', description: 'Ikeja, Lagos', lat: 6.5774, lon: 3.3210, category: 'Airport' },
-  { id: 'lm_mma2', display_name: 'MMA2 Terminal', description: 'Ikeja, Lagos', lat: 6.5732, lon: 3.3338, category: 'Airport' },
-  { id: 'lm_civic', display_name: 'The Civic Centre', description: 'Victoria Island, Lagos', lat: 6.4368, lon: 3.4413, category: 'Tourism' },
-  { id: 'lm_eko_hotel', display_name: 'Eko Hotels & Suites', description: 'Victoria Island, Lagos', lat: 6.4267, lon: 3.4301, category: 'Hotel' },
-  { id: 'lm_ikeja_mall', display_name: 'Ikeja City Mall', description: 'Alausa, Ikeja', lat: 6.6136, lon: 3.3578, category: 'Shopping' },
-  { id: 'lm_palms', display_name: 'The Palms Shopping Mall', description: 'Lekki, Lagos', lat: 6.4339, lon: 3.4456, category: 'Shopping' },
-  { id: 'lm_landmark', display_name: 'Landmark Beach', description: 'Victoria Island, Lagos', lat: 6.4217, lon: 3.4468, category: 'Tourism' },
-  { id: 'lga_ikeja', display_name: 'Ikeja', description: 'State Capital & LGA', lat: 6.6018, lon: 3.3515, category: 'LGA' },
-  { id: 'lga_lekki', display_name: 'Lekki Phase 1', description: 'Eti-Osa, Lagos', lat: 6.4478, lon: 3.4737, category: 'Residential' },
-  { id: 'lga_vi', display_name: 'Victoria Island', description: 'Eti-Osa, Lagos', lat: 6.4281, lon: 3.4219, category: 'Commercial' },
-  { id: 'lga_ikoyi', display_name: 'Ikoyi', description: 'Lagos', lat: 6.4549, lon: 3.4246, category: 'Residential' },
-  { id: 'lga_surulere', display_name: 'Surulere', description: 'Lagos Mainland', lat: 6.4975, lon: 3.3653, category: 'LGA' },
-  { id: 'lga_yaba', display_name: 'Yaba', description: 'Lagos Mainland', lat: 6.5163, lon: 3.3768, category: 'Education' },
-];
-
 import { LocationService, LocationData } from '../services/LocationService';
 import { api } from '@/services/api.service';
 
@@ -74,6 +57,9 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const [isSearchingPickup, setIsSearchingPickup] = useState(false);
   const [isSearchingDest, setIsSearchingDest] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isFetchingRoute, setIsFetchingRoute] = useState(false);
+  const [estimatedMins, setEstimatedMins] = useState<number>(0);
+  const [fareRange, setFareRange] = useState<{ low: number; high: number } | null>(null);
 
   // Booking Type State
   const [bookingType, setBookingType] = useState<'now' | 'schedule'>('now');
@@ -166,15 +152,42 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
   // Calculate Price when points change
   useEffect(() => {
-    if (pickup && destination) {
-      const dist = Math.max(calculateDistance(pickup.lat, pickup.lon, destination.lat, destination.lon), 1);
-      setEstimatedDistance(dist.toFixed(1));
+    if (!pickup || !destination) return;
 
-      // Calculate Price based on Admin Settings
-      const price = settings.baseFare + (dist * settings.pricePerKm);
-      setEstimatedPrice(Math.round(price / 50) * 50); // Round to nearest 50
-    }
-  }, [pickup, destination, settings]);
+    const fetchRoute = async () => {
+      setIsFetchingRoute(true); // ← start loading
+      try {
+        const route = await api.get<{
+          distanceKm: number;
+          estimatedMins: number;
+          currentTrafficMins: number;
+          fareEstimate: { low: number; high: number };
+        }>(
+          `/locations/route?originLat=${pickup.lat}&originLng=${pickup.lon}&destLat=${destination.lat}&destLng=${destination.lon}`,
+          false,
+        );
+
+        setEstimatedDistance(route.distanceKm.toFixed(1));
+        setEstimatedMins(route.estimatedMins);
+        setFareRange({ low: route.fareEstimate.low, high: route.fareEstimate.high });
+        setEstimatedPrice(route.fareEstimate.low);
+      } catch (error) {
+        const dist = Math.max(
+          calculateDistance(pickup.lat, pickup.lon, destination.lat, destination.lon),
+          1,
+        );
+        setEstimatedDistance(dist.toFixed(1));
+        const price = settings.baseFare + dist * settings.pricePerKm;
+        const rounded = Math.round(price / 50) * 50;
+        setEstimatedPrice(rounded);
+        setFareRange({ low: rounded, high: Math.round((rounded * 1.5) / 50) * 50 });
+      } finally {
+        setIsFetchingRoute(false); // ← stop loading regardless of success/failure
+      }
+    };
+
+    fetchRoute();
+  }, [pickup, destination]);
 
   const handleSelectLocation = (loc: LocationData, type: 'pickup' | 'dest') => {
     if (type === 'pickup') {
@@ -250,6 +263,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         destLat: destination.lat,
         destLng: destination.lon,
         distanceKm: parseFloat(estimatedDistance),
+        estimatedMins: estimatedMins || undefined, // send Google's estimate to backend
         vehicleMake: vehicleData.make,
         vehicleModel: vehicleData.model,
         vehicleYear: vehicleData.year,
@@ -287,13 +301,12 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     setRideState('COMPLETED');
     if (currentTripId) {
       try {
-        // Initiate Monnify payment
         const payment = await api.post<any>(`/payments/initiate/${currentTripId}`);
         if (payment.checkoutUrl) {
           window.open(payment.checkoutUrl, '_blank');
         }
-      } catch (error) {
-        console.error('Payment initiation failed:', error);
+      } catch (error: any) {
+        console.error('Payment initiation failed:', error.message);
       }
     }
   };
@@ -523,8 +536,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
               <button
                 onClick={() => { CapacitorService.triggerHaptic(); setBookingType('now'); }}
                 className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${bookingType === 'now'
-                    ? 'bg-white dark:bg-slate-700 shadow-md text-slate-900 dark:text-white'
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  ? 'bg-white dark:bg-slate-700 shadow-md text-slate-900 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                   }`}
               >
                 Ride Now
@@ -532,8 +545,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
               <button
                 onClick={() => { CapacitorService.triggerHaptic(); setBookingType('schedule'); }}
                 className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${bookingType === 'schedule'
-                    ? 'bg-white dark:bg-slate-700 shadow-md text-slate-900 dark:text-white'
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  ? 'bg-white dark:bg-slate-700 shadow-md text-slate-900 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                   }`}
               >
                 Schedule
@@ -602,23 +615,66 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                   </div>
                 )}
 
-                <div className="flex items-center justify-between mb-4 bg-primary/5 p-4 rounded-2xl border border-primary/10">
-                  <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Estimated Fare</p>
-                    <p className="text-2xl font-black text-slate-900 dark:text-white">{formatCurrency(estimatedPrice)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Distance</p>
-                    <p className="text-lg font-bold text-slate-900 dark:text-white">{estimatedDistance} km</p>
-                  </div>
+                <div className="flex items-center justify-between mb-4 bg-primary/5 p-4 rounded-2xl border border-primary/10 min-h-[80px]">
+                  {isFetchingRoute ? (
+                    // Loading state — pulsing skeleton
+                    <div className="w-full flex items-center justify-between animate-pulse">
+                      <div className="flex flex-col gap-2">
+                        <div className="h-3 w-24 bg-slate-300 dark:bg-slate-700 rounded"></div>
+                        <div className="h-7 w-40 bg-slate-300 dark:bg-slate-700 rounded"></div>
+                        <div className="h-2 w-32 bg-slate-200 dark:bg-slate-800 rounded"></div>
+                      </div>
+                      <div className="flex flex-col gap-2 items-end">
+                        <div className="h-3 w-16 bg-slate-300 dark:bg-slate-700 rounded"></div>
+                        <div className="h-5 w-20 bg-slate-300 dark:bg-slate-700 rounded"></div>
+                        <div className="h-2 w-14 bg-slate-200 dark:bg-slate-800 rounded"></div>
+                      </div>
+                    </div>
+                  ) : (
+                    // Loaded state — real data
+                    <>
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Estimated Fare</p>
+                        {fareRange ? (
+                          <p className="text-2xl font-black text-slate-900 dark:text-white">
+                            {formatCurrency(fareRange.low)}
+                            <span className="text-base font-bold text-slate-400"> – {formatCurrency(fareRange.high)}</span>
+                          </p>
+                        ) : (
+                          <p className="text-2xl font-black text-slate-900 dark:text-white">
+                            {formatCurrency(estimatedPrice)}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-slate-400 mt-1">Final fare based on actual trip time</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Distance</p>
+                        <p className="text-lg font-bold text-slate-900 dark:text-white">{estimatedDistance} km</p>
+                        {estimatedMins > 0 && (
+                          <p className="text-xs text-slate-400">~{estimatedMins} mins</p>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
-
                 <button
                   onClick={handleInitiateRequest}
-                  className="w-full h-14 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  disabled={isFetchingRoute}
+                  className="w-full h-14 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {bookingType === 'schedule' ? 'Schedule Ride' : 'Request Driver'}
-                  <span className="material-symbols-outlined">{bookingType === 'schedule' ? 'event_available' : 'arrow_forward'}</span>
+                  {isFetchingRoute ? (
+                    <>
+                      <span className="material-symbols-outlined animate-spin text-lg">refresh</span>
+                      Calculating fare...
+                    </>
+                  ) : (
+                    <>
+                      {bookingType === 'schedule' ? 'Schedule Ride' : 'Request Driver'}
+                      <span className="material-symbols-outlined">
+                        {bookingType === 'schedule' ? 'event_available' : 'arrow_forward'}
+                      </span>
+                    </>
+                  )}
                 </button>
               </div>
             )}
