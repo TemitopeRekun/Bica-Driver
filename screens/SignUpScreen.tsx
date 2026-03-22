@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';   
 import { UserRole, UserProfile } from '../types';
 import { CapacitorService } from '../services/CapacitorService';
 import { CameraSource } from '@capacitor/camera';
@@ -34,6 +34,23 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
   const [showPassword, setShowPassword] = useState(false);
   const [isCapturing, setIsCapturing] = useState<'license' | 'selfie' | 'nin' | null>(null);
   const [showSourceSelector, setShowSourceSelector] = useState<'license' | 'selfie' | 'nin' | null>(null);
+  const [banks, setBanks] = useState<{ name: string; code: string }[]>([]);
+  const [bankFormData, setBankFormData] = useState({
+  bankName: '',
+  bankCode: '',
+  accountNumber: '',
+  accountName: '',
+});
+  const isDriver = role === UserRole.DRIVER;
+
+  useEffect(() => {
+  if (isDriver) {
+    fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3001'}/payments/banks`)
+      .then(r => r.json())
+      .then(setBanks)
+      .catch(console.error);
+  }
+}, [isDriver]);
 
   const handleCapture = async (type: 'license' | 'selfie' | 'nin', source: CameraSource) => {
     setShowSourceSelector(null);
@@ -54,7 +71,11 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
     e.preventDefault();
     
     // Validation
-    if (role === UserRole.DRIVER) {
+    if (!formData.fullName || !formData.email || !formData.phone || !formData.password) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+    if (isDriver) {
       if (!formData.licenseImage || !formData.selfieImage || !formData.ninImage || !formData.backgroundCheckAccepted) {
         alert("Please complete all driver requirements including Driver License, Selfie, NIN image, and background check consent.");
         return;
@@ -63,12 +84,17 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
         alert("Please fill in all personal details including Address, Age and NIN.");
         return;
       }
+      if (!bankFormData.bankCode || !bankFormData.accountNumber || !bankFormData.accountName) {
+    alert("Please provide your bank details.");
+    return;
+     }
     } else {
       if (!formData.carType || !formData.address || !formData.nationality || !formData.age || !formData.gender) {
         alert("Please complete all profile details including Address, Nationality, Age, Gender and Car Type.");
         return;
       }
     }
+   
 
     onSignUp({
       name: formData.fullName,
@@ -87,11 +113,15 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
       age: formData.age,
       nin: formData.nin,
       ninImage: formData.ninImage,
+      bankName: bankFormData.bankName,
+      bankCode: bankFormData.bankCode,
+      accountNumber: bankFormData.accountNumber,
+      accountName: bankFormData.accountName,
       transmission: formData.transmission
     });
   };
 
-  const isDriver = role === UserRole.DRIVER;
+  
 
   return (
     <div className="flex h-screen w-full flex-col bg-background-light dark:bg-background-dark relative">
@@ -309,6 +339,68 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
                   />
                 </div>
               </div>
+
+              {/* Bank Details — Driver Only */}
+<div className="flex flex-col gap-4 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
+  <p className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Bank Details</p>
+
+  <div className="flex flex-col gap-1.5">
+    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Bank</label>
+    <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-3 h-14 border border-slate-200 dark:border-slate-800">
+      <select
+        required
+        className="bg-transparent border-none text-slate-900 dark:text-white text-base font-medium w-full focus:ring-0 p-0"
+        value={bankFormData.bankCode}
+        onChange={(e) => {
+          const bank = banks.find(b => b.code === e.target.value);
+          setBankFormData(prev => ({
+            ...prev,
+            bankCode: e.target.value,
+            bankName: bank?.name || '',
+          }));
+        }}
+      >
+        <option value="" disabled className="dark:bg-surface-dark">Select your bank</option>
+        {banks.map(bank => (
+          <option key={bank.code} value={bank.code} className="dark:bg-surface-dark">
+            {bank.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  </div>
+
+  <div className="flex flex-col gap-1.5">
+    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Account Number</label>
+    <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
+      <span className="material-symbols-outlined text-slate-400 mr-3">account_balance</span>
+      <input
+        required
+        maxLength={10}
+        className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
+        placeholder="10-digit account number"
+        type="text"
+        value={bankFormData.accountNumber}
+        onChange={(e) => setBankFormData(prev => ({ ...prev, accountNumber: e.target.value }))}
+      />
+    </div>
+  </div>
+
+  <div className="flex flex-col gap-1.5">
+    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Account Name</label>
+    <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
+      <span className="material-symbols-outlined text-slate-400 mr-3">person</span>
+      <input
+        required
+        className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
+        placeholder="Name on your bank account"
+        type="text"
+        value={bankFormData.accountName}
+        onChange={(e) => setBankFormData(prev => ({ ...prev, accountName: e.target.value }))}
+      />
+    </div>
+  </div>
+</div> 
 
               <div className="flex flex-col gap-4 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
                 <p className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1 mb-[-8px]">Required Documents</p>

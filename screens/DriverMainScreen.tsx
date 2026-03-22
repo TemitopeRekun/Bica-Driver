@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import InteractiveMap from '../components/InteractiveMap';
 import { CapacitorService } from '../services/CapacitorService';
 import { UserProfile, Trip } from '../types';
+import { io, Socket } from 'socket.io-client';
+import { api } from '../services/api.service';
 
 interface RideRequest {
   id: string;
