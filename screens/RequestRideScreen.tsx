@@ -66,6 +66,9 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
 
+  const [currentTripFareBreakdown, setCurrentTripFareBreakdown] = useState<any>(null);
+  const [isInitiatingPayment, setIsInitiatingPayment] = useState(false);
+
   // Vehicle Details State
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [vehicleData, setVehicleData] = useState({
@@ -82,6 +85,20 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
   const [isLocating, setIsLocating] = useState(false);
 
+  const handlePayNow = async () => {
+    if (!currentTripId) return;
+    setIsInitiatingPayment(true);
+    try {
+      const payment = await api.post<any>(`/payments/initiate/${currentTripId}`);
+      if (payment.checkoutUrl) {
+        window.open(payment.checkoutUrl, '_blank');
+      }
+    } catch (error: any) {
+      alert(error.message || 'Payment initiation failed. Please try again.');
+    } finally {
+      setIsInitiatingPayment(false);
+    }
+  };
 
   const handleUseMyLocation = async () => {
     setIsLocating(true);
@@ -298,17 +315,32 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   };
 
   const handleArrivedAtDestination = async () => {
-    setRideState('COMPLETED');
-    if (currentTripId) {
-      try {
-        const payment = await api.post<any>(`/payments/initiate/${currentTripId}`);
-        if (payment.checkoutUrl) {
-          window.open(payment.checkoutUrl, '_blank');
-        }
-      } catch (error: any) {
-        console.error('Payment initiation failed:', error.message);
+    if (!currentTripId) return;
+
+    try {
+      // Fetch the completed trip to get fare breakdown
+      const trip = await api.get<any>(`/rides/${currentTripId}`);
+      if (trip.fareBreakdown) {
+        setCurrentTripFareBreakdown(trip.fareBreakdown);
+      } else {
+        // Build a simple breakdown from trip data if fareBreakdown not cached
+        setCurrentTripFareBreakdown({
+          finalFare: trip.amount,
+          distanceKm: trip.distanceKm,
+          distanceComponent: trip.amount - 500,
+          timeComponent: 0,
+          extraMins: 0,
+          actualMins: trip.estimatedMins ?? 0,
+          estimatedMins: trip.estimatedMins ?? 0,
+          driverEarnings: trip.driverEarnings,
+          commissionAmount: trip.commissionAmount,
+        });
       }
+    } catch (error) {
+      console.error('Could not fetch trip breakdown:', error);
     }
+
+    setRideState('COMPLETED');
   };
 
   const resetRide = () => {
@@ -807,77 +839,106 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
             )}
           </div>
         )}
-
         {rideState === 'COMPLETED' && (
-          <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-scale-in">
-            <div className="w-20 h-20 mx-auto bg-green-500 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-green-500/30">
-              <span className="material-symbols-outlined text-white text-4xl filled">check</span>
-            </div>
-            <h3 className="text-2xl font-black mb-2">Ride Completed!</h3>
-            <p className="text-slate-500 mb-6">Please make payment to the company account below.</p>
+          <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-in flex flex-col gap-4">
 
-            <div className="bg-slate-50 dark:bg-black/20 rounded-xl p-4 mb-6 text-left relative overflow-hidden">
-              <div className="flex justify-between items-center mb-4">
-                <p className="text-xs font-bold text-slate-500 uppercase">Payment Details</p>
-                <button
-                  onClick={() => copyToClipboard(`Bank: Zenith Bank\nAccount Name: Bica Driver LTD\nAccount Number: 9090390581\nAmount: ${formatCurrency(estimatedPrice)}`, 'All details')}
-                  className="text-xs text-primary font-bold hover:underline"
-                >
-                  Copy All
-                </button>
+            {/* Header */}
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto bg-green-500 rounded-full flex items-center justify-center mb-3 shadow-lg shadow-green-500/30">
+                <span className="material-symbols-outlined text-white text-3xl filled">check</span>
               </div>
-
-              <div className="space-y-3">
-                <div className="flex justify-between items-center group">
-                  <span className="text-sm text-slate-500">Bank Name</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-900 dark:text-white">Zenith Bank</span>
-                    <button onClick={() => copyToClipboard('Zenith Bank', 'Bank Name')} className="text-slate-300 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center group">
-                  <span className="text-sm text-slate-500">Account Name</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-slate-900 dark:text-white">Bica Driver LTD</span>
-                    <button onClick={() => copyToClipboard('Bica Driver LTD', 'Account Name')} className="text-slate-300 hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex justify-between items-center bg-white dark:bg-input-dark p-3 rounded-lg border border-slate-200 dark:border-slate-700">
-                  <span className="text-sm text-slate-500">Account Number</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl font-black text-primary tracking-widest">9090390581</span>
-                    <button onClick={() => copyToClipboard('9090390581', 'Account Number')} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-primary hover:bg-primary/10 transition-colors">
-                      <span className="material-symbols-outlined text-sm">content_copy</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex justify-between border-t border-slate-200 dark:border-slate-700 pt-3 mt-1">
-                  <span className="text-sm font-medium text-slate-500">Amount Due</span>
-                  <span className="text-xl font-black text-slate-900 dark:text-white">{formatCurrency(estimatedPrice)}</span>
-                </div>
-              </div>
+              <h3 className="text-xl font-black">Trip Completed!</h3>
+              <p className="text-slate-500 text-sm mt-1">Please complete payment below</p>
             </div>
 
-            <div className="flex justify-center gap-2 mb-6">
-              {[1, 2, 3, 4, 5].map(star => (
-                <button key={star} className="text-slate-300 hover:text-yellow-400 transition-colors">
-                  <span className="material-symbols-outlined text-4xl filled">star</span>
-                </button>
-              ))}
+            {/* Fare breakdown — shown to owner too */}
+            {currentTripFareBreakdown && (
+              <div className="bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Fare Breakdown</p>
+                </div>
+
+                <div className="px-4 py-3 space-y-3">
+                  {currentTripFareBreakdown.distanceComponent > 0 ? (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 text-sm">
+                        Distance ({currentTripFareBreakdown.distanceKm}km × ₦100)
+                      </span>
+                      <span className="font-bold text-sm">
+                        ₦{currentTripFareBreakdown.distanceComponent.toLocaleString()}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 text-sm">Short trip flat rate</span>
+                      <span className="font-bold text-sm">₦2,000</span>
+                    </div>
+                  )}
+
+                  {currentTripFareBreakdown.extraMins > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-orange-500 text-sm">
+                        Traffic surcharge ({currentTripFareBreakdown.extraMins}mins × ₦50)
+                      </span>
+                      <span className="text-orange-500 font-bold text-sm">
+                        +₦{currentTripFareBreakdown.timeComponent.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between text-xs text-slate-400">
+                    <span>Trip time: {currentTripFareBreakdown.actualMins} mins</span>
+                    <span>Estimated: {currentTripFareBreakdown.estimatedMins} mins</span>
+                  </div>
+                </div>
+
+                <div className="mx-4 border-t border-slate-200 dark:border-slate-700"></div>
+
+                <div className="px-4 py-3 flex justify-between items-center">
+                  <span className="font-black text-slate-900 dark:text-white">Total</span>
+                  <span className="text-2xl font-black text-primary">
+                    ₦{currentTripFareBreakdown.finalFare.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Pay button */}
+            <button
+              onClick={handlePayNow}
+              disabled={isInitiatingPayment}
+              className="w-full h-14 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isInitiatingPayment ? (
+                <>
+                  <span className="material-symbols-outlined animate-spin">refresh</span>
+                  Opening payment...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined">payment</span>
+                  Pay ₦{currentTripFareBreakdown?.finalFare.toLocaleString() ?? estimatedPrice.toLocaleString()}
+                </>
+              )}
+            </button>
+
+            {/* Rating */}
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-xs text-slate-400">Rate your driver</p>
+              <div className="flex justify-center gap-2">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <button key={star} className="text-slate-300 hover:text-yellow-400 transition-colors active:scale-110">
+                    <span className="material-symbols-outlined text-3xl filled">star</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             <button
               onClick={resetRide}
-              className="w-full h-14 bg-primary text-white font-bold rounded-xl shadow-lg active:scale-[0.98] transition-all"
+              className="w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 font-bold text-sm"
             >
-              I have made payment
+              Done
             </button>
           </div>
         )}

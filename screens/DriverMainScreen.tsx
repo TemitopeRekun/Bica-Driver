@@ -5,6 +5,7 @@ import { CapacitorService } from '../services/CapacitorService';
 import { UserProfile, Trip } from '../types';
 import { io, Socket } from 'socket.io-client';
 import { api } from '../services/api.service';
+import { IMAGES } from '@/constants';
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
 
 interface RideRequest {
@@ -18,6 +19,7 @@ interface RideRequest {
   avatar: string;
   coords: [number, number];
   destCoords: [number, number];
+  estimatedMins?: number;
 }
 
 type RidePhase = 'pickup' | 'arrived' | 'trip' | 'completed';
@@ -55,9 +57,19 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   const socketRef = useRef<Socket | null>(null);
   const [liveRideRequests, setLiveRideRequests] = useState<RideRequest[]>([]);
 
+  const [tripTimer, setTripTimer] = useState<number>(0); // seconds elapsed
+  const timerInterval = useRef<any>(null);
+  const [fareBreakdown, setFareBreakdown] = useState<any>(null);
+
 
   useEffect(() => {
-    if (isOnline && approvalStatus === 'APPROVED') {
+    if (isOnline && approvalStatus === 'APPROVED' && user?.id) {
+
+      socketRef.current = io(`${API_URL}/rides`, {
+        transports: ['websocket'],
+      });
+
+
       const updateLocation = async () => {
         try {
           const pos = await CapacitorService.getCurrentLocation();
@@ -69,10 +81,23 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
             await api.patch('/users/location', { lat: latitude, lng: longitude });
 
             // Broadcast via WebSocket for real-time tracking
-            socketRef.current?.emit('driver:location', {
-              driverId: user?.id,
-              lat: latitude,
-              lng: longitude,
+            socketRef.current.emit('driver:register', { driverId: user.id });
+
+            socketRef.current.on('ride:assigned', (trip: any) => {
+              const rideRequest: RideRequest = {
+                id: trip.id,
+                ownerName: trip.owner?.name || 'Car Owner',
+                pickup: trip.pickupAddress,
+                destination: trip.destAddress,
+                distance: `${trip.distanceKm?.toFixed(1)} km`,
+                price: trip.driverEarnings?.toLocaleString() || trip.amount?.toLocaleString(),
+                time: `${trip.estimatedArrivalMins || 5} mins`,
+                avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
+                coords: [trip.pickupLat, trip.pickupLng],
+                destCoords: [trip.destLat, trip.destLng],
+                estimatedMins: trip.estimatedMins ?? null,
+              };
+              setLiveRideRequests(prev => [rideRequest, ...prev]);
             });
           }
         } catch (error) {
@@ -82,8 +107,22 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       updateLocation();
       trackingInterval.current = setInterval(updateLocation, 10000);
     }
-    return () => clearInterval(trackingInterval.current);
-  }, [isOnline, approvalStatus]);
+    return () => {
+      clearInterval(trackingInterval.current);
+      clearInterval(timerInterval.current);
+      socketRef.current?.disconnect();
+    };
+  }, [isOnline, approvalStatus, user?.id]);
+
+  const formatTimer = (seconds: number): string => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hrs > 0) {
+      return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const toggleOnline = () => {
     if (activeRide) return;
@@ -147,21 +186,52 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     setRidePhase('arrived');
   };
 
-  const handleStartTrip = () => {
+  const handleStartTrip = async () => {
     CapacitorService.triggerHaptic();
-    setRidePhase('trip');
+
+    if (!activeRide) return;
+
+    try {
+      // Record startedAt on backend
+      await api.patch(`/rides/${activeRide.id}/status`, {
+        status: 'IN_PROGRESS',
+      });
+
+      setRidePhase('trip');
+
+      // Start live elapsed timer
+      setTripTimer(0);
+      timerInterval.current = setInterval(() => {
+        setTripTimer(prev => prev + 1);
+      }, 1000);
+
+    } catch (error: any) {
+      alert(error.message || 'Failed to start trip. Please try again.');
+    }
   };
 
   const handleCompleteTrip = async () => {
     if (!activeRide) return;
     CapacitorService.triggerHaptic();
 
-    try {
-      // Update trip status to COMPLETED on backend
-      await api.patch(`/rides/${activeRide.id}/status`, { status: 'COMPLETED' });
+    // Stop the timer
+    clearInterval(timerInterval.current);
 
-      const tripPrice = parseInt((activeRide.price || '0').replace(/,/g, ''), 10);
-      onUpdateEarnings(tripPrice);
+    try {
+      const result = await api.patch<any>(`/rides/${activeRide.id}/status`, {
+        status: 'COMPLETED',
+      });
+
+      // Store fare breakdown for display
+      if (result.fareBreakdown) {
+        setFareBreakdown(result.fareBreakdown);
+      }
+
+      // Update local wallet display
+      const earnings = result.fareBreakdown?.driverEarnings ?? result.driver?.walletBalance;
+      if (earnings) {
+        onUpdateEarnings(result.fareBreakdown?.driverEarnings ?? 0);
+      }
 
       const newTrip: Trip = {
         id: activeRide.id,
@@ -169,22 +239,20 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
         driverName: user?.name || 'Unknown Driver',
         ownerName: activeRide.ownerName,
         date: new Date().toLocaleString(),
-        amount: tripPrice,
+        amount: result.fareBreakdown?.finalFare ?? 0,
         status: 'COMPLETED',
         location: `${activeRide.pickup?.split(',')[0]} -> ${activeRide.destination?.split(',')[0]}`,
       };
       onRideComplete(newTrip);
 
       setRidePhase('completed');
-      setTimeout(() => {
-        setActiveRide(null);
-        setRidePhase('pickup');
-        setLiveRideRequests([]);
-      }, 4000);
+
     } catch (error: any) {
-      alert(error.message || 'Failed to complete trip');
+      clearInterval(timerInterval.current);
+      alert(error.message || 'Failed to complete trip. Please try again.');
     }
   };
+
   const handleRequestPayoutClick = () => {
     if (totalEarnings < 5000) {
       alert("Minimum payout amount is ₦5,000");
@@ -470,11 +538,131 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                 </button>
               )}
               {ridePhase === 'trip' && (
-                <button onClick={handleCompleteTrip} className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-600/20 active:scale-95 transition-all">
-                  Complete Trip
-                </button>
+                <>
+                  {/* Live trip timer */}
+                  <div className="bg-input-dark/50 p-4 rounded-2xl border border-white/5 flex items-center justify-between">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-slate-500 uppercase">Trip Duration</span>
+                      <span className="text-2xl font-black text-white font-mono">
+                        {formatTimer(tripTimer)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col text-right">
+                      <span className="text-[10px] font-black text-slate-500 uppercase">Est. Time</span>
+                      <span className="text-sm font-bold text-slate-400">
+                        {activeRide.estimatedMins ? `~${activeRide.estimatedMins} mins` : 'Calculating...'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Surcharge warning if going over estimated time */}
+                  {activeRide.estimatedMins && tripTimer > activeRide.estimatedMins * 60 && (
+                    <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-orange-400 text-sm">schedule</span>
+                      <p className="text-orange-400 text-xs font-bold">
+                        {Math.ceil((tripTimer - activeRide.estimatedMins * 60) / 60)} mins over estimate
+                        — ₦{Math.ceil((tripTimer - activeRide.estimatedMins * 60) / 60) * 50} surcharge accruing
+                      </p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleCompleteTrip}
+                    className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-600/20 active:scale-95 transition-all"
+                  >
+                    Complete Trip
+                  </button>
+                </>
               )}
-              {ridePhase === 'completed' && (
+              {ridePhase === 'completed' && fareBreakdown && (
+                <div className="flex flex-col gap-4 animate-scale-in">
+                  {/* Success header */}
+                  <div className="text-center py-4">
+                    <div className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center text-white mx-auto mb-3 shadow-lg shadow-green-500/40">
+                      <span className="material-symbols-outlined text-3xl filled">verified</span>
+                    </div>
+                    <p className="text-green-500 text-xl font-black">Trip Complete!</p>
+                    <p className="text-slate-400 text-xs mt-1">Earnings added to your wallet</p>
+                  </div>
+
+                  {/* Fare breakdown */}
+                  <div className="bg-input-dark/50 rounded-2xl border border-white/10 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-white/5">
+                      <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Trip Summary</p>
+                    </div>
+
+                    <div className="px-4 py-3 space-y-3">
+                      {fareBreakdown.distanceComponent > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400 text-sm">
+                            Distance ({fareBreakdown.distanceKm}km × ₦100)
+                          </span>
+                          <span className="text-white font-bold text-sm">
+                            ₦{fareBreakdown.distanceComponent.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+
+                      {fareBreakdown.distanceComponent === 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400 text-sm">Base (short trip flat rate)</span>
+                          <span className="text-white font-bold text-sm">₦2,000</span>
+                        </div>
+                      )}
+
+                      {fareBreakdown.extraMins > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-orange-400 text-sm flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm">schedule</span>
+                            Traffic ({fareBreakdown.extraMins}mins × ₦50)
+                          </span>
+                          <span className="text-orange-400 font-bold text-sm">
+                            +₦{fareBreakdown.timeComponent.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center text-xs text-slate-500">
+                        <span>
+                          Actual: {fareBreakdown.actualMins}mins
+                          · Est: {fareBreakdown.estimatedMins}mins
+                        </span>
+                        <span>{fareBreakdown.extraMins > 0 ? `+${fareBreakdown.extraMins}mins over` : 'On time ✓'}</span>
+                      </div>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="mx-4 border-t border-white/10"></div>
+
+                    <div className="px-4 py-3 space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 text-sm">Total fare</span>
+                        <span className="text-white font-bold">
+                          ₦{fareBreakdown.finalFare.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 text-sm">BICA commission (25%)</span>
+                        <span className="text-slate-400 text-sm">
+                          -₦{fareBreakdown.commissionAmount.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-white/10">
+                        <span className="text-primary font-black text-sm uppercase tracking-wide">Your earnings</span>
+                        <span className="text-primary font-black text-xl">
+                          ₦{fareBreakdown.driverEarnings.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-center text-slate-400 text-xs">
+                    Owner has been notified to make payment
+                  </p>
+                </div>
+              )}
+
+              {ridePhase === 'completed' && !fareBreakdown && (
                 <div className="w-full py-6 text-center bg-green-500/10 border-2 border-green-500/30 rounded-[2rem] animate-scale-in flex flex-col items-center gap-2">
                   <div className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center text-white mb-2 shadow-lg shadow-green-500/40">
                     <span className="material-symbols-outlined text-3xl filled">verified</span>
