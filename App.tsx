@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import localforage from 'localforage';
 import { AppScreen, UserRole, UserProfile, ApprovalStatus, Trip, Payout, SystemSettings } from './types';
@@ -14,154 +13,72 @@ import SupportChatbot from './components/SupportChatbot';
 import { IMAGES } from './constants';
 import { CapacitorService } from './services/CapacitorService';
 import LoadingScreen from './screens/LoadingScreen';
+import { api, saveToken, clearToken } from './services/api.service';
 
-const MOCK_USERS: UserProfile[] = [
-  {
-    id: '1',
-    name: "Alex Morgan",
-    email: "alex.morgan@email.com",
-    phone: "+1 (555) 019-2834",
-    role: UserRole.OWNER,
-    rating: 4.9,
-    trips: 240,
-    avatar: IMAGES.USER_AVATAR,
-    carType: "Mercedes S-Class",
-    walletBalance: 0,
-    gender: "Male",
-    nationality: "American",
-    age: "34",
-    isBlocked: false,
-    currentLocation: { lat: 6.4281, lng: 3.4219 } // Victoria Island
-  },
-  {
-    id: '2',
-    name: "John Driver",
-    email: "john@bicadriver.com",
-    phone: "+234 801 234 5678",
-    role: UserRole.DRIVER,
-    rating: 4.8,
-    trips: 156,
-    avatar: IMAGES.DRIVER_CARD,
-    approvalStatus: 'APPROVED',
-    backgroundCheckAccepted: true,
-    walletBalance: 45250,
-    transmission: 'Both',
-    age: "28",
-    nin: "12345678901",
-    isBlocked: false,
-    currentLocation: { lat: 6.4478, lng: 3.4737 } // Lekki Phase 1
-  },
-  {
-    id: '3',
-    name: "Michael Obi",
-    email: "mike.obi@bicadriver.com",
-    phone: "+234 802 333 4444",
-    role: UserRole.DRIVER,
-    rating: 4.9,
-    trips: 890,
-    avatar: "https://images.unsplash.com/photo-1531384441138-2736e62e0919?w=100&h=100&fit=crop",
-    approvalStatus: 'APPROVED',
-    backgroundCheckAccepted: true,
-    walletBalance: 12500,
-    transmission: 'Automatic',
-    age: "35",
-    nin: "9988776655",
-    isBlocked: false,
-    currentLocation: { lat: 6.6018, lng: 3.3515 } // Ikeja
-  },
-  {
-    id: '4',
-    name: "Sarah Connor",
-    email: "sarah.c@bicadriver.com",
-    phone: "+234 803 555 6666",
-    role: UserRole.DRIVER,
-    rating: 5.0,
-    trips: 42,
-    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop",
-    approvalStatus: 'APPROVED',
-    backgroundCheckAccepted: true,
-    walletBalance: 2000,
-    transmission: 'Manual',
-    age: "29",
-    nin: "1122334455",
-    isBlocked: false,
-    currentLocation: { lat: 6.4549, lng: 3.4246 } // Ikoyi
-  }
-];
-
-const INITIAL_TRIPS: Trip[] = [
-  { id: 't_101', driverName: 'John Driver', ownerName: 'Sarah Johnson', date: '2023-10-24 14:30', amount: 12500, status: 'COMPLETED', location: 'Lekki -> Ikeja' },
-  { id: 't_102', driverName: 'Mike Peterson', ownerName: 'Alex Morgan', date: '2023-10-24 16:15', amount: 8000, status: 'CANCELLED', location: 'VI -> Ikoyi' },
-  { id: 't_103', driverName: 'John Driver', ownerName: 'David Okon', date: '2023-10-25 09:00', amount: 25000, status: 'COMPLETED', location: 'Airport -> Eko Hotel' },
-];
-
-const INITIAL_PAYOUTS: Payout[] = [
-  { id: 'p_01', driverId: '2', driverName: 'John Driver', amount: 45000, status: 'PENDING', date: '2023-10-25' },
-];
+// Helper to map backend user to frontend UserProfile shape
+const mapUser = (backendUser: any): UserProfile => ({
+  ...backendUser,
+  // Map backend field names to frontend field names
+  trips: backendUser.totalTrips ?? 0,
+  avatar: backendUser.avatarUrl || (backendUser.role === UserRole.DRIVER ? IMAGES.DRIVER_CARD : IMAGES.USER_AVATAR),
+  licenseImage: backendUser.licenseImageUrl,
+  selfieImage: backendUser.selfieImageUrl,
+  ninImage: backendUser.ninImageUrl,
+  currentLocation: backendUser.locationLat
+    ? { lat: backendUser.locationLat, lng: backendUser.locationLng }
+    : undefined,
+});
 
 const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
-  const [allUsers, setAllUsers] = useState<UserProfile[]>(MOCK_USERS);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOADING);
+  const [selectedSignupRole, setSelectedSignupRole] = useState<UserRole>(UserRole.UNSET);
 
+  // Settings loaded from backend
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>({
+    baseFare: 500,
+    pricePerKm: 100,
+    commission: 25,
+    autoApprove: false,
+  });
+
+  // Initialize — check for existing session
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        const savedUsers = await localforage.getItem<UserProfile[]>('bicadriver_users');
-        if (savedUsers && Array.isArray(savedUsers)) {
-          setAllUsers(savedUsers);
+        // Load settings from backend (public endpoint)
+        try {
+          const settings = await api.get<SystemSettings>('/settings', false);
+          setSystemSettings(settings);
+        } catch (e) {
+          console.warn('Could not load settings, using defaults');
         }
 
+        // Check for saved session
         const savedUser = await localforage.getItem<UserProfile>('bicadriver_current_user');
-        if (savedUser && typeof savedUser === 'object') {
-          if (savedUser.id !== 'admin_preview') {
-            setCurrentUser(savedUser);
-            setCurrentScreen(savedUser.role === UserRole.DRIVER ? AppScreen.DRIVER_DASHBOARD : AppScreen.MAIN_REQUEST);
+        if (savedUser && typeof savedUser === 'object' && savedUser.id !== 'admin_preview') {
+          // Verify the token is still valid
+          try {
+            const freshUser = await api.get<any>('/auth/me');
+            const mapped = mapUser(freshUser);
+            setCurrentUser(mapped);
+            await localforage.setItem('bicadriver_current_user', mapped);
+            setCurrentScreen(mapped.role === UserRole.DRIVER ? AppScreen.DRIVER_DASHBOARD : AppScreen.MAIN_REQUEST);
+          } catch {
+            // Token expired — clear session
+            clearToken();
+            await localforage.removeItem('bicadriver_current_user');
           }
         }
       } catch (e) {
-        console.error("Failed to initialize app from localforage", e);
+        console.error('Init failed', e);
       } finally {
         setIsInitializing(false);
       }
     };
     initializeApp();
   }, []);
-
-  const [selectedSignupRole, setSelectedSignupRole] = useState<UserRole>(UserRole.UNSET);
-  
-  // Global State for Real-time features
-  const [trips, setTrips] = useState<Trip[]>(INITIAL_TRIPS);
-  const [payouts, setPayouts] = useState<Payout[]>(INITIAL_PAYOUTS);
-  const [systemSettings, setSystemSettings] = useState<SystemSettings>({
-    baseFare: 1500,
-    pricePerKm: 250,
-    commission: 15,
-    autoApprove: false
-  });
-
-  useEffect(() => {
-    if (isInitializing) return;
-    try {
-      localforage.setItem('bicadriver_users', allUsers);
-    } catch (error) {
-      console.error("Failed to save users to localforage:", error);
-    }
-  }, [allUsers, isInitializing]);
-
-  useEffect(() => {
-    if (isInitializing) return;
-    try {
-      if (currentUser) {
-        localforage.setItem('bicadriver_current_user', currentUser);
-      } else {
-        localforage.removeItem('bicadriver_current_user');
-      }
-    } catch (error) {
-      console.error("Failed to save current user to localforage:", error);
-    }
-  }, [currentUser, isInitializing]);
 
   useEffect(() => {
     CapacitorService.initStatusBar();
@@ -173,151 +90,100 @@ const App: React.FC = () => {
   };
 
   const handleStart = () => navigateTo(AppScreen.ROLE_SELECTION);
-  
+
   const handleRoleSelect = (role: UserRole) => {
     setSelectedSignupRole(role);
     navigateTo(AppScreen.SIGN_UP);
   };
 
-  const handleSignUpComplete = (userData: Partial<UserProfile>) => {
-    const newUser: UserProfile = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: userData.name || '',
-      email: userData.email || '',
-      phone: userData.phone || '',
-      password: userData.password,
-      role: selectedSignupRole,
-      rating: 5.0,
-      trips: 0,
-      avatar: userData.avatar || (selectedSignupRole === UserRole.DRIVER ? IMAGES.DRIVER_CARD : IMAGES.USER_AVATAR),
-      carType: userData.carType,
-      licenseImage: userData.licenseImage,
-      selfieImage: userData.selfieImage,
-      backgroundCheckAccepted: userData.backgroundCheckAccepted,
-      approvalStatus: selectedSignupRole === UserRole.DRIVER ? (systemSettings.autoApprove ? 'APPROVED' : 'PENDING') : 'APPROVED',
-      walletBalance: 0,
-      gender: userData.gender,
-      address: userData.address,
-      nationality: userData.nationality,
-      age: userData.age,
-      nin: userData.nin,
-      ninImage: userData.ninImage,
-      transmission: userData.transmission,
-      isBlocked: false,
-      currentLocation: { lat: 6.4549, lng: 3.4246 } // Default location for new users
-    };
+  const handleSignUpComplete = async (userData: Partial<UserProfile>) => {
+    try {
+      const body: any = {
+        name: userData.name,
+        email: userData.email,
+        phone: userData.phone,
+        password: userData.password,
+        role: selectedSignupRole,
+        // Owner fields
+        carType: userData.carType,
+        gender: userData.gender,
+        address: userData.address,
+        nationality: userData.nationality,
+        age: userData.age,
+        // Driver fields
+        nin: userData.nin,
+        transmission: userData.transmission,
+        bankName: userData.bankName,
+        bankCode: userData.bankCode,
+        accountNumber: userData.accountNumber,
+        accountName: userData.accountName,
+      };
 
-    setAllUsers([...allUsers, newUser]);
-    setCurrentUser(newUser);
-    
-    if (newUser.role === UserRole.DRIVER) {
-      navigateTo(AppScreen.DRIVER_DASHBOARD);
-    } else {
-      navigateTo(AppScreen.MAIN_REQUEST);
-    }
-  };
+      const response = await api.post<{ token: string; user: any }>(
+        '/auth/register',
+        body,
+        false,
+      );
 
-  const handleLogin = (email?: string, password?: string) => {
-    if (!email || !password) {
-      alert("Please enter both email and password.");
-      return;
-    }
+      saveToken(response.token);
+      const mapped = mapUser(response.user);
+      setCurrentUser(mapped);
+      await localforage.setItem('bicadriver_current_user', mapped);
 
-    if (email.toLowerCase() === 'admin@bicadrive.app' && password === 'admin') {
-      setCurrentUser({ id: 'admin_preview', name: 'Admin', role: UserRole.ADMIN } as any);
-      navigateTo(AppScreen.ADMIN_DASHBOARD);
-      return;
-    }
-
-    const user = allUsers.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
-
-    if (user) {
-      if (user.password && user.password !== password) {
-        alert("Invalid credentials. Please try again.");
-        return;
-      }
-
-      if (user.isBlocked) {
-         alert("Account Suspended: Please contact support.");
-         return;
-      }
-
-      if (user.role === UserRole.DRIVER) {
-        if (user.approvalStatus === 'REJECTED') {
-          alert("Login Denied: Your driver application was rejected. Please contact support.");
-          return;
-        }
-        setCurrentUser(user);
+      if (mapped.role === UserRole.DRIVER) {
         navigateTo(AppScreen.DRIVER_DASHBOARD);
       } else {
-        setCurrentUser(user);
         navigateTo(AppScreen.MAIN_REQUEST);
       }
-    } else {
-      alert("Invalid credentials. Please try again.");
+    } catch (error: any) {
+      alert(error.message || 'Registration failed. Please try again.');
     }
   };
 
-  // ADMIN ACTIONS
-  const handleUpdateDriverStatus = (userId: string, status: ApprovalStatus) => {
-    setAllUsers(prevUsers => prevUsers.map(u => 
-      u.id === userId ? { ...u, approvalStatus: status } : u
-    ));
-    if (currentUser && currentUser.id === userId) {
-      setCurrentUser(prev => prev ? { ...prev, approvalStatus: status } : null);
+  const handleLogin = async (email?: string, password?: string) => {
+    if (!email || !password) {
+      alert('Please enter both email and password.');
+      return;
+    }
+
+    // Admin shortcut — still hits real backend
+    try {
+      const response = await api.post<{ token: string; user: any }>(
+        '/auth/login',
+        { email, password },
+        false,
+      );
+
+      saveToken(response.token);
+      const mapped = mapUser(response.user);
+      setCurrentUser(mapped);
+      await localforage.setItem('bicadriver_current_user', mapped);
+
+      if (mapped.role === UserRole.ADMIN) {
+        navigateTo(AppScreen.ADMIN_DASHBOARD);
+      } else if (mapped.role === UserRole.DRIVER) {
+        if (mapped.approvalStatus === 'REJECTED') {
+          alert('Login Denied: Your driver application was rejected. Please contact support.');
+          clearToken();
+          return;
+        }
+        navigateTo(AppScreen.DRIVER_DASHBOARD);
+      } else {
+        navigateTo(AppScreen.MAIN_REQUEST);
+      }
+    } catch (error: any) {
+      alert(error.message || 'Invalid credentials. Please try again.');
     }
   };
 
-  const handleBlockUser = (userId: string, blocked: boolean) => {
-    setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, isBlocked: blocked } : u));
-    if (currentUser && currentUser.id === userId) {
-      setCurrentUser(prev => prev ? { ...prev, isBlocked: blocked } : null);
-    }
+  const handleLogout = async () => {
+    clearToken();
+    setCurrentUser(null);
+    await localforage.removeItem('bicadriver_current_user');
+    navigateTo(AppScreen.WELCOME);
   };
 
-  const handleApprovePayout = (payoutId: string) => {
-    setPayouts(prev => prev.map(p => p.id === payoutId ? { ...p, status: 'PAID' } : p));
-  };
-
-  const handleUpdateSettings = (newSettings: SystemSettings) => {
-    setSystemSettings(newSettings);
-  };
-
-  // USER ACTIONS
-  const handleUpdateEarnings = (amount: number) => {
-    if (!currentUser) return;
-    const newBalance = (currentUser.walletBalance || 0) + amount;
-    
-    // Update local currentUser
-    setCurrentUser(prev => prev ? { ...prev, walletBalance: newBalance } : null);
-    // Update in global users list
-    setAllUsers(prevUsers => prevUsers.map(u => 
-      u.id === currentUser.id ? { ...u, walletBalance: newBalance } : u
-    ));
-  };
-
-  const handleAddTrip = (trip: Trip) => {
-    setTrips(prev => [trip, ...prev]);
-  };
-
-  const handleRequestPayout = (amount: number) => {
-    if (!currentUser) return;
-    const newPayout: Payout = {
-      id: `p_${Math.random().toString(36).substr(2, 5)}`,
-      driverId: currentUser.id,
-      driverName: currentUser.name,
-      amount: amount,
-      status: 'PENDING',
-      date: new Date().toISOString().split('T')[0]
-    };
-    setPayouts(prev => [newPayout, ...prev]);
-    // Optionally deduct from wallet immediately or wait for approval
-    // For visual clarity, we'll reset wallet here to show it's "moved" to payout
-    const newBalance = (currentUser.walletBalance || 0) - amount;
-    setCurrentUser(prev => prev ? { ...prev, walletBalance: newBalance } : null);
-    setAllUsers(prevUsers => prevUsers.map(u => u.id === currentUser.id ? { ...u, walletBalance: newBalance } : u));
-  };
-
+  // Admin simulate — kept for admin dashboard functionality
   const handleSimulate = (role: UserRole) => {
     const adminUser: UserProfile = {
       id: 'admin_preview',
@@ -338,25 +204,53 @@ const App: React.FC = () => {
       age: '99',
       transmission: 'Automatic',
       isBlocked: false,
-      currentLocation: { lat: 6.5244, lng: 3.3792 }
+      currentLocation: { lat: 6.5244, lng: 3.3792 },
     };
-    
     setCurrentUser(adminUser);
-    if (role === UserRole.DRIVER) {
-      navigateTo(AppScreen.DRIVER_DASHBOARD);
-    } else {
-      navigateTo(AppScreen.MAIN_REQUEST);
+    navigateTo(role === UserRole.DRIVER ? AppScreen.DRIVER_DASHBOARD : AppScreen.MAIN_REQUEST);
+  };
+
+  // Admin actions — call real backend
+  const handleUpdateDriverStatus = async (userId: string, status: ApprovalStatus) => {
+    try {
+      await api.patch(`/users/${userId}/approval`, { approvalStatus: status });
+    } catch (error: any) {
+      alert(error.message);
     }
   };
 
-  const handleLogout = () => {
-    if (currentUser?.id === 'admin_preview' && currentScreen !== AppScreen.ADMIN_DASHBOARD) {
-      // If simulating a user, return to admin dashboard
-      navigateTo(AppScreen.ADMIN_DASHBOARD);
-      return;
+  const handleBlockUser = async (userId: string, blocked: boolean) => {
+    try {
+      await api.patch(`/users/${userId}/block`, { isBlocked: blocked });
+    } catch (error: any) {
+      alert(error.message);
     }
-    setCurrentUser(null);
-    navigateTo(AppScreen.WELCOME);
+  };
+
+  const handleUpdateSettings = async (newSettings: SystemSettings) => {
+    try {
+      await api.patch('/settings', newSettings);
+      setSystemSettings(newSettings);
+    } catch (error: any) {
+      alert(error.message);
+    }
+  };
+
+  const handleAddTrip = (trip: Trip) => {
+    // Trips are now persisted in backend — this is a no-op
+    // History is fetched fresh from GET /rides/history
+  };
+
+  const handleUpdateEarnings = (amount: number) => {
+    // Wallet is now managed by backend — update local display only
+    if (!currentUser) return;
+    setCurrentUser(prev => prev ? { ...prev, walletBalance: (prev.walletBalance || 0) + amount } : null);
+  };
+
+  const handleRequestPayout = async (amount: number) => {
+    // No-op — payout flow now goes through Monnify automatically
+    // Wallet balance reflects earnings, not a withdrawable balance
+    alert('Your earnings are paid directly to your registered bank account after each trip.');
   };
 
   const renderScreen = () => {
@@ -372,50 +266,51 @@ const App: React.FC = () => {
       case AppScreen.LOGIN:
         return <LoginScreen onLogin={handleLogin} onBack={() => navigateTo(AppScreen.WELCOME)} onGoToSignUp={handleStart} />;
       case AppScreen.MAIN_REQUEST:
-        return <RequestRideScreen 
-          settings={systemSettings} 
-          onOpenProfile={() => navigateTo(AppScreen.PROFILE)} 
-          onBack={handleLogout} 
-          onRideComplete={handleAddTrip}
-          currentUser={currentUser}
-          allUsers={allUsers}
-        />;
+        return (
+          <RequestRideScreen
+            settings={systemSettings}
+            onOpenProfile={() => navigateTo(AppScreen.PROFILE)}
+            onBack={handleLogout}
+            onRideComplete={handleAddTrip}
+            currentUser={currentUser}
+            allUsers={[]}
+          />
+        );
       case AppScreen.DRIVER_DASHBOARD:
-        return <DriverMainScreen 
-          user={currentUser} 
-          onOpenProfile={() => navigateTo(AppScreen.PROFILE)} 
-          onBack={handleLogout} 
-          onUpdateEarnings={handleUpdateEarnings}
-          onRequestPayout={handleRequestPayout}
-          onRideComplete={handleAddTrip}
-        />;
+        return (
+          <DriverMainScreen
+            user={currentUser}
+            onOpenProfile={() => navigateTo(AppScreen.PROFILE)}
+            onBack={handleLogout}
+            onUpdateEarnings={handleUpdateEarnings}
+            onRequestPayout={handleRequestPayout}
+            onRideComplete={handleAddTrip}
+          />
+        );
       case AppScreen.PROFILE:
         if (!currentUser) return <WelcomeScreen onCreateAccount={handleStart} onLogin={() => navigateTo(AppScreen.LOGIN)} />;
         return (
-          <ProfileScreen 
-            user={currentUser} 
-            initialRole={currentUser.role} 
-            onBack={() => currentUser.role === UserRole.DRIVER ? navigateTo(AppScreen.DRIVER_DASHBOARD) : navigateTo(AppScreen.MAIN_REQUEST)} 
-            onLogout={handleLogout} 
-            onUpdateAvatar={(a) => {
-              setCurrentUser({...currentUser, avatar: a});
-              setAllUsers(users => users.map(u => u.id === currentUser.id ? {...u, avatar: a} : u));
-            }} 
+          <ProfileScreen
+            user={currentUser}
+            initialRole={currentUser.role}
+            onBack={() => currentUser.role === UserRole.DRIVER ? navigateTo(AppScreen.DRIVER_DASHBOARD) : navigateTo(AppScreen.MAIN_REQUEST)}
+            onLogout={handleLogout}
+            onUpdateAvatar={(a) => setCurrentUser(prev => prev ? { ...prev, avatar: a } : null)}
           />
         );
       case AppScreen.ADMIN_DASHBOARD:
         return (
-          <AdminDashboardScreen 
-            users={allUsers} 
-            trips={trips}
-            payouts={payouts}
+          <AdminDashboardScreen
+            users={[]}
+            trips={[]}
+            payouts={[]}
             settings={systemSettings}
-            onUpdateStatus={handleUpdateDriverStatus} 
+            onUpdateStatus={handleUpdateDriverStatus}
             onBlockUser={handleBlockUser}
-            onApprovePayout={handleApprovePayout}
+            onApprovePayout={async (id) => { /* handled in admin screen */ }}
             onUpdateSettings={handleUpdateSettings}
-            onBack={() => navigateTo(AppScreen.WELCOME)} 
-            onSimulate={handleSimulate} 
+            onBack={() => navigateTo(AppScreen.WELCOME)}
+            onSimulate={handleSimulate}
           />
         );
       default:
@@ -429,8 +324,6 @@ const App: React.FC = () => {
         <div key={currentScreen} className="h-full w-full screen-transition overflow-hidden">
           {renderScreen()}
         </div>
-        
-        {/* Render Chatbot for logged-in users (excluding admin dashboard) */}
         {currentUser && currentScreen !== AppScreen.ADMIN_DASHBOARD && (
           <SupportChatbot user={currentUser} />
         )}

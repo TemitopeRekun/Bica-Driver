@@ -1,4 +1,3 @@
-
 export enum UserRole {
   OWNER = 'OWNER',
   DRIVER = 'DRIVER',
@@ -13,34 +12,40 @@ export interface UserProfile {
   name: string;
   email: string;
   phone: string;
-  password?: string;
+  password?: string;       // only used locally during signup flow
   role: UserRole;
   rating: number;
-  trips: number;
-  avatar: string;
+  trips: number;           // maps to totalTrips from backend
+  totalTrips?: number;     // backend field name
+  avatar: string;          // maps to avatarUrl from backend
+  avatarUrl?: string;      // backend field name
   walletBalance?: number;
-  // Role specific fields
   carType?: string;
   licenseImage?: string;
+  licenseImageUrl?: string;
   selfieImage?: string;
+  selfieImageUrl?: string;
   backgroundCheckAccepted?: boolean;
   approvalStatus?: ApprovalStatus;
-  
-  // New Registration Fields
   gender?: string;
   address?: string;
   nationality?: string;
   age?: string;
   nin?: string;
   ninImage?: string;
+  ninImageUrl?: string;
   transmission?: 'Manual' | 'Automatic' | 'Both';
   isBlocked?: boolean;
-  
-  // Real-time location
-  currentLocation?: {
-    lat: number;
-    lng: number;
-  };
+  // Bank details — drivers only
+  bankName?: string;
+  bankCode?: string;
+  accountNumber?: string;
+  accountName?: string;
+  monnifySubAccountCode?: string;
+  // Location
+  currentLocation?: { lat: number; lng: number };
+  locationLat?: number;
+  locationLng?: number;
 }
 
 export interface Trip {
@@ -49,10 +54,26 @@ export interface Trip {
   ownerId?: string;
   driverName: string;
   ownerName: string;
+  // Backend returns owner/driver as nested objects
+  driver?: { id: string; name: string; avatarUrl?: string; phone?: string; rating?: number };
+  owner?: { id: string; name: string; avatarUrl?: string; phone?: string };
   date: string;
+  createdAt?: string;
   amount: number;
-  status: 'COMPLETED' | 'CANCELLED' | 'PENDING' | 'IN_PROGRESS';
+  distanceKm?: number;
+  status: 'COMPLETED' | 'CANCELLED' | 'PENDING' | 'IN_PROGRESS' | 'ASSIGNED' | 'SEARCHING' | 'SCHEDULED';
+  paymentStatus?: 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED';
   location: string;
+  pickupAddress?: string;
+  destAddress?: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  destLat?: number;
+  destLng?: number;
+  estimatedArrivalMins?: number;
+  driverEarnings?: number;
+  commissionAmount?: number;
+  monnifyTxRef?: string;
 }
 
 export interface Payout {
