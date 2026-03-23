@@ -124,12 +124,13 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const toggleOnline = () => {
+  const toggleOnline = async () => {
     if (activeRide) return;
     CapacitorService.triggerHaptic();
 
-    if (!isOnline) {
-      // Going Online - Check if we need to show rules (every 6 hours)
+    const goingOnline = !isOnline;
+
+    if (goingOnline) {
       const now = Date.now();
       const sixHours = 6 * 60 * 60 * 1000;
       if (now - lastRulesAccepted.current > sixHours) {
@@ -138,12 +139,22 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       }
     }
 
-    setIsOnline(prev => !prev);
+    try {
+      // Sync online status with backend
+      await api.patch('/users/online', { isOnline: goingOnline });
+      setIsOnline(goingOnline);
+    } catch (error) {
+      console.error('Failed to update online status:', error);
+      setIsOnline(goingOnline); // update locally anyway
+    }
   };
 
-  const handleAcceptRules = () => {
+  const handleAcceptRules = async () => {
     lastRulesAccepted.current = Date.now();
     setShowRulesModal(false);
+    try {
+      await api.patch('/users/online', { isOnline: true });
+    } catch (e) { }
     setIsOnline(true);
   };
 
@@ -152,6 +163,31 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     setPendingRide(ride);
     setSelfieImage(null);
     setShowSelfieModal(true);
+  };
+
+  // Update confirmSelfieAndRide to call backend accept
+  const confirmSelfieAndRide = async () => {
+    if (!pendingRide || !selfieImage) return;
+
+    try {
+      // Accept the ride on backend
+      await api.post(`/rides/${pendingRide.id}/accept`);
+
+      setActiveRide(pendingRide);
+      setRidePhase('pickup');
+      setShowSelfieModal(false);
+      // Remove from pending requests list
+      setLiveRideRequests(prev =>
+        prev.filter(r => r.id !== pendingRide.id),
+      );
+      setPendingRide(null);
+      setSelfieImage(null);
+    } catch (error: any) {
+      alert(error.message || 'Failed to accept ride. It may have been cancelled.');
+      setShowSelfieModal(false);
+      setPendingRide(null);
+      setSelfieImage(null);
+    }
   };
 
   const handleTakeSelfie = async () => {
@@ -165,16 +201,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     }
   };
 
-  const confirmSelfieAndRide = () => {
-    if (pendingRide && selfieImage) {
-      setActiveRide(pendingRide);
-      setRidePhase('pickup');
-      setShowSelfieModal(false);
-      setPendingRide(null);
-      setSelfieImage(null);
-    }
-  };
-
   const cancelSelfie = () => {
     setShowSelfieModal(false);
     setPendingRide(null);
@@ -184,6 +210,38 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   const handleArrival = () => {
     CapacitorService.triggerHaptic();
     setRidePhase('arrived');
+  };
+
+  const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
+    seconds,
+    onExpire,
+  }) => {
+    const [remaining, setRemaining] = React.useState(seconds);
+
+    React.useEffect(() => {
+      if (remaining <= 0) {
+        onExpire();
+        return;
+      }
+      const timer = setTimeout(() => setRemaining(prev => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }, [remaining]);
+
+    return (
+      <div className="mt-4 flex flex-col items-center gap-1">
+        <div
+          className="w-12 h-12 rounded-full border-4 border-primary/30 flex items-center justify-center"
+          style={{
+            background: `conic-gradient(#045828 ${(remaining / seconds) * 360}deg, transparent 0deg)`,
+          }}
+        >
+          <div className="w-8 h-8 bg-white dark:bg-surface-dark rounded-full flex items-center justify-center">
+            <span className="text-sm font-black text-primary">{remaining}</span>
+          </div>
+        </div>
+        <span className="text-xs text-slate-400">seconds remaining</span>
+      </div>
+    );
   };
 
   const handleStartTrip = async () => {
@@ -259,6 +317,17 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       return;
     }
     setShowPayoutModal(true);
+  };
+
+  const handleDeclineRide = async (ride: RideRequest) => {
+    CapacitorService.triggerHaptic();
+    try {
+      await api.post(`/rides/${ride.id}/decline`);
+      // Remove from list
+      setLiveRideRequests(prev => prev.filter(r => r.id !== ride.id));
+    } catch (error: any) {
+      alert(error.message || 'Failed to decline ride');
+    }
   };
 
   const confirmPayout = () => {
@@ -433,11 +502,89 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
               {isOnline ? (
                 liveRideRequests.length > 0 ? (
                   liveRideRequests.map(req => (
-                    <div key={req.id} className="...">
-                      {/* existing ride card JSX — no changes needed */}
+                    <div key={req.id} className="bg-input-dark/40 p-5 rounded-3xl border border-white/5 flex flex-col gap-4 shadow-lg animate-slide-up">
+
+                      {/* Owner info */}
+                      <div className="flex items-center gap-4">
+                        <img
+                          src={req.avatar}
+                          className="w-12 h-12 rounded-full object-cover ring-2 ring-white/10"
+                          alt=""
+                        />
+                        <div className="flex-1">
+                          <h4 className="font-bold text-white text-base">{req.ownerName}</h4>
+                          <p className="text-slate-400 text-xs mt-0.5">Verified Car Owner</p>
+                        </div>
+                        {/* 60s countdown on driver side too */}
+                        <div className="w-10 h-10 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center">
+                          <CountdownTimer
+                            seconds={60}
+                            onExpire={() => {
+                              // Backend already auto-declined — remove from list
+                              setLiveRideRequests(prev =>
+                                prev.filter(r => r.id !== req.id),
+                              );
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Trip details */}
+                      <div className="space-y-2 bg-white/5 rounded-2xl p-3">
+                        <div className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-accent text-sm mt-0.5">trip_origin</span>
+                          <div>
+                            <p className="text-[10px] text-slate-500 uppercase font-bold">Pickup</p>
+                            <p className="text-white text-sm font-medium">{req.pickup}</p>
+                          </div>
+                        </div>
+                        <div className="w-0.5 h-3 bg-slate-700 ml-[9px]"></div>
+                        <div className="flex items-start gap-2">
+                          <span className="material-symbols-outlined text-primary text-sm mt-0.5">flag</span>
+                          <div>
+                            <p className="text-[10px] text-slate-500 uppercase font-bold">Destination</p>
+                            <p className="text-white text-sm font-medium">{req.destination}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Fare and distance */}
+                      <div className="flex gap-3">
+                        <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
+                          <p className="text-[10px] text-slate-500 uppercase font-bold">Distance</p>
+                          <p className="text-white font-black">{req.distance}</p>
+                        </div>
+                        <div className="flex-1 bg-primary/20 rounded-xl p-3 text-center border border-primary/30">
+                          <p className="text-[10px] text-primary uppercase font-bold">Your Earnings</p>
+                          <p className="text-primary font-black">₦{req.price}</p>
+                        </div>
+                        <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
+                          <p className="text-[10px] text-slate-500 uppercase font-bold">Est. Time</p>
+                          <p className="text-white font-black">
+                            {req.estimatedMins ? `${req.estimatedMins}m` : req.time}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Accept / Decline */}
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => handleDeclineRide(req)}
+                          className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 transition-all active:scale-95"
+                        >
+                          Decline
+                        </button>
+                        <button
+                          onClick={() => handleAcceptRide(req)}
+                          className="flex-2 flex-grow py-3.5 rounded-2xl bg-primary text-white font-black shadow-lg shadow-primary/30 hover:brightness-110 active:scale-95 transition-all"
+                        >
+                          Accept Ride
+                        </button>
+                      </div>
                     </div>
                   ))
                 ) : (
+                  // Scanning state — no requests yet
                   <div className="py-12 text-center flex flex-col items-center gap-6 animate-fade-in">
                     <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/20 border-dashed">
                       <span className="material-symbols-outlined text-4xl text-primary animate-pulse">radar</span>
@@ -445,13 +592,13 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                     <div>
                       <h3 className="text-lg font-bold text-white mb-1">Scanning for rides</h3>
                       <p className="text-slate-400 text-xs font-medium max-w-[200px] mx-auto leading-relaxed">
-                        You'll be notified when a nearby owner requests a driver.
+                        You'll be notified instantly when an owner selects you.
                       </p>
                     </div>
                   </div>
                 )
-
               ) : (
+                // Offline state
                 <div className="py-12 text-center flex flex-col items-center gap-6 animate-fade-in">
                   <div className="w-20 h-20 rounded-full bg-slate-800/50 flex items-center justify-center border-2 border-slate-700 border-dashed">
                     <span className="material-symbols-outlined text-4xl text-slate-500">wifi_off</span>

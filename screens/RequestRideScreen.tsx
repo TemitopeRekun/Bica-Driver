@@ -4,6 +4,8 @@ import { CapacitorService } from '../services/CapacitorService';
 import InteractiveMap from '../components/InteractiveMap';
 import { IMAGES } from '../constants';
 import { SystemSettings, Trip, UserProfile, UserRole } from '../types';
+import { io, Socket } from 'socket.io-client';
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
 
 interface SearchResult {
   id: string;
@@ -66,6 +68,13 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
 
+  const [availableDrivers, setAvailableDrivers] = useState<any[]>([]);
+  const [selectedDriver, setSelectedDriver] = useState<any>(null);
+  const [isLoadingDrivers, setIsLoadingDrivers] = useState(false);
+  const [showDriverPicker, setShowDriverPicker] = useState(false);
+  const ownerSocketRef = useRef<Socket | null>(null);
+
+
   const [currentTripFareBreakdown, setCurrentTripFareBreakdown] = useState<any>(null);
   const [isInitiatingPayment, setIsInitiatingPayment] = useState(false);
 
@@ -85,6 +94,38 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
   const [isLocating, setIsLocating] = useState(false);
 
+  const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
+    seconds,
+    onExpire,
+  }) => {
+    const [remaining, setRemaining] = React.useState(seconds);
+
+    React.useEffect(() => {
+      if (remaining <= 0) {
+        onExpire();
+        return;
+      }
+      const timer = setTimeout(() => setRemaining(prev => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }, [remaining]);
+
+    return (
+      <div className="mt-4 flex flex-col items-center gap-1">
+        <div
+          className="w-12 h-12 rounded-full border-4 border-primary/30 flex items-center justify-center"
+          style={{
+            background: `conic-gradient(#045828 ${(remaining / seconds) * 360}deg, transparent 0deg)`,
+          }}
+        >
+          <div className="w-8 h-8 bg-white dark:bg-surface-dark rounded-full flex items-center justify-center">
+            <span className="text-sm font-black text-primary">{remaining}</span>
+          </div>
+        </div>
+        <span className="text-xs text-slate-400">seconds remaining</span>
+      </div>
+    );
+  };
+
   const handlePayNow = async () => {
     if (!currentTripId) return;
     setIsInitiatingPayment(true);
@@ -97,6 +138,22 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       alert(error.message || 'Payment initiation failed. Please try again.');
     } finally {
       setIsInitiatingPayment(false);
+    }
+  };
+
+  const fetchAvailableDrivers = async () => {
+    if (!pickup) return;
+    setIsLoadingDrivers(true);
+    try {
+      const drivers = await api.get<any[]>(
+        `/users/drivers/available?pickupLat=${pickup.lat}&pickupLng=${pickup.lon}`,
+      );
+      setAvailableDrivers(drivers);
+    } catch (error) {
+      console.error('Failed to fetch drivers:', error);
+      setAvailableDrivers([]);
+    } finally {
+      setIsLoadingDrivers(false);
     }
   };
 
@@ -149,6 +206,49 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       }));
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    ownerSocketRef.current = io(`${API_URL}/rides`, {
+      transports: ['websocket'],
+    });
+
+    ownerSocketRef.current.emit('owner:register', { ownerId: currentUser.id });
+
+    // Driver accepted — move to ASSIGNED state
+    ownerSocketRef.current.on('ride:accepted', (data: any) => {
+      setDriverInfo(prev => ({
+        ...prev,
+        ...data.driver,
+        avatar: data.driver?.avatarUrl || IMAGES.DRIVER_CARD,
+        timeAway: data.estimatedArrivalMins || 5,
+      }));
+      setRideState('ASSIGNED');
+    });
+
+    // Driver declined or timed out — go back to driver picker
+    ownerSocketRef.current.on('ride:declined', (data: any) => {
+      alert(data.message || 'Driver declined. Please choose another driver.');
+      setSelectedDriver(null);
+      setDriverInfo(null);
+      fetchAvailableDrivers();
+      setShowDriverPicker(true);
+      setRideState('IDLE');
+    });
+
+    // Trip completed by driver — show payment screen
+    ownerSocketRef.current.on('trip:completed', (data: any) => {
+      if (data.fareBreakdown) {
+        setCurrentTripFareBreakdown(data.fareBreakdown);
+      }
+      setRideState('COMPLETED');
+    });
+
+    return () => {
+      ownerSocketRef.current?.disconnect();
+    };
+  }, [currentUser?.id]);
 
   function deg2rad(deg: number) {
     return deg * (Math.PI / 180);
@@ -227,11 +327,19 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     CapacitorService.triggerHaptic();
     if (bookingType === 'schedule') {
       if (!scheduleDate || !scheduleTime) {
-        alert("Please select both date and time for your scheduled ride.");
+        alert('Please select both date and time for your scheduled ride.');
         return;
       }
     }
-    setShowVehicleForm(true);
+    // Fetch drivers and show picker BEFORE vehicle form
+    fetchAvailableDrivers();
+    setShowDriverPicker(true);
+  };
+
+  const handleSelectDriver = (driver: any) => {
+    setSelectedDriver(driver);
+    setShowDriverPicker(false);
+    setShowVehicleForm(true); // now show vehicle form
   };
 
   const handleConfirmRequest = (e: React.FormEvent) => {
@@ -266,7 +374,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   };
 
   const startRideRequest = async () => {
-    if (!pickup || !destination) return;
+    if (!pickup || !destination || !selectedDriver) return;
 
     setRideState('SEARCHING');
     setNoDriversFound(false);
@@ -280,34 +388,29 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         destLat: destination.lat,
         destLng: destination.lon,
         distanceKm: parseFloat(estimatedDistance),
-        estimatedMins: estimatedMins || undefined, // send Google's estimate to backend
+        estimatedMins: estimatedMins || undefined,
+        driverId: selectedDriver.id, // ← owner's chosen driver
         vehicleMake: vehicleData.make,
         vehicleModel: vehicleData.model,
         vehicleYear: vehicleData.year,
         transmission: vehicleData.transmission,
       });
 
-      if (trip.driver) {
-        setDriverInfo({
-          id: trip.driverId,
-          name: trip.driver.name,
-          car: 'Professional Driver',
-          plate: `ID-${trip.driverId?.substr(0, 4).toUpperCase()}`,
-          rating: trip.driver.rating,
-          trips: 0,
-          avatar: trip.driver.avatarUrl || IMAGES.DRIVER_CARD,
-          timeAway: trip.estimatedArrivalMins || 5,
-          tripId: trip.id,
-        });
-        setCurrentTripId(trip.id);
-        setRideState('ASSIGNED');
-      } else {
-        setNoDriversFound(true);
-        setTimeout(() => {
-          setRideState('IDLE');
-          setNoDriversFound(false);
-        }, 3000);
-      }
+      // Trip created — now waiting for driver to accept
+      setCurrentTripId(trip.id);
+      setDriverInfo({
+        id: trip.driverId,
+        name: trip.driver?.name,
+        car: 'Professional Driver',
+        plate: `ID-${trip.driverId?.substr(0, 4).toUpperCase()}`,
+        rating: trip.driver?.rating,
+        trips: trip.driver?.totalTrips ?? 0,
+        avatar: trip.driver?.avatarUrl || IMAGES.DRIVER_CARD,
+        timeAway: selectedDriver.estimatedArrivalMins || 5,
+        tripId: trip.id,
+      });
+      setRideState('SEARCHING'); // stays in searching until driver accepts
+
     } catch (error: any) {
       alert(error.message || 'Could not book ride. Please try again.');
       setRideState('IDLE');
@@ -715,25 +818,40 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
         {rideState === 'SEARCHING' && (
           <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-slide-up">
-            {!noDriversFound ? (
-              <>
-                <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-4 relative">
-                  <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
-                  <span className="material-symbols-outlined text-primary text-3xl">radar</span>
-                </div>
-                <h3 className="text-xl font-bold mb-1">Scanning Nearby</h3>
-                <p className="text-slate-500">Locating the closest available professional...</p>
-                <button onClick={resetRide} className="mt-6 text-slate-400 font-bold text-sm hover:text-slate-600">Cancel Request</button>
-              </>
-            ) : (
-              <div className="animate-fade-in">
-                <div className="w-20 h-20 mx-auto bg-red-500/10 rounded-full flex items-center justify-center mb-4">
-                  <span className="material-symbols-outlined text-red-500 text-3xl">error_outline</span>
-                </div>
-                <h3 className="text-xl font-bold mb-1">No Drivers Nearby</h3>
-                <p className="text-slate-500">All our drivers are currently busy or too far away. Please try again later.</p>
-              </div>
-            )}
+            <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-4 relative">
+              <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+              {driverInfo?.avatar ? (
+                <img
+                  src={driverInfo.avatar}
+                  className="w-12 h-12 rounded-full object-cover"
+                  alt=""
+                />
+              ) : (
+                <span className="material-symbols-outlined text-primary text-3xl">person</span>
+              )}
+            </div>
+            <h3 className="text-xl font-bold mb-1">
+              Waiting for {driverInfo?.name ?? 'Driver'}
+            </h3>
+            <p className="text-slate-500 text-sm">
+              Request sent — driver has 60 seconds to accept
+            </p>
+
+            {/* 60 second countdown */}
+            <CountdownTimer
+              seconds={60}
+              onExpire={() => {
+                // UI will update via WebSocket when backend auto-declines
+                // This just shows the user how long is left
+              }}
+            />
+
+            <button
+              onClick={resetRide}
+              className="mt-6 text-slate-400 font-bold text-sm hover:text-slate-600"
+            >
+              Cancel Request
+            </button>
           </div>
         )}
 
@@ -943,6 +1061,120 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
           </div>
         )}
       </div>
+
+
+      {showDriverPicker && (
+        <div className="fixed inset-0 z-50 bg-background-light dark:bg-background-dark flex flex-col animate-slide-up">
+          {/* Header */}
+          <div className="px-4 py-4 flex items-center gap-4 border-b border-slate-200 dark:border-slate-800">
+            <button
+              onClick={() => setShowDriverPicker(false)}
+              className="w-10 h-10 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center"
+            >
+              <span className="material-symbols-outlined">arrow_back</span>
+            </button>
+            <div>
+              <h2 className="text-lg font-bold">Choose a Driver</h2>
+              <p className="text-xs text-slate-500">
+                {availableDrivers.length} driver{availableDrivers.length !== 1 ? 's' : ''} available nearby
+              </p>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4">
+            {isLoadingDrivers ? (
+              // Loading skeleton
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="animate-pulse flex items-center gap-4 p-4 bg-slate-100 dark:bg-surface-dark rounded-2xl">
+                    <div className="w-14 h-14 rounded-xl bg-slate-200 dark:bg-slate-700 shrink-0"></div>
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-32"></div>
+                      <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-24"></div>
+                    </div>
+                    <div className="h-6 w-16 bg-slate-200 dark:bg-slate-700 rounded"></div>
+                  </div>
+                ))}
+              </div>
+            ) : availableDrivers.length === 0 ? (
+              // No drivers
+              <div className="flex flex-col items-center justify-center h-64 gap-4">
+                <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
+                  <span className="material-symbols-outlined text-4xl text-slate-400">person_off</span>
+                </div>
+                <div className="text-center">
+                  <h3 className="font-bold text-lg">No Drivers Available</h3>
+                  <p className="text-slate-500 text-sm mt-1 max-w-[240px]">
+                    All drivers are currently busy or offline. Please try again shortly.
+                  </p>
+                </div>
+                <button
+                  onClick={fetchAvailableDrivers}
+                  className="flex items-center gap-2 px-6 py-3 bg-primary text-white font-bold rounded-xl"
+                >
+                  <span className="material-symbols-outlined text-sm">refresh</span>
+                  Refresh
+                </button>
+              </div>
+            ) : (
+              // Driver list
+              <div className="space-y-3">
+                {availableDrivers.map(driver => (
+                  <button
+                    key={driver.id}
+                    onClick={() => handleSelectDriver(driver)}
+                    className="w-full flex items-center gap-4 p-4 bg-surface-light dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-primary transition-all active:scale-[0.98] text-left"
+                  >
+                    {/* Avatar */}
+                    <div className="relative shrink-0">
+                      <img
+                        src={driver.avatarUrl || IMAGES.DRIVER_CARD}
+                        className="w-14 h-14 rounded-xl object-cover"
+                        alt={driver.name}
+                      />
+                      {/* Online indicator */}
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-surface-dark"></div>
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-slate-900 dark:text-white truncate">
+                        {driver.name}
+                      </h4>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="material-symbols-outlined text-yellow-500 text-sm filled">star</span>
+                        <span className="text-sm font-bold">{driver.rating?.toFixed(1)}</span>
+                        <span className="text-xs text-slate-400">·</span>
+                        <span className="text-xs text-slate-400">{driver.totalTrips} trips</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded font-bold text-slate-500 uppercase">
+                          {driver.transmission || 'Any'}
+                        </span>
+                        {driver.distanceKm && (
+                          <span className="text-[10px] text-slate-400">
+                            {driver.distanceKm}km away
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ETA + arrow */}
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      {driver.estimatedArrivalMins && (
+                        <span className="text-xs font-bold text-primary">
+                          ~{driver.estimatedArrivalMins} mins
+                        </span>
+                      )}
+                      <span className="material-symbols-outlined text-slate-300">chevron_right</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Vehicle Details Modal */}
       {showVehicleForm && (
