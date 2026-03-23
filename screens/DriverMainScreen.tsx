@@ -41,6 +41,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   user, onOpenProfile, onBack, onUpdateEarnings, onRequestPayout, onRideComplete
 }) => {
   const [isOnline, setIsOnline] = useState(true);
+  const [isLocationRefreshing, setIsLocationRefreshing] = useState(true); // overlay on first login
   const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
   const [ridePhase, setRidePhase] = useState<RidePhase>('pickup');
   const [driverPos, setDriverPos] = useState<[number, number]>([6.4549, 3.3896]);
@@ -63,6 +64,12 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
 
 
   useEffect(() => {
+
+    if (approvalStatus === 'APPROVED' && user?.id) {
+      api.patch('/users/online', { isOnline: true }).catch((e) =>
+        console.error('Auto-online sync failed:', e),
+      );
+    }
     if (isOnline && approvalStatus === 'APPROVED' && user?.id) {
 
       socketRef.current = io(`${API_URL}/rides`, {
@@ -79,6 +86,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
 
             // Update location on backend
             await api.patch('/users/location', { lat: latitude, lng: longitude });
+            setIsLocationRefreshing(false); // location confirmed — hide overlay
 
             // Broadcast via WebSocket for real-time tracking
             socketRef.current.emit('driver:register', { driverId: user.id });
@@ -102,6 +110,8 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
           }
         } catch (error) {
           console.error('Location update failed:', error);
+          setIsLocationRefreshing(false); // location confirmed — hide overlay
+
         }
       };
       updateLocation();
@@ -127,9 +137,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   const toggleOnline = async () => {
     if (activeRide) return;
     CapacitorService.triggerHaptic();
-
     const goingOnline = !isOnline;
-
     if (goingOnline) {
       const now = Date.now();
       const sixHours = 6 * 60 * 60 * 1000;
@@ -137,17 +145,21 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
         setShowRulesModal(true);
         return;
       }
+      setIsLocationRefreshing(true); // ← ADD: show overlay when going back online
     }
-
     try {
-      // Sync online status with backend
       await api.patch('/users/online', { isOnline: goingOnline });
       setIsOnline(goingOnline);
+      // When going offline: clear location so driver disappears from owner map queries
+      if (!goingOnline) {
+        await api.patch('/users/location', { lat: null, lng: null }).catch(() => { });
+      }
     } catch (error) {
       console.error('Failed to update online status:', error);
-      setIsOnline(goingOnline); // update locally anyway
+      setIsOnline(goingOnline);
     }
   };
+
 
   const handleAcceptRules = async () => {
     lastRulesAccepted.current = Date.now();
@@ -408,6 +420,19 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     <div className="h-screen w-full overflow-hidden flex flex-col relative bg-background-dark font-display">
       <div className={`absolute inset-0 z-0 transition-all duration-700 ${!isOnline ? 'grayscale brightness-50 contrast-125' : ''}`}>
         <InteractiveMap center={driverPos} markers={mapMarkers} />
+        {/* Location refreshing overlay — shown on first login or when going back online */}
+        {isOnline && isLocationRefreshing && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-background-dark/80 backdrop-blur-sm gap-4">
+            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary/40 border-dashed animate-pulse">
+              <span className="material-symbols-outlined text-primary text-3xl">my_location</span>
+            </div>
+            <div className="text-center">
+              <p className="text-white font-bold text-base">Updating your location</p>
+              <p className="text-slate-400 text-xs mt-1">Please wait a moment...</p>
+            </div>
+          </div>
+        )}
+
         <div className="absolute inset-0 bg-gradient-to-b from-[#101622]/40 via-transparent to-[#101622]/90 pointer-events-none"></div>
       </div>
 

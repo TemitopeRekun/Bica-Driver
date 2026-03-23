@@ -14,7 +14,7 @@ export const LocationService = {
 
   // Calls GET /locations/search?q=query
   // Returns real Google Places results from backend
-  async search(query: string): Promise<LocationData[]> {
+  async search(query: string, biasLat: any, biasLng: any): Promise<LocationData[]> {
     if (!query || query.trim().length < 2) return [];
     try {
       const results = await api.get<LocationData[]>(
