@@ -12,6 +12,11 @@ interface UseAdminRealtimeOptions {
 export const useAdminRealtime = ({ enabled, adminId, onRefresh }: UseAdminRealtimeOptions) => {
   const adminSocketRef = useRef<Socket | null>(null);
   const adminRefreshTimer = useRef<any>(null);
+  const onRefreshRef = useRef(onRefresh);
+
+  useEffect(() => {
+    onRefreshRef.current = onRefresh;
+  }, [onRefresh]);
 
   useEffect(() => {
     if (!enabled || !adminId) {
@@ -30,7 +35,7 @@ export const useAdminRealtime = ({ enabled, adminId, onRefresh }: UseAdminRealti
       }
 
       adminRefreshTimer.current = setTimeout(() => {
-        onRefresh().catch((error: any) => {
+        onRefreshRef.current().catch((error: any) => {
           console.error('Failed to refresh admin dashboard:', error);
         });
       }, 250);
@@ -63,5 +68,5 @@ export const useAdminRealtime = ({ enabled, adminId, onRefresh }: UseAdminRealti
         adminRefreshTimer.current = null;
       }
     };
-  }, [enabled, adminId, onRefresh]);
+  }, [enabled, adminId]);
 };

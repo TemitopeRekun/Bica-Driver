@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PaymentHistoryRecord, PendingPaymentTrip, SystemSettings, Trip, UserProfile } from '../types';
 import { api } from '../services/api.service';
 import { mapPaymentHistory, mapPendingPaymentTrip, mapTrip, mapUser } from '../mappers/appMappers';
@@ -14,6 +14,11 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
   const [adminPaymentHistory, setAdminPaymentHistory] = useState<PaymentHistoryRecord[]>([]);
   const [adminDashboardLoading, setAdminDashboardLoading] = useState(false);
   const [adminDashboardError, setAdminDashboardError] = useState<string | null>(null);
+  const onSettingsLoadedRef = useRef(options.onSettingsLoaded);
+
+  useEffect(() => {
+    onSettingsLoadedRef.current = options.onSettingsLoaded;
+  }, [options.onSettingsLoaded]);
 
   const loadAdminDashboard = useCallback(async () => {
     setAdminDashboardLoading(true);
@@ -34,14 +39,14 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
       setAdminTrips(dashboard.trips.map(mapTrip));
       setAdminPendingPayments(pendingPayments.map(mapPendingPaymentTrip));
       setAdminPaymentHistory(paymentHistory.map(mapPaymentHistory));
-      options.onSettingsLoaded?.(dashboard.settings);
+      onSettingsLoadedRef.current?.(dashboard.settings);
     } catch (error: any) {
       setAdminDashboardError(error.message || 'Could not load admin dashboard.');
       throw error;
     } finally {
       setAdminDashboardLoading(false);
     }
-  }, [options]);
+  }, []);
 
   return {
     adminUsers,

@@ -3,24 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import InteractiveMap from '../components/InteractiveMap';
 import { CapacitorService } from '../services/CapacitorService';
 import { UserProfile, Trip, WalletSummary } from '../types';
-import { io, Socket } from 'socket.io-client';
 import { api } from '../services/api.service';
 import { IMAGES } from '@/constants';
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
-
-interface RideRequest {
-  id: string;
-  ownerName: string;
-  pickup: string;
-  destination: string;
-  distance: string;
-  price: string;
-  time: string;
-  avatar: string;
-  coords: [number, number];
-  destCoords: [number, number];
-  estimatedMins?: number;
-}
+import { DriverRideRequest, useDriverRealtime } from '../hooks/useDriverRealtime';
 
 type RidePhase = 'pickup' | 'arrived' | 'trip' | 'completed';
 
@@ -73,25 +58,31 @@ const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
 const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   user, onOpenProfile, onBack, onUpdateEarnings, onRideComplete
 }) => {
-  const [isOnline, setIsOnline] = useState(true);
-  const [isLocationRefreshing, setIsLocationRefreshing] = useState(false); // overlay on first login
-  const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
+  const [activeRide, setActiveRide] = useState<DriverRideRequest | null>(null);
   const [ridePhase, setRidePhase] = useState<RidePhase>('pickup');
-  const [driverPos, setDriverPos] = useState<[number, number]>([6.4549, 3.3896]);
   const [walletSummary, setWalletSummary] = useState<WalletSummary | null>(null);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showSelfieModal, setShowSelfieModal] = useState(false);
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
-  const [pendingRide, setPendingRide] = useState<RideRequest | null>(null);
+  const [pendingRide, setPendingRide] = useState<DriverRideRequest | null>(null);
   const [recentTrips, setRecentTrips] = useState<Trip[]>([]);
   const [isLoadingTrips, setIsLoadingTrips] = useState(false);
   const lastRulesAccepted = useRef<number>(0);
-  const trackingInterval = useRef<any>(null);
 
   const approvalStatus = user?.approvalStatus || 'PENDING';
   const totalEarnings = walletSummary?.currentBalance ?? user?.walletBalance ?? 0;
-  const socketRef = useRef<Socket | null>(null);
-  const [liveRideRequests, setLiveRideRequests] = useState<RideRequest[]>([]);
+  const {
+    isOnline,
+    isLocationRefreshing,
+    driverPos,
+    liveRideRequests,
+    enableOnline,
+    disableOnline,
+    removeRideRequest,
+  } = useDriverRealtime({
+    user,
+    approvalStatus,
+  });
 
   const [tripTimer, setTripTimer] = useState<number>(0); // seconds elapsed
   const timerInterval = useRef<any>(null);
@@ -124,125 +115,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       setIsLoadingTrips(false);
     }
   };
-  const registerDriverSocket = () => {
-    if (!socketRef.current?.connected || !user?.id) return;
-    socketRef.current.emit('driver:register', { driverId: user.id });
-  };
-  const pushDriverLocation = async (latitude: number, longitude: number) => {
-    if (!user?.id) return;
-    setDriverPos([latitude, longitude]);
-    await api.patch('/users/location', { lat: latitude, lng: longitude });
-    if (socketRef.current?.connected) {
-      socketRef.current.emit('driver:location', {
-        driverId: user.id,
-        lat: latitude,
-        lng: longitude,
-      });
-    }
-  };
-
-
-  // Effect 1 - Socket connection (only reconnects when user ID changes)
-  useEffect(() => {
-    if (approvalStatus !== 'APPROVED' || !user?.id) return;
-
-    socketRef.current = io(`${API_URL}/rides`, {
-      transports: ['websocket'],
-      autoConnect: false,
-    });
-
-    socketRef.current.on('connect', () => {
-      registerDriverSocket();
-    });
-
-    socketRef.current.on('ride:assigned', (trip: any) => {
-      const rideRequest: RideRequest = {
-        id: trip.id,
-        ownerName: trip.owner?.name || 'Car Owner',
-        pickup: trip.pickupAddress,
-        destination: trip.destAddress,
-        distance: `${trip.distanceKm?.toFixed(1)} km`,
-        price: trip.driverEarnings?.toLocaleString() || trip.amount?.toLocaleString(),
-        time: `${trip.estimatedArrivalMins || 5} mins`,
-        avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
-        coords: [trip.pickupLat, trip.pickupLng],
-        destCoords: [trip.destLat, trip.destLng],
-        estimatedMins: trip.estimatedMins ?? null,
-      };
-
-      setLiveRideRequests(prev => {
-        if (prev.some(r => r.id === trip.id)) return prev;
-        return [rideRequest, ...prev];
-      });
-    });
-
-    return () => {
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-    };
-  }, [approvalStatus, user?.id]);
-
-  useEffect(() => {
-    if (approvalStatus !== 'APPROVED' || !user?.id) return;
-    loadWalletSummary();
-    loadRecentTrips();
-  }, [approvalStatus, user?.id]);
-
-  // Effect 2 - Location tracking (responds to isOnline changes)
-  useEffect(() => {
-    if (approvalStatus !== 'APPROVED' || !user?.id || !socketRef.current) return;
-
-    if (!isOnline) {
-      // Going offline — clear interval, location already cleared in toggleOnline
-      clearInterval(trackingInterval.current);
-      if (socketRef.current?.connected) {
-        socketRef.current.disconnect();
-      }
-      return;
-    }
-
-    // Going online — set backend status and get location
-    const initLocation = async () => {
-      setIsLocationRefreshing(true);
-      try {
-        if (!socketRef.current?.connected) {
-          socketRef.current.connect();
-        } else {
-          registerDriverSocket();
-        }
-        await api.patch('/users/online', { isOnline: true });
-
-        const pos = await CapacitorService.getCurrentLocation();
-        if (pos) {
-          const { latitude, longitude } = pos.coords;
-          await pushDriverLocation(latitude, longitude);
-        }
-      } catch (e) {
-        console.error('Initial location failed:', e);
-      } finally {
-        setIsLocationRefreshing(false);
-      }
-    };
-
-    initLocation();
-
-    // Start interval for ongoing tracking
-    trackingInterval.current = setInterval(async () => {
-      try {
-        const pos = await CapacitorService.getCurrentLocation();
-        if (pos) {
-          const { latitude, longitude } = pos.coords;
-          await pushDriverLocation(latitude, longitude);
-        }
-      } catch (e) {
-        console.error('Location interval failed:', e);
-      }
-    }, 10000);
-
-    return () => {
-      clearInterval(trackingInterval.current);
-    };
-  }, [isOnline, approvalStatus, user?.id]);
 
   const formatTimer = (seconds: number): string => {
     const hrs = Math.floor(seconds / 3600);
@@ -271,16 +143,12 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
 
     try {
       if (!goingOnline) {
-        // Going offline — clear location immediately
-        await api.patch('/users/online', { isOnline: false });
-        await api.patch('/users/location', { lat: null, lng: null }).catch(() => { });
+        await disableOnline();
+      } else {
+        enableOnline();
       }
-      // Going online — the useEffect watching isOnline will handle
-      // setting backend status and getting location
-      setIsOnline(goingOnline);
     } catch (error) {
       console.error('Failed to update online status:', error);
-      setIsOnline(goingOnline);
     }
   };
 
@@ -288,10 +156,10 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   const handleAcceptRules = async () => {
     lastRulesAccepted.current = Date.now();
     setShowRulesModal(false);
-    setIsOnline(true); // ← this triggers the location useEffect automatically
+    enableOnline();
   };
 
-  const handleAcceptRide = (ride: RideRequest) => {
+  const handleAcceptRide = (ride: DriverRideRequest) => {
     CapacitorService.triggerHaptic();
     setPendingRide(ride);
     setSelfieImage(null);
@@ -309,10 +177,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       setActiveRide(pendingRide);
       setRidePhase('pickup');
       setShowSelfieModal(false);
-      // Remove from pending requests list
-      setLiveRideRequests(prev =>
-        prev.filter(r => r.id !== pendingRide.id),
-      );
+      removeRideRequest(pendingRide.id);
       setPendingRide(null);
       setSelfieImage(null);
     } catch (error: any) {
@@ -418,12 +283,12 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     }
   };
 
-  const handleDeclineRide = async (ride: RideRequest) => {
+  const handleDeclineRide = async (ride: DriverRideRequest) => {
     CapacitorService.triggerHaptic();
     try {
       await api.post(`/rides/${ride.id}/decline`);
       // Remove from list
-      setLiveRideRequests(prev => prev.filter(r => r.id !== ride.id));
+      removeRideRequest(ride.id);
     } catch (error: any) {
       alert(error.message || 'Failed to decline ride');
     }
@@ -641,9 +506,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                             seconds={60}
                             onExpire={() => {
                               // Backend already auto-declined — remove from list
-                              setLiveRideRequests(prev =>
-                                prev.filter(r => r.id !== req.id),
-                              );
+                              removeRideRequest(req.id);
                             }}
                           />
                         </div>
@@ -1073,5 +936,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
 };
 
 export default DriverMainScreen;
+
 
 

@@ -34,6 +34,36 @@ export const useOwnerRealtime = ({
   onLocationUpdated,
 }: UseOwnerRealtimeOptions) => {
   const ownerSocketRef = useRef<Socket | null>(null);
+  const onDriverAcceptedRef = useRef(onDriverAccepted);
+  const onDriverDeclinedRef = useRef(onDriverDeclined);
+  const onTripCompletedRef = useRef(onTripCompleted);
+  const onLocationUpdatedRef = useRef(onLocationUpdated);
+  const driverInfoIdRef = useRef(driverInfoId);
+  const rideStateValueRef = useRef(rideState);
+
+  useEffect(() => {
+    onDriverAcceptedRef.current = onDriverAccepted;
+  }, [onDriverAccepted]);
+
+  useEffect(() => {
+    onDriverDeclinedRef.current = onDriverDeclined;
+  }, [onDriverDeclined]);
+
+  useEffect(() => {
+    onTripCompletedRef.current = onTripCompleted;
+  }, [onTripCompleted]);
+
+  useEffect(() => {
+    onLocationUpdatedRef.current = onLocationUpdated;
+  }, [onLocationUpdated]);
+
+  useEffect(() => {
+    driverInfoIdRef.current = driverInfoId;
+  }, [driverInfoId]);
+
+  useEffect(() => {
+    rideStateValueRef.current = rideState;
+  }, [rideState]);
 
   useEffect(() => {
     if (!ownerId) return;
@@ -44,10 +74,17 @@ export const useOwnerRealtime = ({
 
     ownerSocketRef.current.on('connect', () => {
       ownerSocketRef.current?.emit('owner:register', { ownerId });
+      if (
+        driverInfoIdRef.current &&
+        (rideStateValueRef.current === 'ASSIGNED' || rideStateValueRef.current === 'IN_PROGRESS')
+      ) {
+        trackedDriverIdRef.current = driverInfoIdRef.current;
+        ownerSocketRef.current?.emit('track:driver', { driverId: driverInfoIdRef.current });
+      }
     });
 
     ownerSocketRef.current.on('ride:accepted', (data: any) => {
-      onDriverAccepted({
+      onDriverAcceptedRef.current({
         driver: {
           ...data.driver,
           avatar: data.driver?.avatarUrl || IMAGES.DRIVER_CARD,
@@ -61,11 +98,11 @@ export const useOwnerRealtime = ({
     });
 
     ownerSocketRef.current.on('ride:declined', (data: any) => {
-      onDriverDeclined(data);
+      onDriverDeclinedRef.current(data);
     });
 
     ownerSocketRef.current.on('trip:completed', (data: any) => {
-      onTripCompleted(data);
+      onTripCompletedRef.current(data);
     });
 
     ownerSocketRef.current.on('driver:availability', () => {
@@ -79,7 +116,7 @@ export const useOwnerRealtime = ({
     ownerSocketRef.current.on('location:updated', (data: any) => {
       if (!trackedDriverIdRef.current || data.driverId !== trackedDriverIdRef.current) return;
       if (typeof data.lat === 'number' && typeof data.lng === 'number') {
-        onLocationUpdated(data.lat, data.lng);
+        onLocationUpdatedRef.current(data.lat, data.lng);
       }
     });
 
@@ -87,18 +124,7 @@ export const useOwnerRealtime = ({
       ownerSocketRef.current?.disconnect();
       ownerSocketRef.current = null;
     };
-  }, [
-    ownerId,
-    onDriverAccepted,
-    onDriverDeclined,
-    onTripCompleted,
-    onLocationUpdated,
-    pickupRef,
-    refreshAvailableDriversRef,
-    rideStateRef,
-    showDriverPickerRef,
-    trackedDriverIdRef,
-  ]);
+  }, [ownerId, pickupRef, refreshAvailableDriversRef, rideStateRef, showDriverPickerRef, trackedDriverIdRef]);
 
   useEffect(() => {
     if (
