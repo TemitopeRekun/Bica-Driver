@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import localforage from 'localforage';
-import { io, Socket } from 'socket.io-client';
-import { AppScreen, UserRole, UserProfile, ApprovalStatus, Trip, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord } from './types';
+import { AppScreen, UserRole, UserProfile, ApprovalStatus, Trip, SystemSettings } from './types';
 import WelcomeScreen from './screens/WelcomeScreen';
 import SignUpScreen from './screens/SignUpScreen';
 import LoginScreen from './screens/LoginScreen';
@@ -15,84 +14,16 @@ import { IMAGES } from './constants';
 import { CapacitorService } from './services/CapacitorService';
 import LoadingScreen from './screens/LoadingScreen';
 import { api, saveToken, clearToken } from './services/api.service';
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
-
-// Helper to map backend user to frontend UserProfile shape
-const mapUser = (backendUser: any): UserProfile => ({
-  ...backendUser,
-  // Map backend field names to frontend field names
-  trips: backendUser.totalTrips ?? 0,
-  avatar: backendUser.avatarUrl || (backendUser.role === UserRole.DRIVER ? IMAGES.DRIVER_CARD : IMAGES.USER_AVATAR),
-  licenseImage: backendUser.licenseImageUrl,
-  selfieImage: backendUser.selfieImageUrl,
-  ninImage: backendUser.ninImageUrl,
-  currentLocation: backendUser.locationLat
-    ? { lat: backendUser.locationLat, lng: backendUser.locationLng }
-    : undefined,
-});
-
-const mapTrip = (backendTrip: any): Trip => ({
-  ...backendTrip,
-  ownerId: backendTrip.ownerId || backendTrip.owner?.id,
-  driverId: backendTrip.driverId || backendTrip.driver?.id,
-  ownerName: backendTrip.owner?.name || backendTrip.ownerName || 'Owner',
-  driverName: backendTrip.driver?.name || backendTrip.driverName || 'Unassigned',
-  date: backendTrip.createdAt
-    ? new Date(backendTrip.createdAt).toLocaleString()
-    : backendTrip.date || '',
-  location:
-    backendTrip.location ||
-    `${backendTrip.pickupAddress?.split(',')[0] || 'Unknown'} -> ${backendTrip.destAddress?.split(',')[0] || 'Unknown'}`,
-});
-
-const mapPendingPaymentTrip = (backendTrip: any): PendingPaymentTrip => ({
-  ...mapTrip(backendTrip),
-  owner: backendTrip.owner,
-  driver: backendTrip.driver,
-});
-
-const mapPaymentHistory = (payment: any): PaymentHistoryRecord => ({
-  ...payment,
-  trip: payment.trip,
-});
-
-const mapAvailableDriver = (driver: any): UserProfile => ({
-  id: driver.id,
-  name: driver.name,
-  email: '',
-  phone: '',
-  role: UserRole.DRIVER,
-  rating: driver.rating ?? 0,
-  trips: driver.totalTrips ?? 0,
-  totalTrips: driver.totalTrips ?? 0,
-  avatar: driver.avatarUrl || IMAGES.DRIVER_CARD,
-  avatarUrl: driver.avatarUrl || IMAGES.DRIVER_CARD,
-  approvalStatus: 'APPROVED',
-  isBlocked: false,
-  isOnline: true,
-  transmission: driver.transmission ?? undefined,
-  currentLocation:
-    driver.locationLat != null && driver.locationLng != null
-      ? { lat: driver.locationLat, lng: driver.locationLng }
-      : undefined,
-  locationLat: driver.locationLat ?? undefined,
-  locationLng: driver.locationLng ?? undefined,
-});
+import { mapAvailableDriver, mapUser } from './mappers/appMappers';
+import { useAdminDashboard } from './hooks/useAdminDashboard';
+import { useAdminRealtime } from './hooks/useAdminRealtime';
 
 const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOADING);
   const [selectedSignupRole, setSelectedSignupRole] = useState<UserRole>(UserRole.UNSET);
-  const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
-  const [adminTrips, setAdminTrips] = useState<Trip[]>([]);
-  const [adminPendingPayments, setAdminPendingPayments] = useState<PendingPaymentTrip[]>([]);
-  const [adminPaymentHistory, setAdminPaymentHistory] = useState<PaymentHistoryRecord[]>([]);
-  const [adminDashboardLoading, setAdminDashboardLoading] = useState(false);
-  const [adminDashboardError, setAdminDashboardError] = useState<string | null>(null);
   const [ownerVisibleDrivers, setOwnerVisibleDrivers] = useState<UserProfile[]>([]);
-  const adminSocketRef = useRef<Socket | null>(null);
-  const adminRefreshTimer = useRef<any>(null);
 
   // Settings loaded from backend
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
@@ -100,6 +31,20 @@ const App: React.FC = () => {
     pricePerKm: 100,
     commission: 25,
     autoApprove: false,
+  });
+  const {
+    adminUsers,
+    adminTrips,
+    adminPendingPayments,
+    adminPaymentHistory,
+    adminDashboardLoading,
+    adminDashboardError,
+    setAdminDashboardError,
+    loadAdminDashboard,
+  } = useAdminDashboard({
+    onSettingsLoaded: (settings) => {
+      setSystemSettings(prev => ({ ...prev, ...settings }));
+    },
   });
 
   // Initialize — check for existing session
@@ -149,92 +94,20 @@ const App: React.FC = () => {
     CapacitorService.initStatusBar();
   }, []);
 
-  const loadAdminDashboard = async () => {
-    setAdminDashboardLoading(true);
-    setAdminDashboardError(null);
-    try {
-      const [dashboard, pendingPayments, paymentHistory] = await Promise.all([
-        api.get<{
-          users: any[];
-          trips: any[];
-          settings: SystemSettings;
-        }>('/admin/dashboard'),
-        api.get<any[]>('/payments/pending'),
-        api.get<any[]>('/payments/history'),
-      ]);
-
-      setAdminUsers(dashboard.users.map(mapUser));
-      setAdminTrips(dashboard.trips.map(mapTrip));
-      setAdminPendingPayments(pendingPayments.map(mapPendingPaymentTrip));
-      setAdminPaymentHistory(paymentHistory.map(mapPaymentHistory));
-      setSystemSettings(prev => ({ ...prev, ...dashboard.settings }));
-    } finally {
-      setAdminDashboardLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (currentScreen !== AppScreen.ADMIN_DASHBOARD || currentUser?.role !== UserRole.ADMIN) return;
 
     loadAdminDashboard().catch((error: any) => {
       console.error('Failed to load admin dashboard:', error);
-      setAdminDashboardLoading(false);
       setAdminDashboardError(error.message || 'Could not load admin dashboard.');
     });
   }, [currentScreen, currentUser?.role]);
 
-  useEffect(() => {
-    if (currentScreen !== AppScreen.ADMIN_DASHBOARD || currentUser?.role !== UserRole.ADMIN || !currentUser?.id) {
-      adminSocketRef.current?.disconnect();
-      adminSocketRef.current = null;
-      if (adminRefreshTimer.current) {
-        clearTimeout(adminRefreshTimer.current);
-        adminRefreshTimer.current = null;
-      }
-      return;
-    }
-
-    const scheduleAdminRefresh = () => {
-      if (adminRefreshTimer.current) {
-        clearTimeout(adminRefreshTimer.current);
-      }
-
-      adminRefreshTimer.current = setTimeout(() => {
-        loadAdminDashboard().catch((error: any) => {
-          console.error('Failed to refresh admin dashboard:', error);
-          setAdminDashboardLoading(false);
-        });
-      }, 250);
-    };
-
-    adminSocketRef.current = io(`${API_URL}/admin`, {
-      transports: ['websocket'],
-    });
-
-    adminSocketRef.current.on('connect', () => {
-      adminSocketRef.current?.emit('admin:register', { adminId: currentUser.id });
-    });
-
-    [
-      'admin:dashboard:update',
-      'admin:driver:pending_approval',
-      'admin:user:updated',
-      'admin:trip:updated',
-      'admin:settings:updated',
-      'admin:payment:updated',
-    ].forEach((eventName) => {
-      adminSocketRef.current?.on(eventName, scheduleAdminRefresh);
-    });
-
-    return () => {
-      adminSocketRef.current?.disconnect();
-      adminSocketRef.current = null;
-      if (adminRefreshTimer.current) {
-        clearTimeout(adminRefreshTimer.current);
-        adminRefreshTimer.current = null;
-      }
-    };
-  }, [currentScreen, currentUser?.id, currentUser?.role]);
+  useAdminRealtime({
+    enabled: currentScreen === AppScreen.ADMIN_DASHBOARD && currentUser?.role === UserRole.ADMIN,
+    adminId: currentUser?.id,
+    onRefresh: loadAdminDashboard,
+  });
 
   useEffect(() => {
     if (currentScreen !== AppScreen.MAIN_REQUEST || currentUser?.role !== UserRole.OWNER) {
