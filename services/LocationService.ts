@@ -14,13 +14,17 @@ export const LocationService = {
 
   // Calls GET /locations/search?q=query
   // Returns real Google Places results from backend
-  async search(query: string, biasLat: any, biasLng: any): Promise<LocationData[]> {
+  async search(query: string, biasLat?: number, biasLng?: number): Promise<LocationData[]> {
     if (!query || query.trim().length < 2) return [];
     try {
-      const results = await api.get<LocationData[]>(
-        `/locations/search?q=${encodeURIComponent(query)}`,
-        false, // public endpoint — no auth needed
-      );
+      let url = `/locations/search?q=${encodeURIComponent(query)}`;
+
+      // Pass pickup coords so backend biases results to pickup location
+      if (biasLat && biasLng) {
+        url += `&biasLat=${biasLat}&biasLng=${biasLng}`;
+      }
+
+      const results = await api.get<LocationData[]>(url, false);
       return results;
     } catch (error) {
       console.error('Location search failed:', error);

@@ -21,6 +21,8 @@ export interface UserProfile {
   avatarUrl?: string;      // backend field name
   walletBalance?: number;
   carType?: string;
+  carModel?: string;
+  carYear?: string;
   licenseImage?: string;
   licenseImageUrl?: string;
   selfieImage?: string;

@@ -35,13 +35,47 @@ interface DriverMainScreenProps {
 
 import { CameraSource, CameraDirection } from '@capacitor/camera';
 
+
+// Outside DriverMainScreen — not recreated on every render
+const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
+  seconds,
+  onExpire,
+}) => {
+  const [remaining, setRemaining] = React.useState(seconds);
+
+  React.useEffect(() => {
+    if (remaining <= 0) {
+      onExpire();
+      return;
+    }
+    const timer = setTimeout(() => setRemaining(prev => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [remaining]);
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div
+        className="w-10 h-10 rounded-full border-4 border-primary/30 flex items-center justify-center"
+        style={{
+          background: `conic-gradient(#045828 ${(remaining / seconds) * 360}deg, transparent 0deg)`,
+        }}
+      >
+        <div className="w-7 h-7 bg-surface-dark rounded-full flex items-center justify-center">
+          <span className="text-xs font-black text-primary">{remaining}</span>
+        </div>
+      </div>
+      <span className="text-[10px] text-slate-400">sec</span>
+    </div>
+  );
+};
+
 // ... existing imports
 
 const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   user, onOpenProfile, onBack, onUpdateEarnings, onRequestPayout, onRideComplete
 }) => {
   const [isOnline, setIsOnline] = useState(true);
-  const [isLocationRefreshing, setIsLocationRefreshing] = useState(true); // overlay on first login
+  const [isLocationRefreshing, setIsLocationRefreshing] = useState(false); // overlay on first login
   const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
   const [ridePhase, setRidePhase] = useState<RidePhase>('pickup');
   const [driverPos, setDriverPos] = useState<[number, number]>([6.4549, 3.3896]);
@@ -63,64 +97,103 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   const [fareBreakdown, setFareBreakdown] = useState<any>(null);
 
 
+  // Effect 1 — Socket connection (only reconnects when user ID changes)
   useEffect(() => {
+    if (approvalStatus !== 'APPROVED' || !user?.id) return;
 
-    if (approvalStatus === 'APPROVED' && user?.id) {
-      api.patch('/users/online', { isOnline: true }).catch((e) =>
-        console.error('Auto-online sync failed:', e),
-      );
-    }
-    if (isOnline && approvalStatus === 'APPROVED' && user?.id) {
+    socketRef.current = io(`${API_URL}/rides`, {
+      transports: ['websocket'],
+    });
 
-      socketRef.current = io(`${API_URL}/rides`, {
-        transports: ['websocket'],
-      });
+    // Register driver socket ONCE on connect
+    socketRef.current.on('connect', () => {
+      socketRef.current?.emit('driver:register', { driverId: user.id });
+    });
 
-
-      const updateLocation = async () => {
-        try {
-          const pos = await CapacitorService.getCurrentLocation();
-          if (pos) {
-            const { latitude, longitude } = pos.coords;
-            setDriverPos([latitude, longitude]);
-
-            // Update location on backend
-            await api.patch('/users/location', { lat: latitude, lng: longitude });
-            setIsLocationRefreshing(false); // location confirmed — hide overlay
-
-            // Broadcast via WebSocket for real-time tracking
-            socketRef.current.emit('driver:register', { driverId: user.id });
-
-            socketRef.current.on('ride:assigned', (trip: any) => {
-              const rideRequest: RideRequest = {
-                id: trip.id,
-                ownerName: trip.owner?.name || 'Car Owner',
-                pickup: trip.pickupAddress,
-                destination: trip.destAddress,
-                distance: `${trip.distanceKm?.toFixed(1)} km`,
-                price: trip.driverEarnings?.toLocaleString() || trip.amount?.toLocaleString(),
-                time: `${trip.estimatedArrivalMins || 5} mins`,
-                avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
-                coords: [trip.pickupLat, trip.pickupLng],
-                destCoords: [trip.destLat, trip.destLng],
-                estimatedMins: trip.estimatedMins ?? null,
-              };
-              setLiveRideRequests(prev => [rideRequest, ...prev]);
-            });
-          }
-        } catch (error) {
-          console.error('Location update failed:', error);
-          setIsLocationRefreshing(false); // location confirmed — hide overlay
-
-        }
+    // Listen for ride assignments ONCE
+    socketRef.current.on('ride:assigned', (trip: any) => {
+      const rideRequest: RideRequest = {
+        id: trip.id,
+        ownerName: trip.owner?.name || 'Car Owner',
+        pickup: trip.pickupAddress,
+        destination: trip.destAddress,
+        distance: `${trip.distanceKm?.toFixed(1)} km`,
+        price: trip.driverEarnings?.toLocaleString() || trip.amount?.toLocaleString(),
+        time: `${trip.estimatedArrivalMins || 5} mins`,
+        avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
+        coords: [trip.pickupLat, trip.pickupLng],
+        destCoords: [trip.destLat, trip.destLng],
+        estimatedMins: trip.estimatedMins ?? null,
       };
-      updateLocation();
-      trackingInterval.current = setInterval(updateLocation, 10000);
+      setLiveRideRequests(prev => {
+        // Prevent duplicate rides
+        if (prev.some(r => r.id === trip.id)) return prev;
+        return [rideRequest, ...prev];
+      });
+    });
+
+    return () => {
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
+  }, [approvalStatus, user?.id]); // ← only reconnects if user changes, NOT on isOnline toggle
+  // Effect 2 — Location tracking (responds to isOnline changes)
+  useEffect(() => {
+    if (approvalStatus !== 'APPROVED' || !user?.id) return;
+
+    if (!isOnline) {
+      // Going offline — clear interval, location already cleared in toggleOnline
+      clearInterval(trackingInterval.current);
+      return;
     }
+
+    // Going online — set backend status and get location
+    const initLocation = async () => {
+      setIsLocationRefreshing(true);
+      try {
+        await api.patch('/users/online', { isOnline: true });
+
+        const pos = await CapacitorService.getCurrentLocation();
+        if (pos) {
+          const { latitude, longitude } = pos.coords;
+          setDriverPos([latitude, longitude]);
+          await api.patch('/users/location', { lat: latitude, lng: longitude });
+          socketRef.current?.emit('driver:location', {
+            driverId: user.id,
+            lat: latitude,
+            lng: longitude,
+          });
+        }
+      } catch (e) {
+        console.error('Initial location failed:', e);
+      } finally {
+        setIsLocationRefreshing(false);
+      }
+    };
+
+    initLocation();
+
+    // Start interval for ongoing tracking
+    trackingInterval.current = setInterval(async () => {
+      try {
+        const pos = await CapacitorService.getCurrentLocation();
+        if (pos) {
+          const { latitude, longitude } = pos.coords;
+          setDriverPos([latitude, longitude]);
+          await api.patch('/users/location', { lat: latitude, lng: longitude });
+          socketRef.current?.emit('driver:location', {
+            driverId: user.id,
+            lat: latitude,
+            lng: longitude,
+          });
+        }
+      } catch (e) {
+        console.error('Location interval failed:', e);
+      }
+    }, 10000);
+
     return () => {
       clearInterval(trackingInterval.current);
-      clearInterval(timerInterval.current);
-      socketRef.current?.disconnect();
     };
   }, [isOnline, approvalStatus, user?.id]);
 
@@ -137,7 +210,9 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   const toggleOnline = async () => {
     if (activeRide) return;
     CapacitorService.triggerHaptic();
+
     const goingOnline = !isOnline;
+
     if (goingOnline) {
       const now = Date.now();
       const sixHours = 6 * 60 * 60 * 1000;
@@ -145,15 +220,17 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
         setShowRulesModal(true);
         return;
       }
-      setIsLocationRefreshing(true); // ← ADD: show overlay when going back online
     }
+
     try {
-      await api.patch('/users/online', { isOnline: goingOnline });
-      setIsOnline(goingOnline);
-      // When going offline: clear location so driver disappears from owner map queries
       if (!goingOnline) {
+        // Going offline — clear location immediately
+        await api.patch('/users/online', { isOnline: false });
         await api.patch('/users/location', { lat: null, lng: null }).catch(() => { });
       }
+      // Going online — the useEffect watching isOnline will handle
+      // setting backend status and getting location
+      setIsOnline(goingOnline);
     } catch (error) {
       console.error('Failed to update online status:', error);
       setIsOnline(goingOnline);
@@ -164,10 +241,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   const handleAcceptRules = async () => {
     lastRulesAccepted.current = Date.now();
     setShowRulesModal(false);
-    try {
-      await api.patch('/users/online', { isOnline: true });
-    } catch (e) { }
-    setIsOnline(true);
+    setIsOnline(true); // ← this triggers the location useEffect automatically
   };
 
   const handleAcceptRide = (ride: RideRequest) => {
@@ -222,38 +296,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   const handleArrival = () => {
     CapacitorService.triggerHaptic();
     setRidePhase('arrived');
-  };
-
-  const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
-    seconds,
-    onExpire,
-  }) => {
-    const [remaining, setRemaining] = React.useState(seconds);
-
-    React.useEffect(() => {
-      if (remaining <= 0) {
-        onExpire();
-        return;
-      }
-      const timer = setTimeout(() => setRemaining(prev => prev - 1), 1000);
-      return () => clearTimeout(timer);
-    }, [remaining]);
-
-    return (
-      <div className="mt-4 flex flex-col items-center gap-1">
-        <div
-          className="w-12 h-12 rounded-full border-4 border-primary/30 flex items-center justify-center"
-          style={{
-            background: `conic-gradient(#045828 ${(remaining / seconds) * 360}deg, transparent 0deg)`,
-          }}
-        >
-          <div className="w-8 h-8 bg-white dark:bg-surface-dark rounded-full flex items-center justify-center">
-            <span className="text-sm font-black text-primary">{remaining}</span>
-          </div>
-        </div>
-        <span className="text-xs text-slate-400">seconds remaining</span>
-      </div>
-    );
   };
 
   const handleStartTrip = async () => {
@@ -831,6 +873,18 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                   <p className="text-center text-slate-400 text-xs">
                     Owner has been notified to make payment
                   </p>
+
+                  <button
+                    onClick={() => {
+                      setActiveRide(null);
+                      setRidePhase('pickup');
+                      setFareBreakdown(null);
+                      setTripTimer(0);
+                    }}
+                    className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold active:scale-95 transition-all"
+                  >
+                    Back to Radar
+                  </button>
                 </div>
               )}
 
@@ -840,6 +894,17 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                     <span className="material-symbols-outlined text-3xl filled">verified</span>
                   </div>
                   <p className="text-green-500 text-xl font-black">Trip Success!</p>
+                  <button
+                    onClick={() => {
+                      setActiveRide(null);
+                      setRidePhase('pickup');
+                      setFareBreakdown(null);
+                      setTripTimer(0);
+                    }}
+                    className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold active:scale-95 transition-all"
+                  >
+                    Back to Radar
+                  </button>
                 </div>
               )}
             </div>

@@ -5,6 +5,8 @@ import InteractiveMap from '../components/InteractiveMap';
 import { IMAGES } from '../constants';
 import { SystemSettings, Trip, UserProfile, UserRole } from '../types';
 import { io, Socket } from 'socket.io-client';
+import { LocationService, LocationData } from '../services/LocationService';
+import { api } from '@/services/api.service';
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
 
 interface SearchResult {
@@ -34,8 +36,7 @@ const DISCOVERY_CATEGORIES = [
   { label: 'Malls', icon: 'shopping_cart', type: 'Shopping' }
 ];
 
-import { LocationService, LocationData } from '../services/LocationService';
-import { api } from '@/services/api.service';
+
 
 // ... existing interfaces ...
 
@@ -63,6 +64,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const [estimatedMins, setEstimatedMins] = useState<number>(0);
   const [fareRange, setFareRange] = useState<{ low: number; high: number } | null>(null);
 
+  const [searchResults, setSearchResults] = useState<LocationData[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   // Booking Type State
   const [bookingType, setBookingType] = useState<'now' | 'schedule'>('now');
   const [scheduleDate, setScheduleDate] = useState('');
@@ -81,12 +84,22 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   // Vehicle Details State
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [vehicleData, setVehicleData] = useState({
-    make: '',
-    model: '',
-    year: '',
-    transmission: 'Automatic'
+    make: currentUser?.carType || '',
+    model: currentUser?.carModel || '',
+    year: currentUser?.carYear || '',
+    transmission: (currentUser?.transmission as string) || 'Automatic',
   });
 
+  useEffect(() => {
+    if (currentUser) {
+      setVehicleData(prev => ({
+        make: prev.make || currentUser.carType || '',
+        model: prev.model || currentUser.carModel || '',
+        year: prev.year || currentUser.carYear || '',
+        transmission: prev.transmission || (currentUser.transmission as string) || 'Automatic',
+      }));
+    }
+  }, [currentUser]);
   // Simulation State
   const [driverInfo, setDriverInfo] = useState<any>(null);
   const [noDriversFound, setNoDriversFound] = useState(false);
@@ -203,17 +216,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     return () => clearTimers();
   }, []);
 
-  // Pre-fill vehicle data from profile
-  useEffect(() => {
-    if (currentUser) {
-      setVehicleData(prev => ({
-        ...prev,
-        make: currentUser.carType || '',
-        transmission: (currentUser.transmission as string) || 'Automatic'
-      }));
-    }
-  }, [currentUser]);
-
   useEffect(() => {
     if (!currentUser?.id) return;
 
@@ -315,6 +317,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
   const handleSelectLocation = (loc: LocationData, type: 'pickup' | 'dest') => {
     if (type === 'pickup') {
+      setNoDriversFound(false);
       setPickup(loc);
       setIsSearchingPickup(false);
       setMapCenter([loc.lat, loc.lon]);
@@ -332,10 +335,10 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
 
 
-  const handleConfirmRequest = (e: React.FormEvent) => {
+  const handleConfirmRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vehicleData.make || !vehicleData.model || !vehicleData.year) {
-      alert("Please fill in all vehicle details to proceed.");
+      alert('Please fill in all vehicle details to proceed.');
       return;
     }
     setShowVehicleForm(false);
@@ -343,7 +346,9 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     if (bookingType === 'schedule') {
       finalizeScheduledRide();
     } else {
-      startRideRequest();
+      // Fetch drivers filtered by transmission, then show picker
+      await fetchAvailableDrivers();
+      setShowDriverPicker(true);
     }
   };
 
@@ -363,8 +368,15 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     setRideState('SCHEDULED');
   };
 
-  const startRideRequest = async () => {
-    if (!pickup || !destination || !selectedDriver) return;
+  const startRideRequest = async (driver?: any) => {
+    // Use passed driver or fall back to selectedDriver state
+    const bookedDriver = driver || selectedDriver;
+
+    if (!pickup || !destination || !bookedDriver) {
+      alert('Missing trip details. Please try again.');
+      setRideState('IDLE');
+      return;
+    }
 
     setRideState('SEARCHING');
     setNoDriversFound(false);
@@ -379,14 +391,13 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         destLng: destination.lon,
         distanceKm: parseFloat(estimatedDistance),
         estimatedMins: estimatedMins || undefined,
-        driverId: selectedDriver.id, // ← owner's chosen driver
+        driverId: bookedDriver.id,
         vehicleMake: vehicleData.make,
         vehicleModel: vehicleData.model,
         vehicleYear: vehicleData.year,
         transmission: vehicleData.transmission,
       });
 
-      // Trip created — now waiting for driver to accept
       setCurrentTripId(trip.id);
       setDriverInfo({
         id: trip.driverId,
@@ -396,14 +407,15 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         rating: trip.driver?.rating,
         trips: trip.driver?.totalTrips ?? 0,
         avatar: trip.driver?.avatarUrl || IMAGES.DRIVER_CARD,
-        timeAway: selectedDriver.estimatedArrivalMins || 5,
+        timeAway: bookedDriver.estimatedArrivalMins || 5,
         tripId: trip.id,
       });
-      setRideState('SEARCHING'); // stays in searching until driver accepts
+      setRideState('SEARCHING');
 
     } catch (error: any) {
       alert(error.message || 'Could not book ride. Please try again.');
       setRideState('IDLE');
+      setNoDriversFound(true);
     }
   };
 
@@ -469,16 +481,12 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   };
 
 
-  const handleSelectDriver = (driver: any) => {
+  const handleSelectDriver = async (driver: any) => {
     setSelectedDriver(driver);
     setShowDriverPicker(false);
-    // Vehicle form was already filled — proceed directly to booking
-    if (bookingType === 'schedule') {
-      finalizeScheduledRide();
-    } else {
-      startRideRequest();
-    }
-  }
+    // Pass driver directly — don't rely on selectedDriver state which is async
+    await startRideRequest(driver);
+  };
 
 
   const openGoogleMaps = () => {
@@ -492,8 +500,45 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(val).replace('NGN', '₦');
   };
 
-  const [searchResults, setSearchResults] = useState<LocationData[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+
+  const handleCategoryTap = async (categoryType: string) => {
+    const queries: Record<string, string> = {
+      'Airport': 'airport',
+      'Hotel': 'hotels',
+      'Commercial': 'restaurants dining',
+      'Shopping': 'shopping mall',
+    };
+
+    const query = queries[categoryType] || categoryType;
+    setIsSearching(true);
+
+    try {
+      const results = await LocationService.search(
+        query,
+        pickup?.lat,
+        pickup?.lon,
+      );
+
+      // Sort by distance from pickup if pickup is set
+      if (pickup && results.length > 0) {
+        results.sort((a, b) => {
+          const distA = Math.sqrt(
+            Math.pow(a.lat - pickup.lat, 2) + Math.pow(a.lon - pickup.lon, 2),
+          );
+          const distB = Math.sqrt(
+            Math.pow(b.lat - pickup.lat, 2) + Math.pow(b.lon - pickup.lon, 2),
+          );
+          return distA - distB;
+        });
+      }
+
+      setSearchResults(results);
+    } catch (e) {
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   useEffect(() => {
     if (searchQuery.length < 2) {
@@ -502,16 +547,19 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     }
     setIsSearching(true);
     const timer = setTimeout(async () => {
-      // When searching for a destination and pickup is known, bias results
-      // from the pickup point — so "Hotels" shows hotels nearest to pickup
-      const biasLat = isSearchingDest && pickup ? pickup.lat : undefined;
-      const biasLng = isSearchingDest && pickup ? pickup.lon : undefined;
-      const results = await LocationService.search(searchQuery, biasLat, biasLng);
-      setSearchResults(results);
-      setIsSearching(false);
+      try {
+        const results = await LocationService.search(searchQuery, pickup?.lat, pickup?.lon);
+        setSearchResults(results);
+      } catch (e) {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, isSearchingDest, pickup]);
+  }, [searchQuery, pickup]); // ← removed isSearching from deps
+
+
 
 
   const renderSearchModal = (type: 'pickup' | 'dest') => (
@@ -568,7 +616,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
               {DISCOVERY_CATEGORIES.map(cat => (
                 <button
                   key={cat.label}
-                  onClick={() => setSearchQuery(cat.type)}
+                  onClick={() => handleCategoryTap(cat.type)}
                   className="flex flex-col items-center gap-2"
                 >
                   <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
@@ -831,6 +879,23 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                     </>
                   )}
                 </button>
+                {noDriversFound && (
+                  <div className="mt-3 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 animate-fade-in">
+                    <span className="material-symbols-outlined text-red-500 shrink-0">person_off</span>
+                    <div>
+                      <p className="text-red-500 font-bold text-sm">No Drivers Available</p>
+                      <p className="text-red-400 text-xs mt-0.5">
+                        All drivers are busy or offline. Try again in a few minutes.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setNoDriversFound(false)}
+                      className="ml-auto text-red-400 hover:text-red-600"
+                    >
+                      <span className="material-symbols-outlined text-sm">close</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

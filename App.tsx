@@ -106,6 +106,8 @@ const App: React.FC = () => {
         role: selectedSignupRole,
         // Owner fields
         carType: userData.carType,
+        carModel: userData.carModel,
+        carYear: userData.carYear,
         gender: userData.gender,
         address: userData.address,
         nationality: userData.nationality,
