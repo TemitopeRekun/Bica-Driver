@@ -10,6 +10,16 @@ export interface LocationData {
   accuracy?: number;
 }
 
+export interface RouteData {
+  distanceKm: number;
+  estimatedMins: number;
+  currentTrafficMins: number;
+  fareEstimate: {
+    low: number;
+    high: number;
+  };
+}
+
 export const LocationService = {
 
   // Calls GET /locations/search?q=query
@@ -52,5 +62,12 @@ export const LocationService = {
         category: 'Residential',
       };
     }
+  },
+
+  async getRoute(originLat: number, originLng: number, destLat: number, destLng: number): Promise<RouteData> {
+    return api.get<RouteData>(
+      `/locations/route?originLat=${originLat}&originLng=${originLng}&destLat=${destLat}&destLng=${destLng}`,
+      false,
+    );
   },
 };

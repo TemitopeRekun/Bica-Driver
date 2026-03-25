@@ -4,10 +4,10 @@ import { CapacitorService } from '../services/CapacitorService';
 import InteractiveMap from '../components/InteractiveMap';
 import { IMAGES } from '../constants';
 import { SystemSettings, Trip, UserProfile, UserRole, PaymentHistoryRecord } from '../types';
-import { io, Socket } from 'socket.io-client';
-import { LocationService, LocationData } from '../services/LocationService';
+import { LocationData } from '../services/LocationService';
 import { api } from '@/services/api.service';
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+import { useOwnerRealtime } from '../hooks/useOwnerRealtime';
+import { useOwnerLocationSearch } from '../hooks/useOwnerLocationSearch';
 
 interface SearchResult {
   id: string;
@@ -48,24 +48,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   currentUser,
   allUsers
 }) => {
-  const [pickup, setPickup] = useState<LocationData | null>(null);
-  const [destination, setDestination] = useState<LocationData | null>(null);
   const [rideState, setRideState] = useState<RideState>('IDLE');
-  const [mapCenter, setMapCenter] = useState<[number, number]>([6.4549, 3.4246]); // Lagos default
-  const [estimatedPrice, setEstimatedPrice] = useState<number>(0);
-  const [estimatedDistance, setEstimatedDistance] = useState<string>('');
   const [currentTripId, setCurrentTripId] = useState<string | null>(null);
-
-  // Search States
-  const [isSearchingPickup, setIsSearchingPickup] = useState(false);
-  const [isSearchingDest, setIsSearchingDest] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isFetchingRoute, setIsFetchingRoute] = useState(false);
-  const [estimatedMins, setEstimatedMins] = useState<number>(0);
-  const [fareRange, setFareRange] = useState<{ low: number; high: number } | null>(null);
-
-  const [searchResults, setSearchResults] = useState<LocationData[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   // Booking Type State
   const [bookingType, setBookingType] = useState<'now' | 'schedule'>('now');
   const [scheduleDate, setScheduleDate] = useState('');
@@ -75,7 +59,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const [selectedDriver, setSelectedDriver] = useState<any>(null);
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(false);
   const [showDriverPicker, setShowDriverPicker] = useState(false);
-  const ownerSocketRef = useRef<Socket | null>(null);
   const pickupRef = useRef<LocationData | null>(null);
   const rideStateRef = useRef<RideState>('IDLE');
   const showDriverPickerRef = useRef(false);
@@ -114,8 +97,33 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const [recentPayments, setRecentPayments] = useState<PaymentHistoryRecord[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const timerRefs = useRef<any[]>([]);
-
-  const [isLocating, setIsLocating] = useState(false);
+  const {
+    pickup,
+    destination,
+    mapCenter,
+    estimatedPrice,
+    estimatedDistance,
+    isSearchingPickup,
+    isSearchingDest,
+    searchQuery,
+    isFetchingRoute,
+    estimatedMins,
+    fareRange,
+    searchResults,
+    isSearching,
+    isLocating,
+    setIsSearchingPickup,
+    setIsSearchingDest,
+    setSearchQuery,
+    handleUseMyLocation,
+    handleMarkerDragEnd,
+    handleSelectLocation,
+    handleCategoryTap,
+    resetLocationSearch,
+  } = useOwnerLocationSearch({
+    settings,
+    onPickupChanged: () => setNoDriversFound(false),
+  });
 
   const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
     seconds,
@@ -193,106 +201,29 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   transmissionRef.current = vehicleData.transmission;
   refreshAvailableDriversRef.current = fetchAvailableDrivers;
 
-
-  const handleUseMyLocation = async () => {
-    setIsLocating(true);
-    try {
-      const position = await CapacitorService.getCurrentLocation();
-      if (position) {
-        const { latitude, longitude, accuracy } = position.coords;
-        const location = await LocationService.reverseGeocode(latitude, longitude);
-        setPickup({ ...location, accuracy: accuracy || 0 });
-        setMapCenter([latitude, longitude]);
-        setIsSearchingPickup(false);
-      }
-    } catch (error) {
-      alert('Location permission denied. Please enter pickup manually.');
-    } finally {
-      setIsLocating(false);
-    }
-  };
-  const handleMarkerDragEnd = async (id: string, newPos: [number, number]) => {
-    if (id === 'pickup') {
-      const newLocation = await LocationService.reverseGeocode(newPos[0], newPos[1]);
-      setPickup({ ...newLocation, accuracy: 0 });
-    }
-  };
-
   useEffect(() => {
-    // Get initial location
-    CapacitorService.getCurrentLocation().then(pos => {
-      if (pos) {
-        setMapCenter([pos.coords.latitude, pos.coords.longitude]);
-      }
-    });
-
-    // Set default schedule date to today
     setScheduleDate(new Date().toISOString().split('T')[0]);
-
-    // Cleanup timers on unmount
     return () => clearTimers();
   }, []);
 
-  useEffect(() => {
-    if (!currentUser?.id) return;
-
-    const loadOwnerHistory = async () => {
-      setIsLoadingHistory(true);
-      try {
-        const [rides, payments] = await Promise.all([
-          api.get<any[]>('/rides/history'),
-          api.get<PaymentHistoryRecord[]>('/payments/history'),
-        ]);
-
-        setRecentTrips(rides.map((trip) => ({
-          ...trip,
-          ownerId: trip.ownerId || trip.owner?.id,
-          driverId: trip.driverId || trip.driver?.id,
-          ownerName: trip.owner?.name || trip.ownerName || 'Owner',
-          driverName: trip.driver?.name || trip.driverName || 'Unassigned',
-          date: trip.createdAt ? new Date(trip.createdAt).toLocaleString() : '',
-          location: `${trip.pickupAddress?.split(',')[0] || 'Unknown'} -> ${trip.destAddress?.split(',')[0] || 'Unknown'}`,
-        })));
-        setRecentPayments(payments);
-      } catch (error) {
-        console.error('Failed to load owner history:', error);
-        setRecentTrips([]);
-        setRecentPayments([]);
-      } finally {
-        setIsLoadingHistory(false);
-      }
-    };
-
-    loadOwnerHistory();
-  }, [currentUser?.id]);
-
-  useEffect(() => {
-    if (!currentUser?.id) return;
-
-    ownerSocketRef.current = io(`${API_URL}/rides`, {
-      transports: ['websocket'],
-    });
-
-    ownerSocketRef.current.on('connect', () => {
-      ownerSocketRef.current?.emit('owner:register', { ownerId: currentUser.id });
-    });
-
-    // Driver accepted — move to ASSIGNED state
-    ownerSocketRef.current.on('ride:accepted', (data: any) => {
-      setDriverInfo(prev => ({
+  useOwnerRealtime({
+    ownerId: currentUser?.id,
+    driverInfoId: driverInfo?.id,
+    rideState,
+    trackedDriverIdRef,
+    pickupRef,
+    rideStateRef,
+    showDriverPickerRef,
+    refreshAvailableDriversRef,
+    onDriverAccepted: ({ driver, estimatedArrivalMins }) => {
+      setDriverInfo((prev: any) => ({
         ...prev,
-        ...data.driver,
-        avatar: data.driver?.avatarUrl || IMAGES.DRIVER_CARD,
-        timeAway: data.estimatedArrivalMins || 5,
+        ...driver,
+        timeAway: estimatedArrivalMins || 5,
       }));
-      if (data.driver?.id) {
-        trackedDriverIdRef.current = data.driver.id;
-      }
       setRideState('ASSIGNED');
-    });
-
-    // Driver declined or timed out — go back to driver picker
-    ownerSocketRef.current.on('ride:declined', (data: any) => {
+    },
+    onDriverDeclined: (data) => {
       alert(data.message || 'Driver declined. Please choose another driver.');
       setSelectedDriver(null);
       setDriverInfo(null);
@@ -301,113 +232,17 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       fetchAvailableDrivers();
       setShowDriverPicker(true);
       setRideState('IDLE');
-    });
-
-    // Trip completed by driver — show payment screen
-    ownerSocketRef.current.on('trip:completed', (data: any) => {
+    },
+    onTripCompleted: (data) => {
       if (data.fareBreakdown) {
         setCurrentTripFareBreakdown(data.fareBreakdown);
       }
       setRideState('COMPLETED');
-    });
-
-    ownerSocketRef.current.on('driver:availability', () => {
-      if ((showDriverPickerRef.current || rideStateRef.current === 'IDLE') && pickupRef.current) {
-        refreshAvailableDriversRef.current().catch((error) => {
-          console.error('Failed to refresh drivers after availability update:', error);
-        });
-      }
-    });
-
-    ownerSocketRef.current.on('location:updated', (data: any) => {
-      if (!trackedDriverIdRef.current || data.driverId !== trackedDriverIdRef.current) return;
-      if (typeof data.lat === 'number' && typeof data.lng === 'number') {
-        setTrackedDriverPos([data.lat, data.lng]);
-      }
-    });
-
-    return () => {
-      ownerSocketRef.current?.disconnect();
-    };
-  }, [currentUser?.id]);
-  const getSearchBias = (): { lat?: number; lng?: number } => {
-    if (pickup) {
-      return { lat: pickup.lat, lng: pickup.lon };
-    }
-    if (Number.isFinite(mapCenter[0]) && Number.isFinite(mapCenter[1])) {
-      return { lat: mapCenter[0], lng: mapCenter[1] };
-    }
-    return {};
-  };
-
-  function deg2rad(deg: number) {
-    return deg * (Math.PI / 180);
-  }
-
-  function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const R = 6371; // Radius of the earth in km
-    const dLat = deg2rad(lat2 - lat1);
-    const dLon = deg2rad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const d = R * c; // Distance in km
-    return d;
-  }
-
-  // Calculate Price when points change
-  useEffect(() => {
-    if (!pickup || !destination) return;
-
-    const fetchRoute = async () => {
-      setIsFetchingRoute(true); // ← start loading
-      try {
-        const route = await api.get<{
-          distanceKm: number;
-          estimatedMins: number;
-          currentTrafficMins: number;
-          fareEstimate: { low: number; high: number };
-        }>(
-          `/locations/route?originLat=${pickup.lat}&originLng=${pickup.lon}&destLat=${destination.lat}&destLng=${destination.lon}`,
-          false,
-        );
-
-        setEstimatedDistance(route.distanceKm.toFixed(1));
-        setEstimatedMins(route.estimatedMins);
-        setFareRange({ low: route.fareEstimate.low, high: route.fareEstimate.high });
-        setEstimatedPrice(route.fareEstimate.low);
-      } catch (error) {
-        const dist = Math.max(
-          calculateDistance(pickup.lat, pickup.lon, destination.lat, destination.lon),
-          1,
-        );
-        setEstimatedDistance(dist.toFixed(1));
-        const price = settings.baseFare + dist * settings.pricePerKm;
-        const rounded = Math.round(price / 50) * 50;
-        setEstimatedPrice(rounded);
-        setFareRange({ low: rounded, high: Math.round((rounded * 1.5) / 50) * 50 });
-      } finally {
-        setIsFetchingRoute(false); // ← stop loading regardless of success/failure
-      }
-    };
-
-    fetchRoute();
-  }, [pickup, destination]);
-
-  const handleSelectLocation = (loc: LocationData, type: 'pickup' | 'dest') => {
-    if (type === 'pickup') {
-      setNoDriversFound(false);
-      setPickup(loc);
-      setIsSearchingPickup(false);
-      setMapCenter([loc.lat, loc.lon]);
-    } else {
-      setDestination(loc);
-      setIsSearchingDest(false);
-    }
-    setSearchQuery('');
-  };
+    },
+    onLocationUpdated: (lat, lng) => {
+      setTrackedDriverPos([lat, lng]);
+    },
+  });
 
   const clearTimers = () => {
     timerRefs.current.forEach(clearTimeout);
@@ -537,8 +372,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const resetRide = () => {
     clearTimers();
     setRideState('IDLE');
-    setPickup(null);
-    setDestination(null);
+    resetLocationSearch();
     setDriverInfo(null);
     setTrackedDriverPos(null);
     trackedDriverIdRef.current = null;
@@ -582,17 +416,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     await startRideRequest(driver);
   };
 
-  useEffect(() => {
-    if (
-      ownerSocketRef.current?.connected &&
-      driverInfo?.id &&
-      (rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS')
-    ) {
-      trackedDriverIdRef.current = driverInfo.id;
-      ownerSocketRef.current.emit('track:driver', { driverId: driverInfo.id });
-    }
-  }, [driverInfo?.id, rideState]);
-
 
   const openGoogleMaps = () => {
     if (destination) {
@@ -616,66 +439,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   };
 
 
-
-  const handleCategoryTap = async (categoryType: string) => {
-    const queries: Record<string, string> = {
-      'Airport': 'airport',
-      'Hotel': 'hotels',
-      'Commercial': 'restaurants dining',
-      'Shopping': 'shopping mall',
-    };
-
-    const query = queries[categoryType] || categoryType;
-    setIsSearching(true);
-    const bias = getSearchBias();
-
-    try {
-      const results = await LocationService.search(
-        query,
-        bias.lat,
-        bias.lng,
-      );
-
-      // Sort by distance from pickup if pickup is set
-      if (pickup && results.length > 0) {
-        results.sort((a, b) => {
-          const distA = Math.sqrt(
-            Math.pow(a.lat - pickup.lat, 2) + Math.pow(a.lon - pickup.lon, 2),
-          );
-          const distB = Math.sqrt(
-            Math.pow(b.lat - pickup.lat, 2) + Math.pow(b.lon - pickup.lon, 2),
-          );
-          return distA - distB;
-        });
-      }
-
-      setSearchResults(results);
-    } catch (e) {
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  useEffect(() => {
-    if (searchQuery.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    setIsSearching(true);
-    const timer = setTimeout(async () => {
-      const bias = getSearchBias();
-      try {
-        const results = await LocationService.search(searchQuery, bias.lat, bias.lng);
-        setSearchResults(results);
-      } catch (e) {
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, pickup]); // ← removed isSearching from deps
 
 
 
@@ -1524,3 +1287,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 };
 
 export default RequestRideScreen;
+
+
+

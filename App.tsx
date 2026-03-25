@@ -14,16 +14,16 @@ import { IMAGES } from './constants';
 import { CapacitorService } from './services/CapacitorService';
 import LoadingScreen from './screens/LoadingScreen';
 import { api, saveToken, clearToken } from './services/api.service';
-import { mapAvailableDriver, mapUser } from './mappers/appMappers';
+import { mapUser } from './mappers/appMappers';
 import { useAdminDashboard } from './hooks/useAdminDashboard';
 import { useAdminRealtime } from './hooks/useAdminRealtime';
+import { useOwnerVisibleDrivers } from './hooks/useOwnerVisibleDrivers';
 
 const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOADING);
   const [selectedSignupRole, setSelectedSignupRole] = useState<UserRole>(UserRole.UNSET);
-  const [ownerVisibleDrivers, setOwnerVisibleDrivers] = useState<UserProfile[]>([]);
 
   // Settings loaded from backend
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
@@ -45,6 +45,10 @@ const App: React.FC = () => {
     onSettingsLoaded: (settings) => {
       setSystemSettings(prev => ({ ...prev, ...settings }));
     },
+  });
+  const { ownerVisibleDrivers } = useOwnerVisibleDrivers({
+    enabled: currentScreen === AppScreen.MAIN_REQUEST,
+    role: currentUser?.role,
   });
 
   // Initialize — check for existing session
@@ -108,22 +112,6 @@ const App: React.FC = () => {
     adminId: currentUser?.id,
     onRefresh: loadAdminDashboard,
   });
-
-  useEffect(() => {
-    if (currentScreen !== AppScreen.MAIN_REQUEST || currentUser?.role !== UserRole.OWNER) {
-      setOwnerVisibleDrivers([]);
-      return;
-    }
-
-    api.get<any[]>('/users/drivers/available')
-      .then((drivers) => {
-        setOwnerVisibleDrivers(drivers.map(mapAvailableDriver));
-      })
-      .catch((error: any) => {
-        console.error('Failed to load owner-visible drivers:', error);
-        setOwnerVisibleDrivers([]);
-      });
-  }, [currentScreen, currentUser?.role]);
 
   const navigateTo = (screen: AppScreen) => {
     CapacitorService.triggerHaptic();
