@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import localforage from 'localforage';
-import { AppScreen, UserRole, UserProfile, ApprovalStatus, Trip, Payout, SystemSettings } from './types';
+import { io, Socket } from 'socket.io-client';
+import { AppScreen, UserRole, UserProfile, ApprovalStatus, Trip, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord } from './types';
 import WelcomeScreen from './screens/WelcomeScreen';
 import SignUpScreen from './screens/SignUpScreen';
 import LoginScreen from './screens/LoginScreen';
@@ -14,6 +15,7 @@ import { IMAGES } from './constants';
 import { CapacitorService } from './services/CapacitorService';
 import LoadingScreen from './screens/LoadingScreen';
 import { api, saveToken, clearToken } from './services/api.service';
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
 
 // Helper to map backend user to frontend UserProfile shape
 const mapUser = (backendUser: any): UserProfile => ({
@@ -29,11 +31,68 @@ const mapUser = (backendUser: any): UserProfile => ({
     : undefined,
 });
 
+const mapTrip = (backendTrip: any): Trip => ({
+  ...backendTrip,
+  ownerId: backendTrip.ownerId || backendTrip.owner?.id,
+  driverId: backendTrip.driverId || backendTrip.driver?.id,
+  ownerName: backendTrip.owner?.name || backendTrip.ownerName || 'Owner',
+  driverName: backendTrip.driver?.name || backendTrip.driverName || 'Unassigned',
+  date: backendTrip.createdAt
+    ? new Date(backendTrip.createdAt).toLocaleString()
+    : backendTrip.date || '',
+  location:
+    backendTrip.location ||
+    `${backendTrip.pickupAddress?.split(',')[0] || 'Unknown'} -> ${backendTrip.destAddress?.split(',')[0] || 'Unknown'}`,
+});
+
+const mapPendingPaymentTrip = (backendTrip: any): PendingPaymentTrip => ({
+  ...mapTrip(backendTrip),
+  owner: backendTrip.owner,
+  driver: backendTrip.driver,
+});
+
+const mapPaymentHistory = (payment: any): PaymentHistoryRecord => ({
+  ...payment,
+  trip: payment.trip,
+});
+
+const mapAvailableDriver = (driver: any): UserProfile => ({
+  id: driver.id,
+  name: driver.name,
+  email: '',
+  phone: '',
+  role: UserRole.DRIVER,
+  rating: driver.rating ?? 0,
+  trips: driver.totalTrips ?? 0,
+  totalTrips: driver.totalTrips ?? 0,
+  avatar: driver.avatarUrl || IMAGES.DRIVER_CARD,
+  avatarUrl: driver.avatarUrl || IMAGES.DRIVER_CARD,
+  approvalStatus: 'APPROVED',
+  isBlocked: false,
+  isOnline: true,
+  transmission: driver.transmission ?? undefined,
+  currentLocation:
+    driver.locationLat != null && driver.locationLng != null
+      ? { lat: driver.locationLat, lng: driver.locationLng }
+      : undefined,
+  locationLat: driver.locationLat ?? undefined,
+  locationLng: driver.locationLng ?? undefined,
+});
+
 const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOADING);
   const [selectedSignupRole, setSelectedSignupRole] = useState<UserRole>(UserRole.UNSET);
+  const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
+  const [adminTrips, setAdminTrips] = useState<Trip[]>([]);
+  const [adminPendingPayments, setAdminPendingPayments] = useState<PendingPaymentTrip[]>([]);
+  const [adminPaymentHistory, setAdminPaymentHistory] = useState<PaymentHistoryRecord[]>([]);
+  const [adminDashboardLoading, setAdminDashboardLoading] = useState(false);
+  const [adminDashboardError, setAdminDashboardError] = useState<string | null>(null);
+  const [ownerVisibleDrivers, setOwnerVisibleDrivers] = useState<UserProfile[]>([]);
+  const adminSocketRef = useRef<Socket | null>(null);
+  const adminRefreshTimer = useRef<any>(null);
 
   // Settings loaded from backend
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
@@ -64,7 +123,13 @@ const App: React.FC = () => {
             const mapped = mapUser(freshUser);
             setCurrentUser(mapped);
             await localforage.setItem('bicadriver_current_user', mapped);
-            setCurrentScreen(mapped.role === UserRole.DRIVER ? AppScreen.DRIVER_DASHBOARD : AppScreen.MAIN_REQUEST);
+            setCurrentScreen(
+              mapped.role === UserRole.ADMIN
+                ? AppScreen.ADMIN_DASHBOARD
+                : mapped.role === UserRole.DRIVER
+                  ? AppScreen.DRIVER_DASHBOARD
+                  : AppScreen.MAIN_REQUEST,
+            );
           } catch {
             // Token expired — clear session
             clearToken();
@@ -83,6 +148,109 @@ const App: React.FC = () => {
   useEffect(() => {
     CapacitorService.initStatusBar();
   }, []);
+
+  const loadAdminDashboard = async () => {
+    setAdminDashboardLoading(true);
+    setAdminDashboardError(null);
+    try {
+      const [dashboard, pendingPayments, paymentHistory] = await Promise.all([
+        api.get<{
+          users: any[];
+          trips: any[];
+          settings: SystemSettings;
+        }>('/admin/dashboard'),
+        api.get<any[]>('/payments/pending'),
+        api.get<any[]>('/payments/history'),
+      ]);
+
+      setAdminUsers(dashboard.users.map(mapUser));
+      setAdminTrips(dashboard.trips.map(mapTrip));
+      setAdminPendingPayments(pendingPayments.map(mapPendingPaymentTrip));
+      setAdminPaymentHistory(paymentHistory.map(mapPaymentHistory));
+      setSystemSettings(prev => ({ ...prev, ...dashboard.settings }));
+    } finally {
+      setAdminDashboardLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentScreen !== AppScreen.ADMIN_DASHBOARD || currentUser?.role !== UserRole.ADMIN) return;
+
+    loadAdminDashboard().catch((error: any) => {
+      console.error('Failed to load admin dashboard:', error);
+      setAdminDashboardLoading(false);
+      setAdminDashboardError(error.message || 'Could not load admin dashboard.');
+    });
+  }, [currentScreen, currentUser?.role]);
+
+  useEffect(() => {
+    if (currentScreen !== AppScreen.ADMIN_DASHBOARD || currentUser?.role !== UserRole.ADMIN || !currentUser?.id) {
+      adminSocketRef.current?.disconnect();
+      adminSocketRef.current = null;
+      if (adminRefreshTimer.current) {
+        clearTimeout(adminRefreshTimer.current);
+        adminRefreshTimer.current = null;
+      }
+      return;
+    }
+
+    const scheduleAdminRefresh = () => {
+      if (adminRefreshTimer.current) {
+        clearTimeout(adminRefreshTimer.current);
+      }
+
+      adminRefreshTimer.current = setTimeout(() => {
+        loadAdminDashboard().catch((error: any) => {
+          console.error('Failed to refresh admin dashboard:', error);
+          setAdminDashboardLoading(false);
+        });
+      }, 250);
+    };
+
+    adminSocketRef.current = io(`${API_URL}/admin`, {
+      transports: ['websocket'],
+    });
+
+    adminSocketRef.current.on('connect', () => {
+      adminSocketRef.current?.emit('admin:register', { adminId: currentUser.id });
+    });
+
+    [
+      'admin:dashboard:update',
+      'admin:driver:pending_approval',
+      'admin:user:updated',
+      'admin:trip:updated',
+      'admin:settings:updated',
+      'admin:payment:updated',
+    ].forEach((eventName) => {
+      adminSocketRef.current?.on(eventName, scheduleAdminRefresh);
+    });
+
+    return () => {
+      adminSocketRef.current?.disconnect();
+      adminSocketRef.current = null;
+      if (adminRefreshTimer.current) {
+        clearTimeout(adminRefreshTimer.current);
+        adminRefreshTimer.current = null;
+      }
+    };
+  }, [currentScreen, currentUser?.id, currentUser?.role]);
+
+  useEffect(() => {
+    if (currentScreen !== AppScreen.MAIN_REQUEST || currentUser?.role !== UserRole.OWNER) {
+      setOwnerVisibleDrivers([]);
+      return;
+    }
+
+    api.get<any[]>('/users/drivers/available')
+      .then((drivers) => {
+        setOwnerVisibleDrivers(drivers.map(mapAvailableDriver));
+      })
+      .catch((error: any) => {
+        console.error('Failed to load owner-visible drivers:', error);
+        setOwnerVisibleDrivers([]);
+      });
+  }, [currentScreen, currentUser?.role]);
 
   const navigateTo = (screen: AppScreen) => {
     CapacitorService.triggerHaptic();
@@ -216,6 +384,9 @@ const App: React.FC = () => {
   const handleUpdateDriverStatus = async (userId: string, status: ApprovalStatus) => {
     try {
       await api.patch(`/users/${userId}/approval`, { approvalStatus: status });
+      if (currentUser?.role === UserRole.ADMIN) {
+        await loadAdminDashboard();
+      }
     } catch (error: any) {
       alert(error.message);
     }
@@ -224,6 +395,9 @@ const App: React.FC = () => {
   const handleBlockUser = async (userId: string, blocked: boolean) => {
     try {
       await api.patch(`/users/${userId}/block`, { isBlocked: blocked });
+      if (currentUser?.role === UserRole.ADMIN) {
+        await loadAdminDashboard();
+      }
     } catch (error: any) {
       alert(error.message);
     }
@@ -233,6 +407,9 @@ const App: React.FC = () => {
     try {
       await api.patch('/settings', newSettings);
       setSystemSettings(newSettings);
+      if (currentUser?.role === UserRole.ADMIN) {
+        await loadAdminDashboard();
+      }
     } catch (error: any) {
       alert(error.message);
     }
@@ -249,14 +426,8 @@ const App: React.FC = () => {
     setCurrentUser(prev => prev ? { ...prev, walletBalance: (prev.walletBalance || 0) + amount } : null);
   };
 
-  const handleRequestPayout = async (amount: number) => {
-    // No-op — payout flow now goes through Monnify automatically
-    // Wallet balance reflects earnings, not a withdrawable balance
-    alert('Your earnings are paid directly to your registered bank account after each trip.');
-  };
-
-  const renderScreen = () => {
-    switch (currentScreen) {
+  const renderScreen = (screen: AppScreen) => {
+    switch (screen) {
       case AppScreen.LOADING:
         return <LoadingScreen onComplete={() => navigateTo(AppScreen.WELCOME)} />;
       case AppScreen.WELCOME:
@@ -275,7 +446,7 @@ const App: React.FC = () => {
             onBack={handleLogout}
             onRideComplete={handleAddTrip}
             currentUser={currentUser}
-            allUsers={[]}
+            allUsers={ownerVisibleDrivers}
           />
         );
       case AppScreen.DRIVER_DASHBOARD:
@@ -285,7 +456,6 @@ const App: React.FC = () => {
             onOpenProfile={() => navigateTo(AppScreen.PROFILE)}
             onBack={handleLogout}
             onUpdateEarnings={handleUpdateEarnings}
-            onRequestPayout={handleRequestPayout}
             onRideComplete={handleAddTrip}
           />
         );
@@ -303,14 +473,17 @@ const App: React.FC = () => {
       case AppScreen.ADMIN_DASHBOARD:
         return (
           <AdminDashboardScreen
-            users={[]}
-            trips={[]}
-            payouts={[]}
+            users={adminUsers}
+            trips={adminTrips}
+            pendingPayments={adminPendingPayments}
+            paymentHistory={adminPaymentHistory}
             settings={systemSettings}
+            isLoading={adminDashboardLoading}
+            error={adminDashboardError}
             onUpdateStatus={handleUpdateDriverStatus}
             onBlockUser={handleBlockUser}
-            onApprovePayout={async (id) => { /* handled in admin screen */ }}
             onUpdateSettings={handleUpdateSettings}
+            onRetry={loadAdminDashboard}
             onBack={() => navigateTo(AppScreen.WELCOME)}
             onSimulate={handleSimulate}
           />
@@ -320,12 +493,26 @@ const App: React.FC = () => {
     }
   };
 
+  const isDriverProfileOverlay = currentScreen === AppScreen.PROFILE && currentUser?.role === UserRole.DRIVER;
+  const baseScreen = isDriverProfileOverlay ? AppScreen.DRIVER_DASHBOARD : currentScreen;
+
   return (
     <div className="flex justify-center items-start min-h-screen bg-slate-950">
       <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-hidden relative">
-        <div key={currentScreen} className="h-full w-full screen-transition overflow-hidden">
-          {renderScreen()}
+        <div key={baseScreen} className="h-full w-full screen-transition overflow-hidden">
+          {renderScreen(baseScreen)}
         </div>
+        {isDriverProfileOverlay && currentUser && (
+          <div className="absolute inset-0 z-30 bg-background-light dark:bg-background-dark overflow-hidden">
+            <ProfileScreen
+              user={currentUser}
+              initialRole={currentUser.role}
+              onBack={() => navigateTo(AppScreen.DRIVER_DASHBOARD)}
+              onLogout={handleLogout}
+              onUpdateAvatar={(a) => setCurrentUser(prev => prev ? { ...prev, avatar: a } : null)}
+            />
+          </div>
+        )}
         {currentUser && currentScreen !== AppScreen.ADMIN_DASHBOARD && (
           <SupportChatbot user={currentUser} />
         )}

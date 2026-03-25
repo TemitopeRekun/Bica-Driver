@@ -6,6 +6,18 @@ export enum UserRole {
 }
 
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type TripStatus =
+  | 'PENDING'
+  | 'SEARCHING'
+  | 'PENDING_ACCEPTANCE'
+  | 'ASSIGNED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'SCHEDULED'
+  | 'DECLINED';
+
+export type PaymentStatus = 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED';
 
 export interface UserProfile {
   id: string;
@@ -17,6 +29,7 @@ export interface UserProfile {
   rating: number;
   trips: number;           // maps to totalTrips from backend
   totalTrips?: number;     // backend field name
+  isOnline?: boolean;
   avatar: string;          // maps to avatarUrl from backend
   avatarUrl?: string;      // backend field name
   walletBalance?: number;
@@ -48,6 +61,8 @@ export interface UserProfile {
   currentLocation?: { lat: number; lng: number };
   locationLat?: number;
   locationLng?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Trip {
@@ -61,10 +76,15 @@ export interface Trip {
   owner?: { id: string; name: string; avatarUrl?: string; phone?: string };
   date: string;
   createdAt?: string;
+  updatedAt?: string;
+  completedAt?: string | null;
+  startedAt?: string | null;
+  scheduledAt?: string | null;
   amount: number;
+  finalFare?: number | null;
   distanceKm?: number;
-  status: 'COMPLETED' | 'CANCELLED' | 'PENDING' | 'IN_PROGRESS' | 'ASSIGNED' | 'SEARCHING' | 'SCHEDULED';
-  paymentStatus?: 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED';
+  status: TripStatus;
+  paymentStatus?: PaymentStatus;
   location: string;
   pickupAddress?: string;
   destAddress?: string;
@@ -73,9 +93,11 @@ export interface Trip {
   destLat?: number;
   destLng?: number;
   estimatedArrivalMins?: number;
+  estimatedMins?: number | null;
   driverEarnings?: number;
   commissionAmount?: number;
   monnifyTxRef?: string;
+  fareBreakdown?: Record<string, unknown> | null;
 }
 
 export interface Payout {
@@ -85,13 +107,89 @@ export interface Payout {
   amount: number;
   status: 'PENDING' | 'PAID';
   date: string;
+  bankName?: string | null;
+  accountName?: string | null;
+  accountNumber?: string | null;
+  requestedAt?: string;
+  approvedAt?: string | null;
+  tripId?: string | null;
+  driver?: {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    walletBalance?: number;
+  };
+  trip?: {
+    id: string;
+    amount: number;
+    status: TripStatus;
+    createdAt: string;
+  } | null;
+}
+
+export interface WalletSummary {
+  name: string;
+  currentBalance: number;
+  totalEarned: number;
+  totalTrips: number;
+  bankName: string | null;
+  accountNumber: string | null;
+  subAccountActive: boolean;
+  recentPayments: Array<{
+    id: string;
+    totalAmount: number;
+    driverAmount: number;
+    paidAt: string;
+    paymentMethod: string | null;
+  }>;
+}
+
+export interface PaymentHistoryRecord {
+  id: string;
+  tripId: string;
+  totalAmount: number;
+  driverAmount: number;
+  platformAmount: number;
+  monnifyTxRef: string;
+  paymentMethod: string | null;
+  paidAt: string;
+  webhookPayload: Record<string, unknown>;
+  createdAt: string;
+  trip: {
+    id: string;
+    pickupAddress: string;
+    destAddress: string;
+    status: TripStatus;
+    owner: {
+      name: string;
+    };
+    driver: {
+      name: string;
+    } | null;
+  };
+}
+
+export interface PendingPaymentTrip extends Trip {
+  owner: {
+    name: string;
+    email: string;
+    phone: string;
+  };
+  driver: {
+    name: string;
+  } | null;
 }
 
 export interface SystemSettings {
   baseFare: number;
   pricePerKm: number;
+  timeRate?: number;
   commission: number;
   autoApprove: boolean;
+  id?: number;
+  updatedAt?: string;
+  updatedById?: string | null;
 }
 
 export enum AppScreen {

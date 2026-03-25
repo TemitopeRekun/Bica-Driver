@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import InteractiveMap from '../components/InteractiveMap';
 import { CapacitorService } from '../services/CapacitorService';
-import { UserProfile, Trip } from '../types';
+import { UserProfile, Trip, WalletSummary } from '../types';
 import { io, Socket } from 'socket.io-client';
 import { api } from '../services/api.service';
 import { IMAGES } from '@/constants';
@@ -29,7 +29,6 @@ interface DriverMainScreenProps {
   onOpenProfile: () => void;
   onBack: () => void;
   onUpdateEarnings: (amount: number) => void;
-  onRequestPayout: (amount: number) => void;
   onRideComplete: (trip: Trip) => void;
 }
 
@@ -72,45 +71,90 @@ const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
 // ... existing imports
 
 const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
-  user, onOpenProfile, onBack, onUpdateEarnings, onRequestPayout, onRideComplete
+  user, onOpenProfile, onBack, onUpdateEarnings, onRideComplete
 }) => {
   const [isOnline, setIsOnline] = useState(true);
   const [isLocationRefreshing, setIsLocationRefreshing] = useState(false); // overlay on first login
   const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
   const [ridePhase, setRidePhase] = useState<RidePhase>('pickup');
   const [driverPos, setDriverPos] = useState<[number, number]>([6.4549, 3.3896]);
-  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [walletSummary, setWalletSummary] = useState<WalletSummary | null>(null);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showSelfieModal, setShowSelfieModal] = useState(false);
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
   const [pendingRide, setPendingRide] = useState<RideRequest | null>(null);
+  const [recentTrips, setRecentTrips] = useState<Trip[]>([]);
+  const [isLoadingTrips, setIsLoadingTrips] = useState(false);
   const lastRulesAccepted = useRef<number>(0);
   const trackingInterval = useRef<any>(null);
 
   const approvalStatus = user?.approvalStatus || 'PENDING';
-  const totalEarnings = user?.walletBalance || 0;
+  const totalEarnings = walletSummary?.currentBalance ?? user?.walletBalance ?? 0;
   const socketRef = useRef<Socket | null>(null);
   const [liveRideRequests, setLiveRideRequests] = useState<RideRequest[]>([]);
 
   const [tripTimer, setTripTimer] = useState<number>(0); // seconds elapsed
   const timerInterval = useRef<any>(null);
   const [fareBreakdown, setFareBreakdown] = useState<any>(null);
+  const loadWalletSummary = async () => {
+    try {
+      const summary = await api.get<WalletSummary>('/payments/wallet');
+      setWalletSummary(summary);
+    } catch (error) {
+      console.error('Failed to load wallet summary:', error);
+    }
+  };
+  const loadRecentTrips = async () => {
+    setIsLoadingTrips(true);
+    try {
+      const trips = await api.get<any[]>('/rides/history');
+      setRecentTrips(trips.map((trip) => ({
+        ...trip,
+        ownerId: trip.ownerId || trip.owner?.id,
+        driverId: trip.driverId || trip.driver?.id,
+        ownerName: trip.owner?.name || trip.ownerName || 'Owner',
+        driverName: trip.driver?.name || trip.driverName || 'Driver',
+        date: trip.createdAt ? new Date(trip.createdAt).toLocaleString() : '',
+        location: `${trip.pickupAddress?.split(',')[0] || 'Unknown'} -> ${trip.destAddress?.split(',')[0] || 'Unknown'}`,
+      })));
+    } catch (error) {
+      console.error('Failed to load driver trip history:', error);
+      setRecentTrips([]);
+    } finally {
+      setIsLoadingTrips(false);
+    }
+  };
+  const registerDriverSocket = () => {
+    if (!socketRef.current?.connected || !user?.id) return;
+    socketRef.current.emit('driver:register', { driverId: user.id });
+  };
+  const pushDriverLocation = async (latitude: number, longitude: number) => {
+    if (!user?.id) return;
+    setDriverPos([latitude, longitude]);
+    await api.patch('/users/location', { lat: latitude, lng: longitude });
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('driver:location', {
+        driverId: user.id,
+        lat: latitude,
+        lng: longitude,
+      });
+    }
+  };
 
 
-  // Effect 1 — Socket connection (only reconnects when user ID changes)
+  // Effect 1 - Socket connection (only reconnects when user ID changes)
   useEffect(() => {
     if (approvalStatus !== 'APPROVED' || !user?.id) return;
 
     socketRef.current = io(`${API_URL}/rides`, {
       transports: ['websocket'],
+      autoConnect: false,
     });
 
-    // Register driver socket ONCE on connect
     socketRef.current.on('connect', () => {
-      socketRef.current?.emit('driver:register', { driverId: user.id });
+      registerDriverSocket();
     });
 
-    // Listen for ride assignments ONCE
     socketRef.current.on('ride:assigned', (trip: any) => {
       const rideRequest: RideRequest = {
         id: trip.id,
@@ -125,8 +169,8 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
         destCoords: [trip.destLat, trip.destLng],
         estimatedMins: trip.estimatedMins ?? null,
       };
+
       setLiveRideRequests(prev => {
-        // Prevent duplicate rides
         if (prev.some(r => r.id === trip.id)) return prev;
         return [rideRequest, ...prev];
       });
@@ -136,14 +180,24 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
-  }, [approvalStatus, user?.id]); // ← only reconnects if user changes, NOT on isOnline toggle
-  // Effect 2 — Location tracking (responds to isOnline changes)
+  }, [approvalStatus, user?.id]);
+
   useEffect(() => {
     if (approvalStatus !== 'APPROVED' || !user?.id) return;
+    loadWalletSummary();
+    loadRecentTrips();
+  }, [approvalStatus, user?.id]);
+
+  // Effect 2 - Location tracking (responds to isOnline changes)
+  useEffect(() => {
+    if (approvalStatus !== 'APPROVED' || !user?.id || !socketRef.current) return;
 
     if (!isOnline) {
       // Going offline — clear interval, location already cleared in toggleOnline
       clearInterval(trackingInterval.current);
+      if (socketRef.current?.connected) {
+        socketRef.current.disconnect();
+      }
       return;
     }
 
@@ -151,18 +205,17 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     const initLocation = async () => {
       setIsLocationRefreshing(true);
       try {
+        if (!socketRef.current?.connected) {
+          socketRef.current.connect();
+        } else {
+          registerDriverSocket();
+        }
         await api.patch('/users/online', { isOnline: true });
 
         const pos = await CapacitorService.getCurrentLocation();
         if (pos) {
           const { latitude, longitude } = pos.coords;
-          setDriverPos([latitude, longitude]);
-          await api.patch('/users/location', { lat: latitude, lng: longitude });
-          socketRef.current?.emit('driver:location', {
-            driverId: user.id,
-            lat: latitude,
-            lng: longitude,
-          });
+          await pushDriverLocation(latitude, longitude);
         }
       } catch (e) {
         console.error('Initial location failed:', e);
@@ -179,13 +232,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
         const pos = await CapacitorService.getCurrentLocation();
         if (pos) {
           const { latitude, longitude } = pos.coords;
-          setDriverPos([latitude, longitude]);
-          await api.patch('/users/location', { lat: latitude, lng: longitude });
-          socketRef.current?.emit('driver:location', {
-            driverId: user.id,
-            lat: latitude,
-            lng: longitude,
-          });
+          await pushDriverLocation(latitude, longitude);
         }
       } catch (e) {
         console.error('Location interval failed:', e);
@@ -343,6 +390,12 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       const earnings = result.fareBreakdown?.driverEarnings ?? result.driver?.walletBalance;
       if (earnings) {
         onUpdateEarnings(result.fareBreakdown?.driverEarnings ?? 0);
+        setWalletSummary(prev => prev ? {
+          ...prev,
+          currentBalance: prev.currentBalance + (result.fareBreakdown?.driverEarnings ?? 0),
+          totalEarned: prev.totalEarned + (result.fareBreakdown?.driverEarnings ?? 0),
+          totalTrips: prev.totalTrips + 1,
+        } : prev);
       }
 
       const newTrip: Trip = {
@@ -365,14 +418,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     }
   };
 
-  const handleRequestPayoutClick = () => {
-    if (totalEarnings < 5000) {
-      alert("Minimum payout amount is ₦5,000");
-      return;
-    }
-    setShowPayoutModal(true);
-  };
-
   const handleDeclineRide = async (ride: RideRequest) => {
     CapacitorService.triggerHaptic();
     try {
@@ -382,12 +427,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     } catch (error: any) {
       alert(error.message || 'Failed to decline ride');
     }
-  };
-
-  const confirmPayout = () => {
-    onRequestPayout(totalEarnings);
-    setShowPayoutModal(false);
-    alert("Payout request sent to Admin successfully!");
   };
 
   const openNavigation = (coords: [number, number]) => {
@@ -413,6 +452,17 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       minimumFractionDigits: 0
     }).format(amount).replace('NGN', '₦');
   };
+
+  const formatShortDate = (value?: string | null) => {
+    if (!value) return 'Just now';
+    return new Date(value).toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
 
   if (approvalStatus === 'PENDING') {
     return (
@@ -532,16 +582,19 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                 <span className="material-symbols-outlined filled">account_balance_wallet</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Total Earnings</span>
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Cleared Earnings</span>
                 <span className="text-xl font-black text-white tracking-tight">{formatCurrency(totalEarnings)}</span>
+                {walletSummary?.accountNumber && (
+                  <span className="text-[10px] text-slate-400 mt-1">
+                    Settled to {walletSummary.accountNumber}
+                  </span>
+                )}
               </div>
               <div className="w-px h-8 bg-white/10 mx-2"></div>
-              <button
-                onClick={handleRequestPayoutClick}
-                className="text-primary text-[10px] font-black uppercase tracking-widest hover:underline active:scale-95 transition-all"
-              >
-                Payout
-              </button>
+              <div className="text-right">
+                <p className="text-[10px] font-black uppercase tracking-widest text-primary">Monnify</p>
+                <p className="text-[10px] text-slate-400">Paid directly</p>
+              </div>
             </div>
           </div>
         )}
@@ -678,6 +731,56 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                   </div>
                 </div>
               )}
+
+              <div className="grid gap-4">
+                <div className="rounded-3xl border border-white/5 bg-white/5 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Recent Settlements</p>
+                    <span className="text-[10px] text-slate-400">{walletSummary?.recentPayments?.length || 0} records</span>
+                  </div>
+                  {walletSummary?.recentPayments?.length ? (
+                    <div className="space-y-3">
+                      {walletSummary.recentPayments.slice(0, 3).map((payment) => (
+                        <div key={payment.id} className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold text-white">{formatCurrency(payment.driverAmount)}</p>
+                            <p className="text-xs text-slate-400">{formatShortDate(payment.paidAt)}</p>
+                          </div>
+                          <span className="text-[10px] uppercase tracking-widest text-primary">
+                            {payment.paymentMethod || 'Monnify'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">No settlements recorded yet.</p>
+                  )}
+                </div>
+
+                <div className="rounded-3xl border border-white/5 bg-white/5 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Recent Trips</p>
+                    <span className="text-[10px] text-slate-400">{recentTrips.length} total</span>
+                  </div>
+                  {isLoadingTrips ? (
+                    <p className="text-sm text-slate-400">Loading trips...</p>
+                  ) : recentTrips.length > 0 ? (
+                    <div className="space-y-3">
+                      {recentTrips.slice(0, 3).map((trip) => (
+                        <div key={trip.id} className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold text-white truncate">{trip.location}</p>
+                            <p className="text-xs text-slate-400">{formatShortDate(trip.createdAt || trip.date)}</p>
+                          </div>
+                          <span className="text-xs font-bold text-primary">{formatCurrency(trip.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">No trips recorded yet.</p>
+                  )}
+                </div>
+              </div>
             </>
           ) : (
             <div className="flex flex-col gap-6 animate-slide-up">
@@ -768,17 +871,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                       </span>
                     </div>
                   </div>
-
-                  {/* Surcharge warning if going over estimated time */}
-                  {activeRide.estimatedMins && tripTimer > activeRide.estimatedMins * 60 && (
-                    <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-3 flex items-center gap-2">
-                      <span className="material-symbols-outlined text-orange-400 text-sm">schedule</span>
-                      <p className="text-orange-400 text-xs font-bold">
-                        {Math.ceil((tripTimer - activeRide.estimatedMins * 60) / 60)} mins over estimate
-                        — ₦{Math.ceil((tripTimer - activeRide.estimatedMins * 60) / 60) * 50} surcharge accruing
-                      </p>
-                    </div>
-                  )}
 
                   <button
                     onClick={handleCompleteTrip}
@@ -976,25 +1068,10 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
         </div>
       )}
 
-      {showPayoutModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-surface-dark border border-white/10 p-6 rounded-[2rem] w-full max-w-sm text-center">
-            <span className="material-symbols-outlined text-4xl text-white mb-3 bg-white/10 p-4 rounded-full">payments</span>
-            <h3 className="text-xl font-bold text-white mb-2">Request Payout</h3>
-            <p className="text-slate-400 text-sm mb-6">
-              Withdraw your full balance of <span className="text-white font-bold">{formatCurrency(totalEarnings)}</span>?
-              <br /><br />
-              This request will be sent to Admin for approval.
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowPayoutModal(false)} className="flex-1 py-3 rounded-xl bg-white/5 text-slate-300 font-bold">Cancel</button>
-              <button onClick={confirmPayout} className="flex-1 py-3 rounded-xl bg-primary text-white font-bold">Confirm</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
 
 export default DriverMainScreen;
+
+

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CapacitorService } from '../services/CapacitorService';
 import InteractiveMap from '../components/InteractiveMap';
 import { IMAGES } from '../constants';
-import { SystemSettings, Trip, UserProfile, UserRole } from '../types';
+import { SystemSettings, Trip, UserProfile, UserRole, PaymentHistoryRecord } from '../types';
 import { io, Socket } from 'socket.io-client';
 import { LocationService, LocationData } from '../services/LocationService';
 import { api } from '@/services/api.service';
@@ -76,6 +76,12 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const [isLoadingDrivers, setIsLoadingDrivers] = useState(false);
   const [showDriverPicker, setShowDriverPicker] = useState(false);
   const ownerSocketRef = useRef<Socket | null>(null);
+  const pickupRef = useRef<LocationData | null>(null);
+  const rideStateRef = useRef<RideState>('IDLE');
+  const showDriverPickerRef = useRef(false);
+  const transmissionRef = useRef('Automatic');
+  const trackedDriverIdRef = useRef<string | null>(null);
+  const refreshAvailableDriversRef = useRef<() => Promise<void>>(async () => {});
 
 
   const [currentTripFareBreakdown, setCurrentTripFareBreakdown] = useState<any>(null);
@@ -102,7 +108,11 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   }, [currentUser]);
   // Simulation State
   const [driverInfo, setDriverInfo] = useState<any>(null);
+  const [trackedDriverPos, setTrackedDriverPos] = useState<[number, number] | null>(null);
   const [noDriversFound, setNoDriversFound] = useState(false);
+  const [recentTrips, setRecentTrips] = useState<Trip[]>([]);
+  const [recentPayments, setRecentPayments] = useState<PaymentHistoryRecord[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const timerRefs = useRef<any[]>([]);
 
   const [isLocating, setIsLocating] = useState(false);
@@ -155,17 +165,18 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   };
 
   const fetchAvailableDrivers = async () => {
-    if (!pickup) return;
+    const activePickup = pickupRef.current;
+    if (!activePickup) return;
     setIsLoadingDrivers(true);
     try {
       // Pass the owner's chosen transmission so backend only returns
       // compatible drivers (Automatic owners see Automatic + Any drivers;
       // Manual owners see only Manual drivers)
-      const transmissionParam = vehicleData.transmission
-        ? `&transmission=${encodeURIComponent(vehicleData.transmission)}`
+      const transmissionParam = transmissionRef.current
+        ? `&transmission=${encodeURIComponent(transmissionRef.current)}`
         : '';
       const drivers = await api.get<any[]>(
-        `/users/drivers/available?pickupLat=${pickup.lat}&pickupLng=${pickup.lon}${transmissionParam}`,
+        `/users/drivers/available?pickupLat=${activePickup.lat}&pickupLng=${activePickup.lon}${transmissionParam}`,
       );
       setAvailableDrivers(drivers);
     } catch (error) {
@@ -175,6 +186,12 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       setIsLoadingDrivers(false);
     }
   };
+
+  pickupRef.current = pickup;
+  rideStateRef.current = rideState;
+  showDriverPickerRef.current = showDriverPicker;
+  transmissionRef.current = vehicleData.transmission;
+  refreshAvailableDriversRef.current = fetchAvailableDrivers;
 
 
   const handleUseMyLocation = async () => {
@@ -219,11 +236,46 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   useEffect(() => {
     if (!currentUser?.id) return;
 
+    const loadOwnerHistory = async () => {
+      setIsLoadingHistory(true);
+      try {
+        const [rides, payments] = await Promise.all([
+          api.get<any[]>('/rides/history'),
+          api.get<PaymentHistoryRecord[]>('/payments/history'),
+        ]);
+
+        setRecentTrips(rides.map((trip) => ({
+          ...trip,
+          ownerId: trip.ownerId || trip.owner?.id,
+          driverId: trip.driverId || trip.driver?.id,
+          ownerName: trip.owner?.name || trip.ownerName || 'Owner',
+          driverName: trip.driver?.name || trip.driverName || 'Unassigned',
+          date: trip.createdAt ? new Date(trip.createdAt).toLocaleString() : '',
+          location: `${trip.pickupAddress?.split(',')[0] || 'Unknown'} -> ${trip.destAddress?.split(',')[0] || 'Unknown'}`,
+        })));
+        setRecentPayments(payments);
+      } catch (error) {
+        console.error('Failed to load owner history:', error);
+        setRecentTrips([]);
+        setRecentPayments([]);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+
+    loadOwnerHistory();
+  }, [currentUser?.id]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
     ownerSocketRef.current = io(`${API_URL}/rides`, {
       transports: ['websocket'],
     });
 
-    ownerSocketRef.current.emit('owner:register', { ownerId: currentUser.id });
+    ownerSocketRef.current.on('connect', () => {
+      ownerSocketRef.current?.emit('owner:register', { ownerId: currentUser.id });
+    });
 
     // Driver accepted — move to ASSIGNED state
     ownerSocketRef.current.on('ride:accepted', (data: any) => {
@@ -233,6 +285,9 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         avatar: data.driver?.avatarUrl || IMAGES.DRIVER_CARD,
         timeAway: data.estimatedArrivalMins || 5,
       }));
+      if (data.driver?.id) {
+        trackedDriverIdRef.current = data.driver.id;
+      }
       setRideState('ASSIGNED');
     });
 
@@ -241,6 +296,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       alert(data.message || 'Driver declined. Please choose another driver.');
       setSelectedDriver(null);
       setDriverInfo(null);
+      trackedDriverIdRef.current = null;
+      setTrackedDriverPos(null);
       fetchAvailableDrivers();
       setShowDriverPicker(true);
       setRideState('IDLE');
@@ -254,10 +311,34 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       setRideState('COMPLETED');
     });
 
+    ownerSocketRef.current.on('driver:availability', () => {
+      if ((showDriverPickerRef.current || rideStateRef.current === 'IDLE') && pickupRef.current) {
+        refreshAvailableDriversRef.current().catch((error) => {
+          console.error('Failed to refresh drivers after availability update:', error);
+        });
+      }
+    });
+
+    ownerSocketRef.current.on('location:updated', (data: any) => {
+      if (!trackedDriverIdRef.current || data.driverId !== trackedDriverIdRef.current) return;
+      if (typeof data.lat === 'number' && typeof data.lng === 'number') {
+        setTrackedDriverPos([data.lat, data.lng]);
+      }
+    });
+
     return () => {
       ownerSocketRef.current?.disconnect();
     };
   }, [currentUser?.id]);
+  const getSearchBias = (): { lat?: number; lng?: number } => {
+    if (pickup) {
+      return { lat: pickup.lat, lng: pickup.lon };
+    }
+    if (Number.isFinite(mapCenter[0]) && Number.isFinite(mapCenter[1])) {
+      return { lat: mapCenter[0], lng: mapCenter[1] };
+    }
+    return {};
+  };
 
   function deg2rad(deg: number) {
     return deg * (Math.PI / 180);
@@ -429,13 +510,18 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         setCurrentTripFareBreakdown(trip.fareBreakdown);
       } else {
         // Build a simple breakdown from trip data if fareBreakdown not cached
+        const fallbackActualMins = trip.estimatedMins ?? 0;
+        const fallbackBaseFare = settings.baseFare;
+        const fallbackDistanceComponent = Math.max((trip.distanceKm ?? 0) * 100, 0);
+        const fallbackTimeComponent = Math.max(fallbackActualMins * 50, 0);
         setCurrentTripFareBreakdown({
           finalFare: trip.amount,
           distanceKm: trip.distanceKm,
-          distanceComponent: trip.amount - 500,
-          timeComponent: 0,
-          extraMins: 0,
-          actualMins: trip.estimatedMins ?? 0,
+          baseFare: fallbackBaseFare,
+          distanceComponent: fallbackDistanceComponent,
+          timeComponent: fallbackTimeComponent,
+          totalMins: fallbackActualMins,
+          actualMins: fallbackActualMins,
           estimatedMins: trip.estimatedMins ?? 0,
           driverEarnings: trip.driverEarnings,
           commissionAmount: trip.commissionAmount,
@@ -454,6 +540,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     setPickup(null);
     setDestination(null);
     setDriverInfo(null);
+    setTrackedDriverPos(null);
+    trackedDriverIdRef.current = null;
     setNoDriversFound(false);
     setBookingType('now');
   };
@@ -483,10 +571,27 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
   const handleSelectDriver = async (driver: any) => {
     setSelectedDriver(driver);
+    trackedDriverIdRef.current = driver.id;
+    if (typeof driver.locationLat === 'number' && typeof driver.locationLng === 'number') {
+      setTrackedDriverPos([driver.locationLat, driver.locationLng]);
+    } else {
+      setTrackedDriverPos(null);
+    }
     setShowDriverPicker(false);
     // Pass driver directly — don't rely on selectedDriver state which is async
     await startRideRequest(driver);
   };
+
+  useEffect(() => {
+    if (
+      ownerSocketRef.current?.connected &&
+      driverInfo?.id &&
+      (rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS')
+    ) {
+      trackedDriverIdRef.current = driverInfo.id;
+      ownerSocketRef.current.emit('track:driver', { driverId: driverInfo.id });
+    }
+  }, [driverInfo?.id, rideState]);
 
 
   const openGoogleMaps = () => {
@@ -500,6 +605,17 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(val).replace('NGN', '₦');
   };
 
+  const formatShortDate = (value?: string | null) => {
+    if (!value) return 'Just now';
+    return new Date(value).toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
+
 
   const handleCategoryTap = async (categoryType: string) => {
     const queries: Record<string, string> = {
@@ -511,12 +627,13 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
     const query = queries[categoryType] || categoryType;
     setIsSearching(true);
+    const bias = getSearchBias();
 
     try {
       const results = await LocationService.search(
         query,
-        pickup?.lat,
-        pickup?.lon,
+        bias.lat,
+        bias.lng,
       );
 
       // Sort by distance from pickup if pickup is set
@@ -547,8 +664,9 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     }
     setIsSearching(true);
     const timer = setTimeout(async () => {
+      const bias = getSearchBias();
       try {
-        const results = await LocationService.search(searchQuery, pickup?.lat, pickup?.lon);
+        const results = await LocationService.search(searchQuery, bias.lat, bias.lng);
         setSearchResults(results);
       } catch (e) {
         setSearchResults([]);
@@ -667,7 +785,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   if (driverInfo && (rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS')) {
     markers.push({
       id: 'driver',
-      position: [pickup!.lat + 0.002, pickup!.lon + 0.002], // Simulated pos
+      position: trackedDriverPos || [pickup!.lat + 0.002, pickup!.lon + 0.002],
       title: driverInfo.name,
       icon: 'taxi'
     });
@@ -848,7 +966,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                             {formatCurrency(estimatedPrice)}
                           </p>
                         )}
-                        <p className="text-[10px] text-slate-400 mt-1">Final fare based on actual trip time</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Estimate uses route time. Final fare uses actual trip duration.</p>
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Distance</p>
@@ -896,6 +1014,58 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                     </button>
                   </div>
                 )}
+
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black/20 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-500">Recent Trips</p>
+                      <span className="text-[10px] text-slate-400">{recentTrips.length} total</span>
+                    </div>
+                    {isLoadingHistory ? (
+                      <p className="text-sm text-slate-400">Loading trip history...</p>
+                    ) : recentTrips.length > 0 ? (
+                      <div className="space-y-3">
+                        {recentTrips.slice(0, 3).map((trip) => (
+                          <div key={trip.id} className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{trip.location}</p>
+                              <p className="text-xs text-slate-500">{formatShortDate(trip.createdAt || trip.date)}</p>
+                            </div>
+                            <span className="text-xs font-bold text-slate-500 uppercase">{trip.status.replace(/_/g, ' ')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400">No trips yet.</p>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black/20 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-black uppercase tracking-widest text-slate-500">Payment History</p>
+                      <span className="text-[10px] text-slate-400">{recentPayments.length} records</span>
+                    </div>
+                    {isLoadingHistory ? (
+                      <p className="text-sm text-slate-400">Loading payments...</p>
+                    ) : recentPayments.length > 0 ? (
+                      <div className="space-y-3">
+                        {recentPayments.slice(0, 3).map((payment) => (
+                          <div key={payment.id} className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                {payment.trip.pickupAddress.split(',')[0]} to {payment.trip.destAddress.split(',')[0]}
+                              </p>
+                              <p className="text-xs text-slate-500">{formatShortDate(payment.paidAt)}</p>
+                            </div>
+                            <span className="text-sm font-black text-primary">{formatCurrency(payment.totalAmount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400">No completed payments yet.</p>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1058,40 +1228,38 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
             {currentTripFareBreakdown && (
               <div className="bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Fare Breakdown</p>
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Final Fare Breakdown</p>
                 </div>
 
                 <div className="px-4 py-3 space-y-3">
-                  {currentTripFareBreakdown.distanceComponent > 0 ? (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 text-sm">
-                        Distance ({currentTripFareBreakdown.distanceKm}km × ₦100)
-                      </span>
-                      <span className="font-bold text-sm">
-                        ₦{currentTripFareBreakdown.distanceComponent.toLocaleString()}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 text-sm">Short trip flat rate</span>
-                      <span className="font-bold text-sm">₦2,000</span>
-                    </div>
-                  )}
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 text-sm">Base fare</span>
+                    <span className="font-bold text-sm">
+                      NGN {(currentTripFareBreakdown.baseFare ?? settings.baseFare).toLocaleString()}
+                    </span>
+                  </div>
 
-                  {currentTripFareBreakdown.extraMins > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-orange-500 text-sm">
-                        Traffic surcharge ({currentTripFareBreakdown.extraMins}mins × ₦50)
-                      </span>
-                      <span className="text-orange-500 font-bold text-sm">
-                        +₦{currentTripFareBreakdown.timeComponent.toLocaleString()}
-                      </span>
-                    </div>
-                  )}
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 text-sm">
+                      Distance ({currentTripFareBreakdown.distanceKm ?? 0}km x NGN 100)
+                    </span>
+                    <span className="font-bold text-sm">
+                      NGN {(currentTripFareBreakdown.distanceComponent ?? 0).toLocaleString()}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 text-sm">
+                      Time ({currentTripFareBreakdown.totalMins ?? currentTripFareBreakdown.actualMins ?? 0} mins x NGN 50)
+                    </span>
+                    <span className="font-bold text-sm">
+                      NGN {(currentTripFareBreakdown.timeComponent ?? 0).toLocaleString()}
+                    </span>
+                  </div>
 
                   <div className="flex justify-between text-xs text-slate-400">
-                    <span>Trip time: {currentTripFareBreakdown.actualMins} mins</span>
-                    <span>Estimated: {currentTripFareBreakdown.estimatedMins} mins</span>
+                    <span>Actual trip time: {currentTripFareBreakdown.actualMins ?? currentTripFareBreakdown.totalMins ?? 0} mins</span>
+                    <span>Estimated route time: {currentTripFareBreakdown.estimatedMins ?? 0} mins</span>
                   </div>
                 </div>
 
@@ -1100,7 +1268,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                 <div className="px-4 py-3 flex justify-between items-center">
                   <span className="font-black text-slate-900 dark:text-white">Total</span>
                   <span className="text-2xl font-black text-primary">
-                    ₦{currentTripFareBreakdown.finalFare.toLocaleString()}
+                    NGN {currentTripFareBreakdown.finalFare.toLocaleString()}
                   </span>
                 </div>
               </div>
@@ -1120,7 +1288,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
               ) : (
                 <>
                   <span className="material-symbols-outlined">payment</span>
-                  Pay ₦{currentTripFareBreakdown?.finalFare.toLocaleString() ?? estimatedPrice.toLocaleString()}
+                  Pay NGN {currentTripFareBreakdown?.finalFare.toLocaleString() ?? estimatedPrice.toLocaleString()}
                 </>
               )}
             </button>

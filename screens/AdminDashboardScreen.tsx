@@ -1,37 +1,55 @@
 
 import React, { useState } from 'react';
-import { UserProfile, UserRole, ApprovalStatus, Trip, Payout, SystemSettings } from '../types';
-import { IMAGES } from '../constants';
+import { UserProfile, UserRole, ApprovalStatus, Trip, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord } from '../types';
 
 interface AdminDashboardScreenProps {
   users: UserProfile[];
   trips: Trip[];
-  payouts: Payout[];
+  pendingPayments: PendingPaymentTrip[];
+  paymentHistory: PaymentHistoryRecord[];
   settings: SystemSettings;
+  isLoading?: boolean;
+  error?: string | null;
   onUpdateStatus: (userId: string, status: ApprovalStatus) => void;
   onBlockUser: (userId: string, blocked: boolean) => void;
-  onApprovePayout: (payoutId: string) => void;
   onUpdateSettings: (settings: SystemSettings) => void;
+  onRetry: () => Promise<void> | void;
   onBack: () => void;
   onSimulate: (role: UserRole) => void;
 }
 
 type AdminSection = 'overview' | 'drivers' | 'owners' | 'trips' | 'finance' | 'settings';
+type DriverFilter = 'All' | 'Pending' | 'Active' | 'Blocked';
 
 const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({ 
-  users, trips, payouts, settings, 
-  onUpdateStatus, onBlockUser, onApprovePayout, onUpdateSettings, 
-  onBack, onSimulate 
+  users, trips, pendingPayments, paymentHistory, settings, isLoading, error,
+  onUpdateStatus, onBlockUser, onUpdateSettings, 
+  onRetry, onBack, onSimulate 
 }) => {
   const [activeSection, setActiveSection] = useState<AdminSection>('overview');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [driverFilter, setDriverFilter] = useState<DriverFilter>('All');
   const [localSettings, setLocalSettings] = useState<SystemSettings>(settings);
 
   // Derived Data
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
   const owners = users.filter(u => u.role === UserRole.OWNER);
   const pendingDrivers = drivers.filter(u => u.approvalStatus === 'PENDING');
+  const filteredDrivers = drivers
+    .filter((driver) => {
+      switch (driverFilter) {
+        case 'Pending':
+          return driver.approvalStatus === 'PENDING';
+        case 'Active':
+          return !driver.isBlocked && driver.isOnline && driver.approvalStatus === 'APPROVED';
+        case 'Blocked':
+          return !!driver.isBlocked;
+        default:
+          return true;
+      }
+    })
+    .filter(d => (d.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
   
   const totalRevenue = trips.reduce((acc, t) => t.status === 'COMPLETED' ? acc + t.amount : acc, 0);
   const platformFees = totalRevenue * (settings.commission / 100);
@@ -40,9 +58,35 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(amount).replace('NGN', '₦');
   };
 
+  const formatShortDate = (value?: string | null) => {
+    if (!value) return 'Just now';
+    return new Date(value).toLocaleString([], {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
+
   const handleSaveSettings = () => {
     onUpdateSettings(localSettings);
     alert("System Settings Updated Successfully!");
+  };
+
+  const getTripStatusClass = (status: Trip['status']) => {
+    switch (status) {
+      case 'COMPLETED':
+        return 'bg-green-500/10 text-green-500';
+      case 'CANCELLED':
+      case 'DECLINED':
+        return 'bg-red-500/10 text-red-500';
+      case 'IN_PROGRESS':
+      case 'ASSIGNED':
+        return 'bg-blue-500/10 text-blue-500';
+      default:
+        return 'bg-orange-500/10 text-orange-500';
+    }
   };
 
   const renderOverview = () => (
@@ -133,13 +177,21 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   const renderDrivers = () => (
     <div className="space-y-4 animate-slide-up">
       <div className="flex gap-2 mb-2 overflow-x-auto no-scrollbar pb-2">
-         {['All', 'Pending', 'Active', 'Blocked'].map((filter) => (
-           <button key={filter} className="px-4 py-2 bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold uppercase whitespace-nowrap hover:border-primary transition-colors">
+         {(['All', 'Pending', 'Active', 'Blocked'] as DriverFilter[]).map((filter) => (
+           <button
+             key={filter}
+             onClick={() => setDriverFilter(filter)}
+             className={`px-4 py-2 rounded-xl text-xs font-bold uppercase whitespace-nowrap transition-colors ${
+               driverFilter === filter
+                 ? 'bg-primary text-white border border-primary'
+                 : 'bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 hover:border-primary'
+             }`}
+           >
              {filter}
            </button>
          ))}
       </div>
-      {drivers.filter(d => (d.name || '').toLowerCase().includes(searchTerm.toLowerCase())).map(driver => (
+      {filteredDrivers.map(driver => (
         <div 
           key={driver.id}
           onClick={() => setSelectedUser(driver)}
@@ -153,6 +205,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
             <h4 className="font-bold text-sm truncate flex items-center gap-2">
               {driver.name}
               {driver.isBlocked && <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded uppercase">Blocked</span>}
+              {!driver.isBlocked && driver.isOnline && <span className="text-[9px] bg-green-500 text-white px-1.5 py-0.5 rounded uppercase">Online</span>}
             </h4>
             <p className="text-xs text-slate-500 truncate">{driver.email}</p>
             <div className="flex items-center gap-2 mt-1">
@@ -163,6 +216,9 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
           <span className="material-symbols-outlined text-slate-300">chevron_right</span>
         </div>
       ))}
+      {filteredDrivers.length === 0 && (
+        <p className="text-center text-slate-500 text-sm py-6">No drivers match the current filter.</p>
+      )}
     </div>
   );
 
@@ -204,10 +260,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                   <h4 className="font-bold text-sm">{trip.location}</h4>
                   <p className="text-xs text-slate-500">{trip.date}</p>
                </div>
-               <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
-                 trip.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500' : 
-                 trip.status === 'CANCELLED' ? 'bg-red-500/10 text-red-500' : 'bg-orange-500/10 text-orange-500'
-               }`}>{trip.status}</span>
+               <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${getTripStatusClass(trip.status)}`}>{trip.status.replace(/_/g, ' ')}</span>
             </div>
             <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-700 pt-3">
                <div className="flex items-center gap-2">
@@ -238,33 +291,89 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
           <p className="text-[10px] text-slate-400 mt-2">Accrued form {settings.commission}% commission on {trips.length} trips</p>
        </div>
 
-       <div>
-          <h3 className="font-bold text-sm mb-3 uppercase tracking-wider text-slate-500">Payout Requests</h3>
+       <div className="bg-surface-light dark:bg-surface-dark p-5 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4">
+          <div>
+             <h3 className="font-bold text-sm uppercase tracking-wider text-slate-500">Driver Settlement Model</h3>
+             <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+               Drivers are settled directly through Monnify split payments. The in-app wallet balance is only a cleared-earnings ledger for reporting and period resets.
+             </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+             <div className="rounded-2xl bg-slate-50 dark:bg-black/20 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Completed Trips</p>
+                <p className="text-2xl font-black mt-1">{trips.filter(trip => trip.status === 'COMPLETED').length}</p>
+             </div>
+             <div className="rounded-2xl bg-slate-50 dark:bg-black/20 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Pending Payments</p>
+                <p className="text-2xl font-black mt-1">{pendingPayments.length}</p>
+             </div>
+          </div>
+          <p className="text-xs text-slate-500">
+            Admin finance actions should focus on payment monitoring and ledger resets, not manual payout approvals.
+          </p>
+       </div>
+
+       <div className="bg-surface-light dark:bg-surface-dark p-5 rounded-3xl border border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-sm uppercase tracking-wider text-slate-500">Pending Trip Payments</h3>
+            <span className="text-xs font-bold text-slate-400">{pendingPayments.length} open</span>
+          </div>
           <div className="space-y-3">
-             {payouts.map(payout => (
-               <div key={payout.id} className="bg-surface-light dark:bg-surface-dark p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+            {pendingPayments.slice(0, 6).map((paymentTrip) => (
+              <div key={paymentTrip.id} className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-black/20 p-4">
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                     <p className="font-bold text-sm">{payout.driverName}</p>
-                     <p className="text-xs text-slate-500">{payout.date} • ID: {payout.driverId.slice(0,4)}</p>
+                    <p className="font-bold text-sm text-slate-900 dark:text-white">{paymentTrip.location}</p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {paymentTrip.owner?.name} • {paymentTrip.driver?.name || 'Driver pending'}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-3">
-                     <span className="font-black">{formatCurrency(payout.amount)}</span>
-                     {payout.status === 'PENDING' ? (
-                       <button 
-                         onClick={() => onApprovePayout(payout.id)}
-                         className="bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-green-600 transition-colors"
-                       >
-                         Approve
-                       </button>
-                     ) : (
-                       <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
-                         <span className="material-symbols-outlined text-sm">check</span> Paid
-                       </span>
-                     )}
+                  <span className="text-xs font-bold px-2 py-1 rounded-full bg-orange-500/10 text-orange-500 uppercase">
+                    {paymentTrip.paymentStatus || 'PENDING'}
+                  </span>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                  <span>{paymentTrip.date}</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(paymentTrip.amount)}</span>
+                </div>
+              </div>
+            ))}
+            {pendingPayments.length === 0 && (
+              <p className="text-center text-slate-500 text-sm py-4">No pending trip payments right now.</p>
+            )}
+          </div>
+       </div>
+
+       <div className="bg-surface-light dark:bg-surface-dark p-5 rounded-3xl border border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-sm uppercase tracking-wider text-slate-500">Recent Payment History</h3>
+            <span className="text-xs font-bold text-slate-400">{paymentHistory.length} records</span>
+          </div>
+          <div className="space-y-3">
+            {paymentHistory.slice(0, 8).map((payment) => (
+              <div key={payment.id} className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-black/20 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                      {payment.trip.pickupAddress.split(',')[0]} to {payment.trip.destAddress.split(',')[0]}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {payment.trip.owner.name} • {payment.trip.driver?.name || 'Driver pending'}
+                    </p>
                   </div>
-               </div>
-             ))}
-             {payouts.length === 0 && <p className="text-center text-slate-500 text-sm py-4">No pending payouts.</p>}
+                  <span className="text-xs font-bold px-2 py-1 rounded-full bg-green-500/10 text-green-500 uppercase">
+                    Paid
+                  </span>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                  <span>{formatShortDate(payment.paidAt)}</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(payment.totalAmount)}</span>
+                </div>
+              </div>
+            ))}
+            {paymentHistory.length === 0 && (
+              <p className="text-center text-slate-500 text-sm py-4">No payment history available yet.</p>
+            )}
           </div>
        </div>
     </div>
@@ -301,6 +410,16 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                type="number" 
                value={localSettings.commission}
                onChange={(e) => setLocalSettings({...localSettings, commission: Number(e.target.value)})}
+               className="bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white"
+             />
+          </div>
+
+          <div className="flex flex-col gap-2">
+             <label className="text-xs font-bold text-slate-500 uppercase">Time Rate (â‚¦ / min)</label>
+             <input 
+               type="number" 
+               value={localSettings.timeRate ?? 50}
+               onChange={(e) => setLocalSettings({...localSettings, timeRate: Number(e.target.value)})}
                className="bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white"
              />
           </div>
@@ -373,6 +492,31 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto no-scrollbar p-4 relative">
+        {isLoading && users.length === 0 && trips.length === 0 && (
+          <div className="h-full flex flex-col items-center justify-center text-center gap-3 opacity-80">
+            <span className="material-symbols-outlined animate-spin text-4xl text-primary">refresh</span>
+            <p className="font-bold">Loading admin dashboard...</p>
+          </div>
+        )}
+
+        {!isLoading && error && users.length === 0 && trips.length === 0 && (
+          <div className="h-full flex flex-col items-center justify-center text-center gap-4">
+            <span className="material-symbols-outlined text-4xl text-red-500">error</span>
+            <div>
+              <p className="font-bold text-red-500">Could not load admin data</p>
+              <p className="text-sm text-slate-500 mt-1">{error}</p>
+            </div>
+            <button
+              onClick={onRetry}
+              className="px-5 py-3 rounded-xl bg-primary text-white font-bold"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!((isLoading && users.length === 0 && trips.length === 0) || (!isLoading && error && users.length === 0 && trips.length === 0)) && (
+          <>
         {/* Global Search (visible on lists) */}
         {(activeSection === 'drivers' || activeSection === 'owners') && (
            <div className="mb-6 sticky top-0 z-10">
@@ -395,6 +539,8 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
         {activeSection === 'trips' && renderTrips()}
         {activeSection === 'finance' && renderFinance()}
         {activeSection === 'settings' && renderSettings()}
+          </>
+        )}
       </main>
 
       {/* User Detail Modal */}

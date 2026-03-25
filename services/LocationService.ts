@@ -20,7 +20,7 @@ export const LocationService = {
       let url = `/locations/search?q=${encodeURIComponent(query)}`;
 
       // Pass pickup coords so backend biases results to pickup location
-      if (biasLat && biasLng) {
+      if (Number.isFinite(biasLat) && Number.isFinite(biasLng)) {
         url += `&biasLat=${biasLat}&biasLng=${biasLng}`;
       }
 
