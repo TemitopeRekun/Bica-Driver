@@ -16,6 +16,7 @@ interface UseOwnerRealtimeOptions {
   onDriverAccepted: (payload: { driver: any; estimatedArrivalMins?: number }) => void;
   onDriverDeclined: (payload: { message?: string }) => void;
   onTripCompleted: (payload: { fareBreakdown?: any }) => void;
+  onPaymentUpdated: (payload: { tripId: string; paymentStatus: string; paidAt: string | null; transactionReference: string | null; message: string }) => void;
   onLocationUpdated: (lat: number, lng: number) => void;
 }
 
@@ -31,12 +32,14 @@ export const useOwnerRealtime = ({
   onDriverAccepted,
   onDriverDeclined,
   onTripCompleted,
+  onPaymentUpdated,
   onLocationUpdated,
 }: UseOwnerRealtimeOptions) => {
   const ownerSocketRef = useRef<Socket | null>(null);
   const onDriverAcceptedRef = useRef(onDriverAccepted);
   const onDriverDeclinedRef = useRef(onDriverDeclined);
   const onTripCompletedRef = useRef(onTripCompleted);
+  const onPaymentUpdatedRef = useRef(onPaymentUpdated);
   const onLocationUpdatedRef = useRef(onLocationUpdated);
   const driverInfoIdRef = useRef(driverInfoId);
   const rideStateValueRef = useRef(rideState);
@@ -52,6 +55,10 @@ export const useOwnerRealtime = ({
   useEffect(() => {
     onTripCompletedRef.current = onTripCompleted;
   }, [onTripCompleted]);
+
+  useEffect(() => {
+    onPaymentUpdatedRef.current = onPaymentUpdated;
+  }, [onPaymentUpdated]);
 
   useEffect(() => {
     onLocationUpdatedRef.current = onLocationUpdated;
@@ -103,6 +110,10 @@ export const useOwnerRealtime = ({
 
     ownerSocketRef.current.on('trip:completed', (data: any) => {
       onTripCompletedRef.current(data);
+    });
+
+    ownerSocketRef.current.on('payment:updated', (data: any) => {
+      onPaymentUpdatedRef.current(data);
     });
 
     ownerSocketRef.current.on('driver:availability', () => {

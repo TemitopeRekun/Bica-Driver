@@ -8,6 +8,15 @@ export interface LocationData {
   lon: number;
   category: string;
   accuracy?: number;
+  formatted_address?: string;
+  street_number?: string;
+  street?: string;
+  area?: string;
+  city?: string;
+  lga?: string;
+  state?: string;
+  country?: string;
+  place_types?: string[];
 }
 
 export interface RouteData {
@@ -70,4 +79,37 @@ export const LocationService = {
       false,
     );
   },
+};
+
+export const getLocationPrimaryText = (location?: LocationData | null): string => {
+  if (!location) return 'Unknown Location';
+  return location.display_name || location.area || location.city || location.formatted_address || 'Unknown Location';
+};
+
+export const getLocationSecondaryText = (location?: LocationData | null): string => {
+  if (!location) return '';
+
+  const streetLabel = [location.street_number, location.street].filter(Boolean).join(' ').trim();
+  const structured = [streetLabel, location.area, location.city || location.lga, location.state, location.country]
+    .filter(Boolean)
+    .join(', ');
+
+  return structured || location.description || location.formatted_address || '';
+};
+
+export const getLocationAddress = (location?: LocationData | null): string => {
+  if (!location) return 'Unknown Location';
+  return location.formatted_address || location.description || location.display_name;
+};
+
+export const getLocationShortText = (location?: LocationData | null): string => {
+  if (!location) return 'Unknown';
+  return (
+    location.display_name?.split(',')[0] ||
+    location.area ||
+    location.city ||
+    location.lga ||
+    location.formatted_address?.split(',')[0] ||
+    'Unknown'
+  );
 };

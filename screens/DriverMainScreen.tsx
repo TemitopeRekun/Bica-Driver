@@ -14,6 +14,7 @@ interface DriverMainScreenProps {
   onOpenProfile: () => void;
   onBack: () => void;
   onUpdateEarnings: (amount: number) => void;
+  onUpdateOnlineStatus: (isOnline: boolean) => void;
   onRideComplete: (trip: Trip) => void;
 }
 
@@ -56,7 +57,7 @@ const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
 // ... existing imports
 
 const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
-  user, onOpenProfile, onBack, onUpdateEarnings, onRideComplete
+  user, onOpenProfile, onBack, onUpdateEarnings, onUpdateOnlineStatus, onRideComplete
 }) => {
   const [activeRide, setActiveRide] = useState<DriverRideRequest | null>(null);
   const [ridePhase, setRidePhase] = useState<RidePhase>('pickup');
@@ -79,9 +80,11 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     enableOnline,
     disableOnline,
     removeRideRequest,
+    restoreRideRequest,
   } = useDriverRealtime({
     user,
     approvalStatus,
+    onOnlineStatusChange: onUpdateOnlineStatus,
   });
 
   const [tripTimer, setTripTimer] = useState<number>(0); // seconds elapsed
@@ -115,6 +118,79 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       setIsLoadingTrips(false);
     }
   };
+
+  const buildRideRequestFromTrip = (trip: any): DriverRideRequest => ({
+    id: trip.id,
+    ownerName: trip.owner?.name || trip.ownerName || 'Car Owner',
+    pickup: trip.pickupAddress,
+    destination: trip.destAddress,
+    distance: `${trip.distanceKm?.toFixed(1) || '0.0'} km`,
+    price: `${trip.driverEarnings ?? trip.amount ?? 0}`,
+    time: `${trip.estimatedArrivalMins || trip.estimatedMins || 5} mins`,
+    avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
+    coords: [trip.pickupLat, trip.pickupLng],
+    destCoords: [trip.destLat, trip.destLng],
+    estimatedMins: trip.estimatedMins ?? null,
+  });
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    let isMounted = true;
+
+    const bootstrapDriverState = async () => {
+      await Promise.all([loadWalletSummary(), loadRecentTrips()]);
+
+      if (approvalStatus !== 'APPROVED') return;
+
+      try {
+        const currentRide = await api.get<any | null>('/rides/current');
+        if (!isMounted || !currentRide) return;
+
+        const restoredRide = buildRideRequestFromTrip(currentRide);
+
+        if (currentRide.status === 'PENDING_ACCEPTANCE') {
+          restoreRideRequest(restoredRide);
+          return;
+        }
+
+        setActiveRide(restoredRide);
+
+        if (currentRide.status === 'IN_PROGRESS') {
+          setRidePhase('trip');
+          setFareBreakdown(currentRide.fareBreakdown || null);
+
+          const elapsedSeconds = currentRide.startedAt
+            ? Math.max(0, Math.floor((Date.now() - new Date(currentRide.startedAt).getTime()) / 1000))
+            : 0;
+          setTripTimer(elapsedSeconds);
+          clearInterval(timerInterval.current);
+          timerInterval.current = setInterval(() => {
+            setTripTimer((prev) => prev + 1);
+          }, 1000);
+          return;
+        }
+
+        if (currentRide.status === 'COMPLETED') {
+          setRidePhase('completed');
+          setFareBreakdown(currentRide.fareBreakdown || null);
+          setTripTimer(0);
+          return;
+        }
+
+        setRidePhase('pickup');
+      } catch (error) {
+        console.error('Failed to restore driver ride context:', error);
+      }
+    };
+
+    bootstrapDriverState();
+
+    return () => {
+      isMounted = false;
+      clearInterval(timerInterval.current);
+    };
+  }, [user?.id, approvalStatus]);
 
   const formatTimer = (seconds: number): string => {
     const hrs = Math.floor(seconds / 3600);
@@ -761,42 +837,34 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                     </div>
 
                     <div className="px-4 py-3 space-y-3">
-                      {fareBreakdown.distanceComponent > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-400 text-sm">
-                            Distance ({fareBreakdown.distanceKm}km × ₦100)
-                          </span>
-                          <span className="text-white font-bold text-sm">
-                            ₦{fareBreakdown.distanceComponent.toLocaleString()}
-                          </span>
-                        </div>
-                      )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 text-sm">Base fare</span>
+                        <span className="text-white font-bold text-sm">
+                          {formatCurrency(fareBreakdown.baseFare ?? 0)}
+                        </span>
+                      </div>
 
-                      {fareBreakdown.distanceComponent === 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-400 text-sm">Base (short trip flat rate)</span>
-                          <span className="text-white font-bold text-sm">₦2,000</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 text-sm">Distance charge</span>
+                        <span className="text-white font-bold text-sm">
+                          {formatCurrency(fareBreakdown.distanceComponent ?? 0)}
+                        </span>
+                      </div>
 
-                      {fareBreakdown.extraMins > 0 && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-orange-400 text-sm flex items-center gap-1">
-                            <span className="material-symbols-outlined text-sm">schedule</span>
-                            Traffic ({fareBreakdown.extraMins}mins × ₦50)
-                          </span>
-                          <span className="text-orange-400 font-bold text-sm">
-                            +₦{fareBreakdown.timeComponent.toLocaleString()}
-                          </span>
-                        </div>
-                      )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-400 text-sm">Time charge</span>
+                        <span className="text-white font-bold text-sm">
+                          {formatCurrency(fareBreakdown.timeComponent ?? 0)}
+                        </span>
+                      </div>
 
                       <div className="flex justify-between items-center text-xs text-slate-500">
                         <span>
-                          Actual: {fareBreakdown.actualMins}mins
-                          · Est: {fareBreakdown.estimatedMins}mins
+                          Actual: {fareBreakdown.actualMins ?? fareBreakdown.totalMins ?? 0} mins
                         </span>
-                        <span>{fareBreakdown.extraMins > 0 ? `+${fareBreakdown.extraMins}mins over` : 'On time ✓'}</span>
+                        <span>
+                          Estimated: {fareBreakdown.estimatedMins ?? 0} mins
+                        </span>
                       </div>
                     </div>
 
@@ -807,19 +875,19 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                       <div className="flex justify-between items-center">
                         <span className="text-slate-400 text-sm">Total fare</span>
                         <span className="text-white font-bold">
-                          ₦{fareBreakdown.finalFare.toLocaleString()}
+                          {formatCurrency(fareBreakdown.finalFare)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-400 text-sm">BICA commission (25%)</span>
+                        <span className="text-slate-400 text-sm">BICA commission</span>
                         <span className="text-slate-400 text-sm">
-                          -₦{fareBreakdown.commissionAmount.toLocaleString()}
+                          -{formatCurrency(fareBreakdown.commissionAmount)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center pt-2 border-t border-white/10">
                         <span className="text-primary font-black text-sm uppercase tracking-wide">Your earnings</span>
                         <span className="text-primary font-black text-xl">
-                          ₦{fareBreakdown.driverEarnings.toLocaleString()}
+                          {formatCurrency(fareBreakdown.driverEarnings)}
                         </span>
                       </div>
                     </div>

@@ -29,6 +29,7 @@ const App: React.FC = () => {
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
     baseFare: 500,
     pricePerKm: 100,
+    timeRate: 50,
     commission: 25,
     autoApprove: false,
   });
@@ -144,6 +145,10 @@ const App: React.FC = () => {
         // Driver fields
         nin: userData.nin,
         transmission: userData.transmission,
+        licenseImageUrl: userData.licenseImage,
+        ninImageUrl: userData.ninImage,
+        selfieImageUrl: userData.selfieImage,
+        backgroundCheckAccepted: userData.backgroundCheckAccepted,
         bankName: userData.bankName,
         bankCode: userData.bankCode,
         accountNumber: userData.accountNumber,
@@ -287,6 +292,15 @@ const App: React.FC = () => {
     setCurrentUser(prev => prev ? { ...prev, walletBalance: (prev.walletBalance || 0) + amount } : null);
   };
 
+  const handleUpdateDriverOnlineStatus = (isOnline: boolean) => {
+    setCurrentUser((prev) => {
+      if (!prev || prev.role !== UserRole.DRIVER) return prev;
+      const nextUser = { ...prev, isOnline };
+      void localforage.setItem('bicadriver_current_user', nextUser);
+      return nextUser;
+    });
+  };
+
   const renderScreen = (screen: AppScreen) => {
     switch (screen) {
       case AppScreen.LOADING:
@@ -317,6 +331,7 @@ const App: React.FC = () => {
             onOpenProfile={() => navigateTo(AppScreen.PROFILE)}
             onBack={handleLogout}
             onUpdateEarnings={handleUpdateEarnings}
+            onUpdateOnlineStatus={handleUpdateDriverOnlineStatus}
             onRideComplete={handleAddTrip}
           />
         );

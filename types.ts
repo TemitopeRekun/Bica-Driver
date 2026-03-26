@@ -170,6 +170,20 @@ export interface PaymentHistoryRecord {
   };
 }
 
+export interface PaymentStatusResponse {
+  tripId: string;
+  paymentStatus: PaymentStatus;
+  paidAt: string | null;
+  amount: number;
+  finalFare: number | null;
+  driverEarnings: number;
+  platformEarnings: number;
+  transactionReference: string | null;
+  paymentRecordId: string | null;
+  paymentMethod: string | null;
+  paymentRecordCreatedAt: string | null;
+}
+
 export interface PendingPaymentTrip extends Trip {
   owner: {
     name: string;
@@ -183,8 +197,8 @@ export interface PendingPaymentTrip extends Trip {
 
 export interface SystemSettings {
   baseFare: number;
-  pricePerKm: number;
-  timeRate?: number;
+  pricePerKm: number; // distance rate per km used in the fare formula
+  timeRate: number;   // per-minute time rate used in the fare formula
   commission: number;
   autoApprove: boolean;
   id?: number;

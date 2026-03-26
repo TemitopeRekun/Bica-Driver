@@ -24,18 +24,32 @@ export interface DriverRideRequest {
 interface UseDriverRealtimeOptions {
   user: UserProfile | null;
   approvalStatus: string;
+  onOnlineStatusChange?: (isOnline: boolean) => void;
 }
 
-export const useDriverRealtime = ({ user, approvalStatus }: UseDriverRealtimeOptions) => {
-  const [isOnline, setIsOnline] = useState(true);
+const DEFAULT_DRIVER_POS: [number, number] = [6.4549, 3.3896];
+
+export const useDriverRealtime = ({
+  user,
+  approvalStatus,
+  onOnlineStatusChange,
+}: UseDriverRealtimeOptions) => {
+  const [isOnline, setIsOnline] = useState(Boolean(user?.isOnline));
   const [isLocationRefreshing, setIsLocationRefreshing] = useState(false);
   const [driverPos, setDriverPos] = useState<[number, number]>(() =>
-    user?.currentLocation ? [user.currentLocation.lat, user.currentLocation.lng] : [6.4549, 3.3896],
+    user?.currentLocation ? [user.currentLocation.lat, user.currentLocation.lng] : DEFAULT_DRIVER_POS,
   );
   const [liveRideRequests, setLiveRideRequests] = useState<DriverRideRequest[]>([]);
 
   const socketRef = useRef<Socket | null>(null);
   const trackingInterval = useRef<any>(null);
+  const updateOnlineState = useCallback(
+    (nextIsOnline: boolean) => {
+      setIsOnline(nextIsOnline);
+      onOnlineStatusChange?.(nextIsOnline);
+    },
+    [onOnlineStatusChange],
+  );
 
   const registerDriverSocket = useCallback(() => {
     if (!socketRef.current?.connected || !user?.id) return;
@@ -56,18 +70,39 @@ export const useDriverRealtime = ({ user, approvalStatus }: UseDriverRealtimeOpt
   }, [user?.id]);
 
   const enableOnline = useCallback(() => {
-    setIsOnline(true);
-  }, []);
+    updateOnlineState(true);
+  }, [updateOnlineState]);
 
   const disableOnline = useCallback(async () => {
     await api.patch('/users/online', { isOnline: false });
     await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
-    setIsOnline(false);
-  }, []);
+    updateOnlineState(false);
+  }, [updateOnlineState]);
 
   const removeRideRequest = useCallback((rideId: string) => {
     setLiveRideRequests((prev) => prev.filter((ride) => ride.id !== rideId));
   }, []);
+
+  const restoreRideRequest = useCallback((rideRequest: DriverRideRequest) => {
+    setLiveRideRequests((prev) => {
+      if (prev.some((ride) => ride.id === rideRequest.id)) return prev;
+      return [rideRequest, ...prev];
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setIsOnline(false);
+      setDriverPos(DEFAULT_DRIVER_POS);
+      setLiveRideRequests([]);
+      return;
+    }
+
+    setIsOnline(Boolean(user.isOnline));
+    if (user.currentLocation) {
+      setDriverPos([user.currentLocation.lat, user.currentLocation.lng]);
+    }
+  }, [user?.id, user?.isOnline, user?.currentLocation?.lat, user?.currentLocation?.lng]);
 
   useEffect(() => {
     if (approvalStatus !== 'APPROVED' || !user?.id) return;
@@ -168,5 +203,6 @@ export const useDriverRealtime = ({ user, approvalStatus }: UseDriverRealtimeOpt
     enableOnline,
     disableOnline,
     removeRideRequest,
+    restoreRideRequest,
   };
 };

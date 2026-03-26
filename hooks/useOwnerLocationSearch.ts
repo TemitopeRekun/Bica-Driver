@@ -8,6 +8,11 @@ interface UseOwnerLocationSearchOptions {
   onPickupChanged?: () => void;
 }
 
+const DISTANCE_RATE = 100;
+const TIME_RATE = 50;
+const FALLBACK_MINUTES_PER_KM = 3;
+const MIN_FALLBACK_MINUTES = 5;
+
 export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLocationSearchOptions) => {
   const [pickup, setPickup] = useState<LocationData | null>(null);
   const [destination, setDestination] = useState<LocationData | null>(null);
@@ -104,25 +109,24 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
 
     try {
       const results = await LocationService.search(query, bias.lat, bias.lng);
-
-      if (pickup && results.length > 0) {
-        results.sort((a, b) => {
-          const distA = Math.sqrt(
-            Math.pow(a.lat - pickup.lat, 2) + Math.pow(a.lon - pickup.lon, 2),
-          );
-          const distB = Math.sqrt(
-            Math.pow(b.lat - pickup.lat, 2) + Math.pow(b.lon - pickup.lon, 2),
-          );
-          return distA - distB;
-        });
-      }
-
       setSearchResults(results);
     } catch {
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const restoreLocations = (nextPickup: LocationData | null, nextDestination: LocationData | null) => {
+    setPickup(nextPickup);
+    setDestination(nextDestination);
+    if (nextPickup) {
+      setMapCenter([nextPickup.lat, nextPickup.lon]);
+    }
+    setSearchQuery('');
+    setSearchResults([]);
+    setIsSearchingPickup(false);
+    setIsSearchingDest(false);
   };
 
   const resetLocationSearch = () => {
@@ -168,18 +172,29 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
           calculateDistance(pickup.lat, pickup.lon, destination.lat, destination.lon),
           1,
         );
+        const fallbackEstimatedMins = Math.max(
+          Math.round(dist * FALLBACK_MINUTES_PER_KM),
+          MIN_FALLBACK_MINUTES,
+        );
+        const fallbackLowEstimate =
+          settings.baseFare + dist * DISTANCE_RATE + fallbackEstimatedMins * TIME_RATE;
+        const bufferMins = Math.max(Math.ceil(fallbackEstimatedMins * 0.15), MIN_FALLBACK_MINUTES);
+        const fallbackHighEstimate =
+          settings.baseFare + dist * DISTANCE_RATE + (fallbackEstimatedMins + bufferMins) * TIME_RATE;
+        const roundedLow = Math.round(fallbackLowEstimate / 50) * 50;
+        const roundedHigh = Math.max(roundedLow, Math.round(fallbackHighEstimate / 50) * 50);
+
         setEstimatedDistance(dist.toFixed(1));
-        const price = settings.baseFare + dist * settings.pricePerKm;
-        const rounded = Math.round(price / 50) * 50;
-        setEstimatedPrice(rounded);
-        setFareRange({ low: rounded, high: Math.round((rounded * 1.5) / 50) * 50 });
+        setEstimatedMins(fallbackEstimatedMins);
+        setEstimatedPrice(roundedLow);
+        setFareRange({ low: roundedLow, high: roundedHigh });
       } finally {
         setIsFetchingRoute(false);
       }
     };
 
     fetchRoute();
-  }, [pickup, destination, settings.baseFare, settings.pricePerKm]);
+  }, [pickup, destination, settings.baseFare]);
 
   useEffect(() => {
     if (searchQuery.length < 2) {
@@ -225,6 +240,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     handleMarkerDragEnd,
     handleSelectLocation,
     handleCategoryTap,
+    restoreLocations,
     resetLocationSearch,
   };
 };

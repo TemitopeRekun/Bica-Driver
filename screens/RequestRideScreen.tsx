@@ -3,20 +3,25 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CapacitorService } from '../services/CapacitorService';
 import InteractiveMap from '../components/InteractiveMap';
 import { IMAGES } from '../constants';
-import { SystemSettings, Trip, UserProfile, UserRole, PaymentHistoryRecord } from '../types';
-import { LocationData } from '../services/LocationService';
+import {
+  SystemSettings,
+  Trip,
+  UserProfile,
+  UserRole,
+  PaymentHistoryRecord,
+  PaymentStatus,
+  PaymentStatusResponse,
+} from '../types';
+import {
+  LocationData,
+  getLocationAddress,
+  getLocationPrimaryText,
+  getLocationSecondaryText,
+  getLocationShortText,
+} from '../services/LocationService';
 import { api } from '@/services/api.service';
 import { useOwnerRealtime } from '../hooks/useOwnerRealtime';
 import { useOwnerLocationSearch } from '../hooks/useOwnerLocationSearch';
-
-interface SearchResult {
-  id: string;
-  display_name: string;
-  description: string;
-  lat: number;
-  lon: number;
-  category: 'LGA' | 'Airport' | 'Hotel' | 'Shopping' | 'Residential' | 'Commercial' | 'Tourism' | 'Education' | 'Transport' | 'District';
-}
 
 interface RequestRideScreenProps {
   onOpenProfile: () => void;
@@ -69,6 +74,9 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
   const [currentTripFareBreakdown, setCurrentTripFareBreakdown] = useState<any>(null);
   const [isInitiatingPayment, setIsInitiatingPayment] = useState(false);
+  const [currentPaymentStatus, setCurrentPaymentStatus] = useState<PaymentStatus | null>(null);
+  const [paymentStatusMessage, setPaymentStatusMessage] = useState('');
+  const [isRestoringRide, setIsRestoringRide] = useState(false);
 
   // Vehicle Details State
   const [showVehicleForm, setShowVehicleForm] = useState(false);
@@ -119,6 +127,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     handleMarkerDragEnd,
     handleSelectLocation,
     handleCategoryTap,
+    restoreLocations,
     resetLocationSearch,
   } = useOwnerLocationSearch({
     settings,
@@ -157,11 +166,147 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     );
   };
 
+  const buildLocationFromTrip = (
+    id: string,
+    address: string,
+    lat?: number | null,
+    lng?: number | null,
+  ): LocationData | null => {
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    return {
+      id,
+      display_name: address || 'Unknown Location',
+      description: address || 'Unknown Location',
+      formatted_address: address || 'Unknown Location',
+      lat,
+      lon: lng,
+      category: 'Residential',
+    };
+  };
+
+  const buildDriverInfoFromTrip = (trip: any) => {
+    if (!trip?.driver) return null;
+    return {
+      id: trip.driver.id,
+      name: trip.driver.name,
+      car: 'Professional Driver',
+      plate: `ID-${trip.driver.id?.substr(0, 4).toUpperCase()}`,
+      rating: trip.driver.rating,
+      avatar: trip.driver.avatarUrl || IMAGES.DRIVER_CARD,
+      timeAway: trip.estimatedArrivalMins || 5,
+      tripId: trip.id,
+    };
+  };
+
+  const loadOwnerHistory = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const [tripHistory, paymentHistory] = await Promise.all([
+        api.get<any[]>('/rides/history'),
+        api.get<PaymentHistoryRecord[]>('/payments/history'),
+      ]);
+
+      setRecentTrips(
+        tripHistory.map((trip) => ({
+          ...trip,
+          ownerId: trip.ownerId || trip.owner?.id,
+          driverId: trip.driverId || trip.driver?.id,
+          ownerName: trip.owner?.name || trip.ownerName || 'Owner',
+          driverName: trip.driver?.name || trip.driverName || 'Driver',
+          date: trip.createdAt ? new Date(trip.createdAt).toLocaleString() : trip.date || '',
+          location:
+            trip.location ||
+            `${trip.pickupAddress?.split(',')[0] || 'Unknown'} -> ${trip.destAddress?.split(',')[0] || 'Unknown'}`,
+        })),
+      );
+      setRecentPayments(paymentHistory);
+    } catch (error) {
+      console.error('Failed to load owner history:', error);
+      setRecentTrips([]);
+      setRecentPayments([]);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const loadPaymentStatus = async (tripId: string) => {
+    try {
+      const payment = await api.get<PaymentStatusResponse>(`/payments/status/${tripId}`);
+      setCurrentPaymentStatus(payment.paymentStatus);
+      setPaymentStatusMessage(
+        payment.paymentStatus === 'PAID'
+          ? 'Payment confirmed.'
+          : payment.paymentStatus === 'FAILED'
+            ? 'Payment failed. Please try again.'
+            : payment.paymentStatus === 'PENDING'
+              ? 'Payment is being verified by the backend.'
+              : 'Please complete payment below.',
+      );
+      return payment;
+    } catch (error) {
+      console.error('Failed to load payment status:', error);
+      return null;
+    }
+  };
+
+  const applyRecoveredRide = (trip: any) => {
+    const restoredPickup = buildLocationFromTrip(
+      `pickup_${trip.id}`,
+      trip.pickupAddress,
+      trip.pickupLat,
+      trip.pickupLng,
+    );
+    const restoredDestination = buildLocationFromTrip(
+      `dest_${trip.id}`,
+      trip.destAddress,
+      trip.destLat,
+      trip.destLng,
+    );
+
+    restoreLocations(restoredPickup, restoredDestination);
+    setCurrentTripId(trip.id);
+    setCurrentTripFareBreakdown(trip.fareBreakdown || null);
+    setCurrentPaymentStatus(trip.paymentStatus ?? null);
+    setPaymentStatusMessage('');
+
+    const restoredDriverInfo = buildDriverInfoFromTrip(trip);
+    setDriverInfo(restoredDriverInfo);
+
+    if (trip.driver?.id) {
+      trackedDriverIdRef.current = trip.driver.id;
+    }
+
+    if (typeof trip.driver?.locationLat === 'number' && typeof trip.driver?.locationLng === 'number') {
+      setTrackedDriverPos([trip.driver.locationLat, trip.driver.locationLng]);
+    } else {
+      setTrackedDriverPos(null);
+    }
+
+    switch (trip.status) {
+      case 'PENDING_ACCEPTANCE':
+        setRideState('SEARCHING');
+        break;
+      case 'ASSIGNED':
+        setRideState('ASSIGNED');
+        break;
+      case 'IN_PROGRESS':
+        setRideState('IN_PROGRESS');
+        break;
+      case 'COMPLETED':
+        setRideState('COMPLETED');
+        break;
+      default:
+        setRideState('IDLE');
+        break;
+    }
+  };
+
   const handlePayNow = async () => {
     if (!currentTripId) return;
     setIsInitiatingPayment(true);
     try {
       const payment = await api.post<any>(`/payments/initiate/${currentTripId}`);
+      setPaymentStatusMessage('Checkout opened. Payment is only confirmed after backend verification.');
       if (payment.checkoutUrl) {
         window.open(payment.checkoutUrl, '_blank');
       }
@@ -206,6 +351,40 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     return () => clearTimers();
   }, []);
 
+  useEffect(() => {
+    if (!currentUser?.id) return;
+
+    let isMounted = true;
+
+    const bootstrapOwnerState = async () => {
+      setIsRestoringRide(true);
+      try {
+        await loadOwnerHistory();
+
+        const currentRide = await api.get<any | null>('/rides/current');
+        if (!isMounted || !currentRide) return;
+
+        applyRecoveredRide(currentRide);
+
+        if (currentRide.status === 'COMPLETED') {
+          await loadPaymentStatus(currentRide.id);
+        }
+      } catch (error) {
+        console.error('Failed to restore owner ride context:', error);
+      } finally {
+        if (isMounted) {
+          setIsRestoringRide(false);
+        }
+      }
+    };
+
+    bootstrapOwnerState();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser?.id]);
+
   useOwnerRealtime({
     ownerId: currentUser?.id,
     driverInfoId: driverInfo?.id,
@@ -237,7 +416,19 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       if (data.fareBreakdown) {
         setCurrentTripFareBreakdown(data.fareBreakdown);
       }
+      setCurrentPaymentStatus('UNPAID');
+      setPaymentStatusMessage('Please complete payment below.');
       setRideState('COMPLETED');
+    },
+    onPaymentUpdated: (data) => {
+      if (data.tripId !== currentTripId) return;
+      setCurrentPaymentStatus(data.paymentStatus as PaymentStatus);
+      setPaymentStatusMessage(data.message || '');
+      if (data.paymentStatus === 'PAID') {
+        loadOwnerHistory().catch((error) => {
+          console.error('Failed to refresh owner history after payment update:', error);
+        });
+      }
     },
     onLocationUpdated: (lat, lng) => {
       setTrackedDriverPos([lat, lng]);
@@ -276,7 +467,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       ownerId: currentUser?.id,
       ownerName: currentUser?.name || 'Me',
       driverName: 'Pending Assignment',
-      location: `${pickup?.display_name?.split(',')[0] || 'Unknown'} -> ${destination?.display_name?.split(',')[0] || 'Unknown'}`,
+      location: `${getLocationShortText(pickup)} -> ${getLocationShortText(destination)}`,
       status: 'PENDING',
       date: formattedDate,
       amount: estimatedPrice
@@ -296,13 +487,15 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
     setRideState('SEARCHING');
     setNoDriversFound(false);
+    setCurrentPaymentStatus(null);
+    setPaymentStatusMessage('');
 
     try {
       const trip = await api.post<any>('/rides', {
-        pickupAddress: pickup.display_name,
+        pickupAddress: getLocationAddress(pickup),
         pickupLat: pickup.lat,
         pickupLng: pickup.lon,
-        destAddress: destination.display_name,
+        destAddress: getLocationAddress(destination),
         destLat: destination.lat,
         destLng: destination.lon,
         distanceKm: parseFloat(estimatedDistance),
@@ -372,10 +565,14 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const resetRide = () => {
     clearTimers();
     setRideState('IDLE');
+    setCurrentTripId(null);
     resetLocationSearch();
     setDriverInfo(null);
     setTrackedDriverPos(null);
     trackedDriverIdRef.current = null;
+    setCurrentTripFareBreakdown(null);
+    setCurrentPaymentStatus(null);
+    setPaymentStatusMessage('');
     setNoDriversFound(false);
     setBookingType('now');
   };
@@ -527,10 +724,10 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                 <span className="material-symbols-outlined text-slate-500 text-lg">location_on</span>
               </div>
               <div>
-                <p className="font-bold text-slate-900 dark:text-white text-sm">{loc.display_name}</p>
+                <p className="font-bold text-slate-900 dark:text-white text-sm">{getLocationPrimaryText(loc)}</p>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] bg-slate-200 dark:bg-slate-700 px-1.5 rounded text-slate-500 font-bold uppercase">{loc.category}</span>
-                  <p className="text-xs text-slate-500">{loc.description}</p>
+                  <p className="text-xs text-slate-500">{getLocationSecondaryText(loc)}</p>
                 </div>
               </div>
             </button>
@@ -652,7 +849,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                 </div>
                 <div className="flex-1 h-14 bg-slate-50 dark:bg-black/20 rounded-xl flex items-center px-4 border border-transparent hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
                   <p className={`text-sm font-medium truncate ${pickup ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`}>
-                    {pickup ? pickup.display_name : "Current Location"}
+                    {pickup ? getLocationPrimaryText(pickup) : "Current Location"}
                   </p>
                 </div>
               </button>
@@ -667,7 +864,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                 </div>
                 <div className="flex-1 h-14 bg-slate-50 dark:bg-black/20 rounded-xl flex items-center px-4 border border-transparent hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
                   <p className={`text-sm font-medium truncate ${destination ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`}>
-                    {destination ? destination.display_name : "Enter Destination"}
+                    {destination ? getLocationPrimaryText(destination) : "Enter Destination"}
                   </p>
                 </div>
               </button>
@@ -984,8 +1181,28 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                 <span className="material-symbols-outlined text-white text-3xl filled">check</span>
               </div>
               <h3 className="text-xl font-black">Trip Completed!</h3>
-              <p className="text-slate-500 text-sm mt-1">Please complete payment below</p>
+              <p className="text-slate-500 text-sm mt-1">
+                {currentPaymentStatus === 'PAID'
+                  ? 'Payment confirmed.'
+                  : currentPaymentStatus === 'PENDING'
+                    ? 'Payment verification is in progress.'
+                    : currentPaymentStatus === 'FAILED'
+                      ? 'Payment failed. Please retry below.'
+                      : 'Please complete payment below'}
+              </p>
             </div>
+
+            {paymentStatusMessage && (
+              <div className={`rounded-2xl px-4 py-3 text-sm font-medium ${
+                currentPaymentStatus === 'PAID'
+                  ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                  : currentPaymentStatus === 'FAILED'
+                    ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                    : 'bg-slate-100 dark:bg-black/20 text-slate-600 dark:text-slate-300'
+              }`}>
+                {paymentStatusMessage}
+              </div>
+            )}
 
             {/* Fare breakdown — shown to owner too */}
             {currentTripFareBreakdown && (
@@ -1003,18 +1220,14 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-slate-500 text-sm">
-                      Distance ({currentTripFareBreakdown.distanceKm ?? 0}km x NGN 100)
-                    </span>
+                    <span className="text-slate-500 text-sm">Distance charge</span>
                     <span className="font-bold text-sm">
                       NGN {(currentTripFareBreakdown.distanceComponent ?? 0).toLocaleString()}
                     </span>
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-slate-500 text-sm">
-                      Time ({currentTripFareBreakdown.totalMins ?? currentTripFareBreakdown.actualMins ?? 0} mins x NGN 50)
-                    </span>
+                    <span className="text-slate-500 text-sm">Time charge</span>
                     <span className="font-bold text-sm">
                       NGN {(currentTripFareBreakdown.timeComponent ?? 0).toLocaleString()}
                     </span>
@@ -1040,13 +1253,23 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
             {/* Pay button */}
             <button
               onClick={handlePayNow}
-              disabled={isInitiatingPayment}
+              disabled={isInitiatingPayment || currentPaymentStatus === 'PENDING' || currentPaymentStatus === 'PAID'}
               className="w-full h-14 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/25 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isInitiatingPayment ? (
                 <>
                   <span className="material-symbols-outlined animate-spin">refresh</span>
                   Opening payment...
+                </>
+              ) : currentPaymentStatus === 'PAID' ? (
+                <>
+                  <span className="material-symbols-outlined">verified</span>
+                  Payment Confirmed
+                </>
+              ) : currentPaymentStatus === 'PENDING' ? (
+                <>
+                  <span className="material-symbols-outlined">hourglass_top</span>
+                  Awaiting Confirmation
                 </>
               ) : (
                 <>

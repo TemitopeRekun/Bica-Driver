@@ -383,6 +383,9 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
     <div className="space-y-6 animate-slide-up">
        <div className="bg-surface-light dark:bg-surface-dark p-5 rounded-3xl border border-slate-200 dark:border-slate-800 space-y-4">
           <h3 className="font-bold border-b border-slate-100 dark:border-slate-700 pb-2">Pricing Configuration</h3>
+          <p className="text-xs text-slate-500">
+            Fare formula: Base fare + (Distance rate x km) + (Time rate x minutes)
+          </p>
           
           <div className="flex flex-col gap-2">
              <label className="text-xs font-bold text-slate-500 uppercase">Base Fare (₦)</label>
@@ -395,7 +398,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
           </div>
 
           <div className="flex flex-col gap-2">
-             <label className="text-xs font-bold text-slate-500 uppercase">Price Per KM (₦)</label>
+             <label className="text-xs font-bold text-slate-500 uppercase">Distance Rate (₦ / km)</label>
              <input 
                type="number" 
                value={localSettings.pricePerKm}
@@ -415,10 +418,10 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
           </div>
 
           <div className="flex flex-col gap-2">
-             <label className="text-xs font-bold text-slate-500 uppercase">Time Rate (â‚¦ / min)</label>
+             <label className="text-xs font-bold text-slate-500 uppercase">Time Rate (₦ / min)</label>
              <input 
                type="number" 
-               value={localSettings.timeRate ?? 50}
+               value={localSettings.timeRate}
                onChange={(e) => setLocalSettings({...localSettings, timeRate: Number(e.target.value)})}
                className="bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 font-bold text-slate-900 dark:text-white"
              />
