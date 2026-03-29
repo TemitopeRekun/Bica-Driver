@@ -4,11 +4,11 @@ import { CapacitorService } from '../services/CapacitorService';
 import InteractiveMap from '../components/InteractiveMap';
 import { IMAGES } from '../constants';
 import {
+  OwnerActivityTab,
   SystemSettings,
   Trip,
   UserProfile,
   UserRole,
-  PaymentHistoryRecord,
   PaymentStatus,
   PaymentStatusResponse,
 } from '../types';
@@ -25,7 +25,7 @@ import { useOwnerLocationSearch } from '../hooks/useOwnerLocationSearch';
 
 interface RequestRideScreenProps {
   onOpenProfile: () => void;
-  onBack: () => void;
+  onOpenActivity: (tab: OwnerActivityTab) => void;
   settings: SystemSettings;
   onRideComplete: (trip: Trip) => void;
   currentUser: UserProfile | null;
@@ -47,7 +47,7 @@ const DISCOVERY_CATEGORIES = [
 
 const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   onOpenProfile,
-  onBack,
+  onOpenActivity,
   settings,
   onRideComplete,
   currentUser,
@@ -76,7 +76,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const [isInitiatingPayment, setIsInitiatingPayment] = useState(false);
   const [currentPaymentStatus, setCurrentPaymentStatus] = useState<PaymentStatus | null>(null);
   const [paymentStatusMessage, setPaymentStatusMessage] = useState('');
-  const [isRestoringRide, setIsRestoringRide] = useState(false);
 
   // Vehicle Details State
   const [showVehicleForm, setShowVehicleForm] = useState(false);
@@ -101,9 +100,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const [driverInfo, setDriverInfo] = useState<any>(null);
   const [trackedDriverPos, setTrackedDriverPos] = useState<[number, number] | null>(null);
   const [noDriversFound, setNoDriversFound] = useState(false);
-  const [recentTrips, setRecentTrips] = useState<Trip[]>([]);
-  const [recentPayments, setRecentPayments] = useState<PaymentHistoryRecord[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const timerRefs = useRef<any[]>([]);
   const {
     pickup,
@@ -128,6 +124,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     handleSelectLocation,
     handleCategoryTap,
     restoreLocations,
+    refreshRoute,
     resetLocationSearch,
   } = useOwnerLocationSearch({
     settings,
@@ -196,37 +193,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       timeAway: trip.estimatedArrivalMins || 5,
       tripId: trip.id,
     };
-  };
-
-  const loadOwnerHistory = async () => {
-    setIsLoadingHistory(true);
-    try {
-      const [tripHistory, paymentHistory] = await Promise.all([
-        api.get<any[]>('/rides/history'),
-        api.get<PaymentHistoryRecord[]>('/payments/history'),
-      ]);
-
-      setRecentTrips(
-        tripHistory.map((trip) => ({
-          ...trip,
-          ownerId: trip.ownerId || trip.owner?.id,
-          driverId: trip.driverId || trip.driver?.id,
-          ownerName: trip.owner?.name || trip.ownerName || 'Owner',
-          driverName: trip.driver?.name || trip.driverName || 'Driver',
-          date: trip.createdAt ? new Date(trip.createdAt).toLocaleString() : trip.date || '',
-          location:
-            trip.location ||
-            `${trip.pickupAddress?.split(',')[0] || 'Unknown'} -> ${trip.destAddress?.split(',')[0] || 'Unknown'}`,
-        })),
-      );
-      setRecentPayments(paymentHistory);
-    } catch (error) {
-      console.error('Failed to load owner history:', error);
-      setRecentTrips([]);
-      setRecentPayments([]);
-    } finally {
-      setIsLoadingHistory(false);
-    }
   };
 
   const loadPaymentStatus = async (tripId: string) => {
@@ -357,10 +323,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     let isMounted = true;
 
     const bootstrapOwnerState = async () => {
-      setIsRestoringRide(true);
       try {
-        await loadOwnerHistory();
-
         const currentRide = await api.get<any | null>('/rides/current');
         if (!isMounted || !currentRide) return;
 
@@ -371,10 +334,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         }
       } catch (error) {
         console.error('Failed to restore owner ride context:', error);
-      } finally {
-        if (isMounted) {
-          setIsRestoringRide(false);
-        }
       }
     };
 
@@ -424,11 +383,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       if (data.tripId !== currentTripId) return;
       setCurrentPaymentStatus(data.paymentStatus as PaymentStatus);
       setPaymentStatusMessage(data.message || '');
-      if (data.paymentStatus === 'PAID') {
-        loadOwnerHistory().catch((error) => {
-          console.error('Failed to refresh owner history after payment update:', error);
-        });
-      }
     },
     onLocationUpdated: (lat, lng) => {
       setTrackedDriverPos([lat, lng]);
@@ -625,18 +579,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(val).replace('NGN', '₦');
   };
 
-  const formatShortDate = (value?: string | null) => {
-    if (!value) return 'Just now';
-    return new Date(value).toLocaleString([], {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
-
-
-
 
 
 
@@ -785,13 +727,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       </div>
 
       {/* Header */}
-      <header className="relative z-10 px-4 py-3 flex items-center justify-between">
-        <button
-          onClick={onBack}
-          className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-        >
-          <span className="material-symbols-outlined">arrow_back</span>
-        </button>
+      <header className="relative z-10 px-4 py-3 flex items-center justify-end">
         <button
           onClick={onOpenProfile}
           className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/30 transition-colors overflow-hidden border border-white/20"
@@ -804,13 +740,55 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         </button>
       </header>
 
+      {rideState === 'IDLE' && (
+        <div className="relative z-10 px-4">
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => onOpenActivity('trips')}
+              className="group relative overflow-hidden rounded-[1.75rem] border border-emerald-300/25 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-500 p-4 text-left text-white shadow-xl shadow-emerald-900/20 transition-all hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-emerald-900/25"
+            >
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.3),transparent_38%)] opacity-90" />
+              <div className="relative mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white/18 ring-1 ring-white/20">
+                <span className="material-symbols-outlined">route</span>
+              </div>
+              <p className="relative text-sm font-black">Trips</p>
+              <p className="relative mt-1 text-xs text-white/80">View your recent and scheduled rides</p>
+            </button>
+            <button
+              onClick={() => onOpenActivity('payments')}
+              className="group relative overflow-hidden rounded-[1.75rem] border border-amber-300/25 bg-gradient-to-br from-amber-400 via-orange-500 to-orange-600 p-4 text-left text-white shadow-xl shadow-orange-900/20 transition-all hover:-translate-y-0.5 hover:shadow-2xl hover:shadow-orange-900/25"
+            >
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.28),transparent_38%)] opacity-90" />
+              <div className="relative mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-white/18 ring-1 ring-white/20">
+                <span className="material-symbols-outlined">payments</span>
+              </div>
+              <p className="relative text-sm font-black">Payments</p>
+              <p className="relative mt-1 text-xs text-white/80">Check completed fare payments and records</p>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1"></div>
 
       {/* Bottom Sheet UI */}
       <div className="relative z-20 px-4 pb-8">
         {rideState === 'IDLE' && (
           <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-slide-up">
-            <h2 className="text-lg font-bold mb-4">Plan your ride</h2>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-lg font-bold">Plan your ride</h2>
+              <button
+                onClick={() => refreshRoute().catch((error) => {
+                  console.error('Failed to refresh route:', error);
+                })}
+                disabled={!pickup || !destination || isFetchingRoute}
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-primary/15 bg-primary/8 px-3 text-xs font-black uppercase tracking-wide text-primary transition-colors hover:bg-primary/12 disabled:cursor-not-allowed disabled:opacity-50"
+                title="Refresh route"
+              >
+                <span className={`material-symbols-outlined text-base ${isFetchingRoute ? 'animate-spin' : ''}`}>refresh</span>
+                Refresh
+              </button>
+            </div>
 
             {/* Booking Type Toggle */}
             <div className="flex bg-slate-100 dark:bg-black/30 p-1 rounded-xl mb-6">
@@ -974,58 +952,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                     </button>
                   </div>
                 )}
-
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black/20 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-xs font-black uppercase tracking-widest text-slate-500">Recent Trips</p>
-                      <span className="text-[10px] text-slate-400">{recentTrips.length} total</span>
-                    </div>
-                    {isLoadingHistory ? (
-                      <p className="text-sm text-slate-400">Loading trip history...</p>
-                    ) : recentTrips.length > 0 ? (
-                      <div className="space-y-3">
-                        {recentTrips.slice(0, 3).map((trip) => (
-                          <div key={trip.id} className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{trip.location}</p>
-                              <p className="text-xs text-slate-500">{formatShortDate(trip.createdAt || trip.date)}</p>
-                            </div>
-                            <span className="text-xs font-bold text-slate-500 uppercase">{trip.status.replace(/_/g, ' ')}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-400">No trips yet.</p>
-                    )}
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black/20 p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-xs font-black uppercase tracking-widest text-slate-500">Payment History</p>
-                      <span className="text-[10px] text-slate-400">{recentPayments.length} records</span>
-                    </div>
-                    {isLoadingHistory ? (
-                      <p className="text-sm text-slate-400">Loading payments...</p>
-                    ) : recentPayments.length > 0 ? (
-                      <div className="space-y-3">
-                        {recentPayments.slice(0, 3).map((payment) => (
-                          <div key={payment.id} className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                                {payment.trip.pickupAddress.split(',')[0]} to {payment.trip.destAddress.split(',')[0]}
-                              </p>
-                              <p className="text-xs text-slate-500">{formatShortDate(payment.paidAt)}</p>
-                            </div>
-                            <span className="text-sm font-black text-primary">{formatCurrency(payment.totalAmount)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-400">No completed payments yet.</p>
-                    )}
-                  </div>
-                </div>
               </div>
             )}
           </div>
@@ -1351,6 +1277,9 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                   <h3 className="font-bold text-lg">No Drivers Available</h3>
                   <p className="text-slate-500 text-sm mt-1 max-w-[240px]">
                     All drivers are currently busy or offline. Please try again shortly.
+                  </p>
+                  <p className="text-slate-400 text-xs mt-3 max-w-[260px]">
+                    Drivers must be approved, online, and sharing live location before they can appear here.
                   </p>
                 </div>
                 <button

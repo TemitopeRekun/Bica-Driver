@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import InteractiveMap from '../components/InteractiveMap';
 import { CapacitorService } from '../services/CapacitorService';
-import { UserProfile, Trip, WalletSummary } from '../types';
+import { DriverActivityTab, UserProfile, Trip, WalletSummary } from '../types';
 import { api } from '../services/api.service';
 import { IMAGES } from '@/constants';
 import { DriverRideRequest, useDriverRealtime } from '../hooks/useDriverRealtime';
@@ -12,6 +12,7 @@ type RidePhase = 'pickup' | 'arrived' | 'trip' | 'completed';
 interface DriverMainScreenProps {
   user: UserProfile | null;
   onOpenProfile: () => void;
+  onOpenActivity: (tab: DriverActivityTab) => void;
   onBack: () => void;
   onUpdateEarnings: (amount: number) => void;
   onUpdateOnlineStatus: (isOnline: boolean) => void;
@@ -57,7 +58,7 @@ const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
 // ... existing imports
 
 const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
-  user, onOpenProfile, onBack, onUpdateEarnings, onUpdateOnlineStatus, onRideComplete
+  user, onOpenProfile, onOpenActivity, onBack, onUpdateEarnings, onUpdateOnlineStatus, onRideComplete
 }) => {
   const [activeRide, setActiveRide] = useState<DriverRideRequest | null>(null);
   const [ridePhase, setRidePhase] = useState<RidePhase>('pickup');
@@ -66,8 +67,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   const [showSelfieModal, setShowSelfieModal] = useState(false);
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
   const [pendingRide, setPendingRide] = useState<DriverRideRequest | null>(null);
-  const [recentTrips, setRecentTrips] = useState<Trip[]>([]);
-  const [isLoadingTrips, setIsLoadingTrips] = useState(false);
   const lastRulesAccepted = useRef<number>(0);
 
   const approvalStatus = user?.approvalStatus || 'PENDING';
@@ -75,6 +74,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   const {
     isOnline,
     isLocationRefreshing,
+    availabilityIssue,
     driverPos,
     liveRideRequests,
     enableOnline,
@@ -98,26 +98,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       console.error('Failed to load wallet summary:', error);
     }
   };
-  const loadRecentTrips = async () => {
-    setIsLoadingTrips(true);
-    try {
-      const trips = await api.get<any[]>('/rides/history');
-      setRecentTrips(trips.map((trip) => ({
-        ...trip,
-        ownerId: trip.ownerId || trip.owner?.id,
-        driverId: trip.driverId || trip.driver?.id,
-        ownerName: trip.owner?.name || trip.ownerName || 'Owner',
-        driverName: trip.driver?.name || trip.driverName || 'Driver',
-        date: trip.createdAt ? new Date(trip.createdAt).toLocaleString() : '',
-        location: `${trip.pickupAddress?.split(',')[0] || 'Unknown'} -> ${trip.destAddress?.split(',')[0] || 'Unknown'}`,
-      })));
-    } catch (error) {
-      console.error('Failed to load driver trip history:', error);
-      setRecentTrips([]);
-    } finally {
-      setIsLoadingTrips(false);
-    }
-  };
 
   const buildRideRequestFromTrip = (trip: any): DriverRideRequest => ({
     id: trip.id,
@@ -139,7 +119,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     let isMounted = true;
 
     const bootstrapDriverState = async () => {
-      await Promise.all([loadWalletSummary(), loadRecentTrips()]);
+      await loadWalletSummary();
 
       if (approvalStatus !== 'APPROVED') return;
 
@@ -394,17 +374,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     }).format(amount).replace('NGN', '₦');
   };
 
-  const formatShortDate = (value?: string | null) => {
-    if (!value) return 'Just now';
-    return new Date(value).toLocaleString([], {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
-
-
   if (approvalStatus === 'PENDING') {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center p-8 bg-background-dark text-center gap-6">
@@ -539,6 +508,49 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
             </div>
           </div>
         )}
+
+        {!activeRide && (
+          <div className="animate-fade-in grid grid-cols-2 gap-3">
+            <button
+              onClick={() => onOpenActivity('trips')}
+              className="group relative overflow-hidden rounded-[1.35rem] border border-cyan-400/25 bg-gradient-to-br from-cyan-500/20 via-sky-500/10 to-transparent px-4 py-3 text-left shadow-lg shadow-cyan-900/10 transition-all hover:border-cyan-300/40 hover:brightness-110 active:scale-[0.98]"
+            >
+              <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-cyan-400/15 to-transparent pointer-events-none" />
+              <div className="relative flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-400/15 text-cyan-300">
+                  <span className="material-symbols-outlined">route</span>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-200/80">Activity</p>
+                  <p className="text-sm font-black text-white">Trips</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => onOpenActivity('settlements')}
+              className="group relative overflow-hidden rounded-[1.35rem] border border-emerald-400/25 bg-gradient-to-br from-emerald-500/20 via-lime-400/10 to-transparent px-4 py-3 text-left shadow-lg shadow-emerald-900/10 transition-all hover:border-emerald-300/40 hover:brightness-110 active:scale-[0.98]"
+            >
+              <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-emerald-400/15 to-transparent pointer-events-none" />
+              <div className="relative flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300">
+                  <span className="material-symbols-outlined">account_balance_wallet</span>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-200/80">Activity</p>
+                  <p className="text-sm font-black text-white">Settlements</p>
+                </div>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {!activeRide && availabilityIssue && (
+          <div className="animate-fade-in rounded-[1.35rem] border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 shadow-lg shadow-amber-900/10">
+            <p className="font-bold text-amber-200">Driver not visible yet</p>
+            <p className="mt-1 text-xs leading-relaxed text-amber-100/90">{availabilityIssue}</p>
+          </div>
+        )}
       </div>
 
       <div className="flex-1"></div>
@@ -549,13 +561,13 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
             <>
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-extrabold text-white">Live Radar</h3>
-                  <p className="text-slate-400 text-xs font-medium">{isOnline ? 'Scanning for nearby jobs...' : 'Go online to receive jobs'}</p>
+                  <h3 className="text-xl font-extrabold text-white">Incoming Requests</h3>
+                  <p className="text-slate-400 text-xs font-medium">{isOnline ? 'Waiting for owner ride requests' : 'Go online to receive owner requests'}</p>
                 </div>
                 {isOnline && (
                   <div className="flex items-center gap-1.5 bg-primary/10 px-3 py-1.5 rounded-xl border border-primary/20">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></div>
-                    <span className="text-primary text-[10px] font-black uppercase tracking-widest">Active</span>
+                    <span className="text-primary text-[10px] font-black uppercase tracking-widest">Available</span>
                   </div>
                 )}
               </div>
@@ -649,9 +661,9 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                       <span className="material-symbols-outlined text-4xl text-primary animate-pulse">radar</span>
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-white mb-1">Scanning for rides</h3>
+                      <h3 className="text-lg font-bold text-white mb-1">Waiting for owner requests</h3>
                       <p className="text-slate-400 text-xs font-medium max-w-[200px] mx-auto leading-relaxed">
-                        You'll be notified instantly when an owner selects you.
+                        Stay online and keep your location fresh. Owners who select you will appear here instantly.
                       </p>
                     </div>
                   </div>
@@ -665,61 +677,12 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                   <div>
                     <h3 className="text-lg font-bold text-white mb-1">You're Offline</h3>
                     <p className="text-slate-400 text-xs font-medium max-w-[200px] mx-auto leading-relaxed">
-                      Switch to online mode above to start receiving ride requests.
+                      Switch to online mode above to start receiving owner requests.
                     </p>
                   </div>
                 </div>
               )}
 
-              <div className="grid gap-4">
-                <div className="rounded-3xl border border-white/5 bg-white/5 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Recent Settlements</p>
-                    <span className="text-[10px] text-slate-400">{walletSummary?.recentPayments?.length || 0} records</span>
-                  </div>
-                  {walletSummary?.recentPayments?.length ? (
-                    <div className="space-y-3">
-                      {walletSummary.recentPayments.slice(0, 3).map((payment) => (
-                        <div key={payment.id} className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-bold text-white">{formatCurrency(payment.driverAmount)}</p>
-                            <p className="text-xs text-slate-400">{formatShortDate(payment.paidAt)}</p>
-                          </div>
-                          <span className="text-[10px] uppercase tracking-widest text-primary">
-                            {payment.paymentMethod || 'Monnify'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400">No settlements recorded yet.</p>
-                  )}
-                </div>
-
-                <div className="rounded-3xl border border-white/5 bg-white/5 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Recent Trips</p>
-                    <span className="text-[10px] text-slate-400">{recentTrips.length} total</span>
-                  </div>
-                  {isLoadingTrips ? (
-                    <p className="text-sm text-slate-400">Loading trips...</p>
-                  ) : recentTrips.length > 0 ? (
-                    <div className="space-y-3">
-                      {recentTrips.slice(0, 3).map((trip) => (
-                        <div key={trip.id} className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-white truncate">{trip.location}</p>
-                            <p className="text-xs text-slate-400">{formatShortDate(trip.createdAt || trip.date)}</p>
-                          </div>
-                          <span className="text-xs font-bold text-primary">{formatCurrency(trip.amount)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400">No trips recorded yet.</p>
-                  )}
-                </div>
-              </div>
             </>
           ) : (
             <div className="flex flex-col gap-6 animate-slide-up">
@@ -906,7 +869,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                     }}
                     className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold active:scale-95 transition-all"
                   >
-                    Back to Radar
+                    Back to Requests
                   </button>
                 </div>
               )}
@@ -926,7 +889,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                     }}
                     className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold active:scale-95 transition-all"
                   >
-                    Back to Radar
+                    Back to Requests
                   </button>
                 </div>
               )}

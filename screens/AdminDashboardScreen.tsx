@@ -1,6 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { UserProfile, UserRole, ApprovalStatus, Trip, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord } from '../types';
+import { mapUser } from '../mappers/appMappers';
+import { api } from '../services/api.service';
 
 interface AdminDashboardScreenProps {
   users: UserProfile[];
@@ -28,9 +30,16 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
 }) => {
   const [activeSection, setActiveSection] = useState<AdminSection>('overview');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [selectedUserDetails, setSelectedUserDetails] = useState<UserProfile | null>(null);
+  const [selectedUserDetailsLoading, setSelectedUserDetailsLoading] = useState(false);
+  const [selectedUserDetailsError, setSelectedUserDetailsError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [driverFilter, setDriverFilter] = useState<DriverFilter>('All');
   const [localSettings, setLocalSettings] = useState<SystemSettings>(settings);
+  const modalUser =
+    selectedUserDetails && selectedUserDetails.id === selectedUser?.id
+      ? selectedUserDetails
+      : selectedUser;
 
   // Derived Data
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
@@ -67,6 +76,50 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
       minute: '2-digit',
     });
   };
+
+  const formatJoinedDate = (value?: string | null) => {
+    if (!value) return 'Unknown';
+    return new Date(value).toLocaleDateString([], {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const hasText = (value?: string | null) => Boolean(value?.trim());
+
+  useEffect(() => {
+    if (!selectedUser) {
+      setSelectedUserDetails(null);
+      setSelectedUserDetailsLoading(false);
+      setSelectedUserDetailsError(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    setSelectedUserDetails(selectedUser);
+    setSelectedUserDetailsError(null);
+    setSelectedUserDetailsLoading(true);
+
+    api.get<any>(`/users/${selectedUser.id}`)
+      .then((user) => {
+        if (cancelled) return;
+        setSelectedUserDetails(mapUser(user));
+      })
+      .catch((error: any) => {
+        if (cancelled) return;
+        setSelectedUserDetailsError(error.message || 'Could not refresh the full user profile.');
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setSelectedUserDetailsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedUser]);
 
 
   const handleSaveSettings = () => {
@@ -209,7 +262,9 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
             </h4>
             <p className="text-xs text-slate-500 truncate">{driver.email}</p>
             <div className="flex items-center gap-2 mt-1">
-               <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-mono">{driver.carType || 'No Car'}</span>
+               {hasText(driver.transmission) && (
+                 <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 font-mono">{driver.transmission}</span>
+               )}
                {driver.approvalStatus === 'PENDING' && <span className="text-[10px] text-orange-500 font-bold uppercase">Review Needed</span>}
             </div>
           </div>
@@ -547,7 +602,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
       </main>
 
       {/* User Detail Modal */}
-      {selectedUser && (
+      {selectedUser && modalUser && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setSelectedUser(null)}>
           <div className="w-full max-w-md bg-white dark:bg-surface-dark rounded-[2.5rem] shadow-2xl overflow-hidden animate-slide-up flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
             <div className="p-8 flex flex-col gap-6 overflow-y-auto no-scrollbar">
@@ -559,43 +614,62 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
               </div>
 
               <div className="flex items-center gap-5 p-2">
-                <img src={selectedUser.avatar} className="w-20 h-20 rounded-3xl object-cover ring-4 ring-primary/20" alt="" />
+                <img src={modalUser.avatar} className="w-20 h-20 rounded-3xl object-cover ring-4 ring-primary/20" alt="" />
                 <div>
                    <h4 className="text-2xl font-black leading-tight flex items-center gap-2">
-                     {selectedUser.name}
-                     {selectedUser.isBlocked && <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded uppercase">Blocked</span>}
+                     {modalUser.name}
+                     {modalUser.isBlocked && <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded uppercase">Blocked</span>}
                    </h4>
-                   <p className="text-slate-500 font-bold">{selectedUser.phone}</p>
+                   <p className="text-slate-500 font-bold">{modalUser.phone}</p>
                    <div className="flex flex-wrap gap-2 mt-2">
-                      <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-[10px] font-bold text-slate-500 uppercase">ID: {selectedUser.id.slice(0, 6)}</span>
-                      {selectedUser.approvalStatus === 'PENDING' && <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded text-[10px] font-bold uppercase">Pending Review</span>}
+                      <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-[10px] font-bold text-slate-500 uppercase">ID: {modalUser.id.slice(0, 6)}</span>
+                      {modalUser.approvalStatus === 'PENDING' && <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded text-[10px] font-bold uppercase">Pending Review</span>}
                    </div>
                 </div>
               </div>
 
+              {selectedUserDetailsLoading && (
+                <div className="flex items-center gap-2 rounded-2xl bg-slate-50 dark:bg-black/20 px-4 py-3 text-xs font-medium text-slate-500">
+                  <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+                  Refreshing the full profile for the latest registration details...
+                </div>
+              )}
+
+              {selectedUserDetailsError && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+                  Using the dashboard snapshot right now. Some registration fields may still be missing in this view.
+                </div>
+              )}
+
               {/* ... (existing fields) ... */}
               <div className="space-y-6">
                  {/* Only show Driver Specifics if driver */}
-                 {selectedUser.role === UserRole.DRIVER && (
+                 {modalUser.role === UserRole.DRIVER && (
                     <>
                       <div className="grid grid-cols-2 gap-3">
                          <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
                             <p className="text-[10px] uppercase text-slate-500 font-bold">NIN Number</p>
-                            <p className="font-mono font-bold text-sm truncate">{selectedUser.nin || 'Not Provided'}</p>
-                         </div>
-                         <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
-                            <p className="text-[10px] uppercase text-slate-500 font-bold">Car Type</p>
-                            <p className="font-bold text-sm truncate">{selectedUser.carType || 'Not Provided'}</p>
+                            <p className="font-mono font-bold text-sm truncate">{modalUser.nin || 'Not Provided'}</p>
                          </div>
                          <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
                             <p className="text-[10px] uppercase text-slate-500 font-bold">Transmission</p>
-                            <p className="font-bold text-sm truncate">{selectedUser.transmission || 'Not Provided'}</p>
+                            <p className="font-bold text-sm truncate">{modalUser.transmission || 'Not Provided'}</p>
                          </div>
                          <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
                             <p className="text-[10px] uppercase text-slate-500 font-bold">Age</p>
-                            <p className="font-bold text-sm truncate">{selectedUser.age || 'Not Provided'}</p>
+                            <p className="font-bold text-sm truncate">{modalUser.age || 'Unavailable in this feed'}</p>
+                         </div>
+                         <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
+                            <p className="text-[10px] uppercase text-slate-500 font-bold">Joined</p>
+                            <p className="font-bold text-sm truncate">{formatJoinedDate(modalUser.createdAt)}</p>
                          </div>
                       </div>
+
+                      {!hasText(modalUser.age) && !selectedUserDetailsLoading && !selectedUserDetailsError && (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-medium text-slate-500 dark:border-slate-800 dark:bg-black/20 dark:text-slate-400">
+                          Driver age is collected during signup, but the current admin response still did not return it for this profile.
+                        </div>
+                      )}
 
                       {/* Driver Documents Section */}
                       <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -605,8 +679,8 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                           {/* License Image */}
                           <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
                             <p className="text-[10px] uppercase text-slate-500 font-bold mb-2">Driver's License</p>
-                            {selectedUser.licenseImage ? (
-                              <img src={selectedUser.licenseImage} alt="Driver License" className="w-full h-40 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
+                            {modalUser.licenseImage ? (
+                              <img src={modalUser.licenseImage} alt="Driver License" className="w-full h-40 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
                             ) : (
                               <div className="w-full h-20 flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-400 text-xs font-medium">No License Uploaded</div>
                             )}
@@ -615,8 +689,8 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                           {/* NIN Image */}
                           <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
                             <p className="text-[10px] uppercase text-slate-500 font-bold mb-2">NIN Document</p>
-                            {selectedUser.ninImage ? (
-                              <img src={selectedUser.ninImage} alt="NIN Document" className="w-full h-40 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
+                            {modalUser.ninImage ? (
+                              <img src={modalUser.ninImage} alt="NIN Document" className="w-full h-40 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
                             ) : (
                               <div className="w-full h-20 flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-400 text-xs font-medium">No NIN Uploaded</div>
                             )}
@@ -625,8 +699,8 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                           {/* Selfie Image */}
                           <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
                             <p className="text-[10px] uppercase text-slate-500 font-bold mb-2">Verification Selfie</p>
-                            {selectedUser.selfieImage ? (
-                              <img src={selectedUser.selfieImage} alt="Selfie" className="w-full h-40 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
+                            {modalUser.selfieImage ? (
+                              <img src={modalUser.selfieImage} alt="Selfie" className="w-full h-40 object-cover rounded-lg border border-slate-200 dark:border-slate-700" />
                             ) : (
                               <div className="w-full h-20 flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-400 text-xs font-medium">No Selfie Uploaded</div>
                             )}
@@ -635,27 +709,47 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                       </div>
                     </>
                  )}
+                 {modalUser.role === UserRole.OWNER && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
+                        <p className="text-[10px] uppercase text-slate-500 font-bold">Car Type</p>
+                        <p className="font-bold text-sm truncate">{modalUser.carType || 'Not Provided'}</p>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
+                        <p className="text-[10px] uppercase text-slate-500 font-bold">Car Model</p>
+                        <p className="font-bold text-sm truncate">{modalUser.carModel || 'Not Provided'}</p>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
+                        <p className="text-[10px] uppercase text-slate-500 font-bold">Car Year</p>
+                        <p className="font-bold text-sm truncate">{modalUser.carYear || 'Not Provided'}</p>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
+                        <p className="text-[10px] uppercase text-slate-500 font-bold">Age</p>
+                        <p className="font-bold text-sm truncate">{modalUser.age || 'Not Provided'}</p>
+                      </div>
+                    </div>
+                 )}
                  <div className="bg-slate-50 dark:bg-black/20 p-3 rounded-xl">
                     <p className="text-[10px] uppercase text-slate-500 font-bold">Email</p>
-                    <p className="font-bold text-sm truncate">{selectedUser.email}</p>
+                    <p className="font-bold text-sm truncate">{modalUser.email}</p>
                  </div>
               </div>
 
               <div className="flex gap-4 mt-2 pb-4 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <button 
                   onClick={() => {
-                     onBlockUser(selectedUser.id, !selectedUser.isBlocked);
+                     onBlockUser(modalUser.id, !modalUser.isBlocked);
                      setSelectedUser(null);
                   }}
-                  className={`flex-1 py-4 rounded-2xl font-black hover:brightness-110 transition-all active:scale-[0.98] ${selectedUser.isBlocked ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}
+                  className={`flex-1 py-4 rounded-2xl font-black hover:brightness-110 transition-all active:scale-[0.98] ${modalUser.isBlocked ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}
                 >
-                  {selectedUser.isBlocked ? 'Unblock Account' : 'Block Account'}
+                  {modalUser.isBlocked ? 'Unblock Account' : 'Block Account'}
                 </button>
                 
-                {selectedUser.role === UserRole.DRIVER && selectedUser.approvalStatus !== 'APPROVED' && !selectedUser.isBlocked && (
+                {modalUser.role === UserRole.DRIVER && modalUser.approvalStatus !== 'APPROVED' && !modalUser.isBlocked && (
                   <button 
                     onClick={() => {
-                      onUpdateStatus(selectedUser.id, 'APPROVED');
+                      onUpdateStatus(modalUser.id, 'APPROVED');
                       setSelectedUser(null);
                     }}
                     className="flex-1 py-4 rounded-2xl bg-primary text-white font-black shadow-xl shadow-primary/25 hover:brightness-110 transition-all active:scale-[0.98]"

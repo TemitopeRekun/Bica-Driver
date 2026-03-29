@@ -4,14 +4,18 @@ import { Camera, CameraResultType, CameraSource, CameraDirection } from '@capaci
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { StatusBar, Style } from '@capacitor/status-bar';
 
+const GEOLOCATION_OPTIONS = {
+  enableHighAccuracy: true,
+  timeout: 15000,
+  maximumAge: 0,
+};
+
+const DESIRED_ACCURACY_METERS = 100;
+
 export const CapacitorService = {
   async getCurrentLocation(): Promise<any> {
-    try {
-      const coordinates = await Geolocation.getCurrentPosition();
-      return coordinates;
-    } catch (e) {
-      console.warn('Capacitor Geolocation failed, trying web fallback...', e);
-      return new Promise<any>((resolve) => {
+    const getWebLocation = () =>
+      new Promise<any>((resolve) => {
         if ("geolocation" in navigator) {
           navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -31,12 +35,39 @@ export const CapacitorService = {
             (error) => {
               console.error("Web Geolocation error:", error);
               resolve(null);
-            }
+            },
+            GEOLOCATION_OPTIONS,
           );
         } else {
           resolve(null);
         }
       });
+
+    const shouldRetryForAccuracy = (position: any) =>
+      Boolean(
+        position?.coords &&
+        typeof position.coords.accuracy === 'number' &&
+        position.coords.accuracy > DESIRED_ACCURACY_METERS,
+      );
+
+    try {
+      let coordinates = await Geolocation.getCurrentPosition(GEOLOCATION_OPTIONS);
+
+      // Retry once when the device reports a stale or low-accuracy GPS fix.
+      if (shouldRetryForAccuracy(coordinates)) {
+        coordinates = await Geolocation.getCurrentPosition(GEOLOCATION_OPTIONS);
+      }
+
+      return coordinates;
+    } catch (e) {
+      console.warn('Capacitor Geolocation failed, trying web fallback...', e);
+      let webCoordinates = await getWebLocation();
+
+      if (shouldRetryForAccuracy(webCoordinates)) {
+        webCoordinates = await getWebLocation();
+      }
+
+      return webCoordinates;
     }
   },
 

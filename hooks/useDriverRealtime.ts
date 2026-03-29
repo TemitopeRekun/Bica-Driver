@@ -37,6 +37,7 @@ export const useDriverRealtime = ({
 }: UseDriverRealtimeOptions) => {
   const [isOnline, setIsOnline] = useState(Boolean(user?.isOnline));
   const [isLocationRefreshing, setIsLocationRefreshing] = useState(false);
+  const [availabilityIssue, setAvailabilityIssue] = useState<string | null>(null);
   const [driverPos, setDriverPos] = useState<[number, number]>(() =>
     user?.currentLocation ? [user.currentLocation.lat, user.currentLocation.lng] : DEFAULT_DRIVER_POS,
   );
@@ -71,12 +72,14 @@ export const useDriverRealtime = ({
   }, [user?.id]);
 
   const enableOnline = useCallback(() => {
+    setAvailabilityIssue(null);
     updateOnlineState(true);
   }, [updateOnlineState]);
 
   const disableOnline = useCallback(async () => {
     await api.patch('/users/online', { isOnline: false });
     await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
+    setAvailabilityIssue(null);
     updateOnlineState(false);
   }, [updateOnlineState]);
 
@@ -94,6 +97,7 @@ export const useDriverRealtime = ({
   useEffect(() => {
     if (!user?.id) {
       setIsOnline(false);
+      setAvailabilityIssue(null);
       setDriverPos(DEFAULT_DRIVER_POS);
       setLiveRideRequests([]);
       return;
@@ -157,21 +161,37 @@ export const useDriverRealtime = ({
 
     const initLocation = async () => {
       setIsLocationRefreshing(true);
+      setAvailabilityIssue(null);
       try {
+        const pos = await CapacitorService.getCurrentLocation();
+        if (
+          !pos?.coords ||
+          typeof pos.coords.latitude !== 'number' ||
+          typeof pos.coords.longitude !== 'number'
+        ) {
+          throw new Error('Live location was unavailable.');
+        }
+
         if (!socketRef.current?.connected) {
           socketRef.current.connect();
         } else {
           registerDriverSocket();
         }
-        await api.patch('/users/online', { isOnline: true });
 
-        const pos = await CapacitorService.getCurrentLocation();
-        if (pos) {
-          const { latitude, longitude } = pos.coords;
-          await pushDriverLocation(latitude, longitude);
-        }
+        const { latitude, longitude } = pos.coords;
+        await pushDriverLocation(latitude, longitude);
+        await api.patch('/users/online', { isOnline: true });
       } catch (error) {
         console.error('Initial location failed:', error);
+        await api.patch('/users/online', { isOnline: false }).catch(() => {});
+        await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
+        if (socketRef.current?.connected) {
+          socketRef.current.disconnect();
+        }
+        setAvailabilityIssue(
+          'Location access is required before owners can see you. Turn on location and try going online again.',
+        );
+        updateOnlineState(false);
       } finally {
         setIsLocationRefreshing(false);
       }
@@ -199,6 +219,7 @@ export const useDriverRealtime = ({
   return {
     isOnline,
     isLocationRefreshing,
+    availabilityIssue,
     driverPos,
     liveRideRequests,
     enableOnline,

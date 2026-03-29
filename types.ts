@@ -195,6 +195,9 @@ export interface PendingPaymentTrip extends Trip {
   } | null;
 }
 
+export type OwnerActivityTab = 'trips' | 'payments';
+export type DriverActivityTab = 'trips' | 'settlements';
+
 export interface SystemSettings {
   baseFare: number;
   pricePerKm: number; // distance rate per km used in the fare formula
@@ -213,7 +216,9 @@ export enum AppScreen {
   LOGIN = 'LOGIN',
   ROLE_SELECTION = 'ROLE_SELECTION',
   MAIN_REQUEST = 'MAIN_REQUEST',
+  OWNER_ACTIVITY = 'OWNER_ACTIVITY',
   DRIVER_DASHBOARD = 'DRIVER_DASHBOARD',
+  DRIVER_ACTIVITY = 'DRIVER_ACTIVITY',
   PROFILE = 'PROFILE',
   ADMIN_DASHBOARD = 'ADMIN_DASHBOARD'
 }

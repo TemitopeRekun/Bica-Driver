@@ -78,7 +78,12 @@ export const useOwnerRealtime = ({
 
     ownerSocketRef.current = io(`${API_URL}/rides`, {
       transports: ['websocket'],
+      autoConnect: false,
     });
+
+    const connectTimer = setTimeout(() => {
+      ownerSocketRef.current?.connect();
+    }, 0);
 
     ownerSocketRef.current.on('connect', () => {
       ownerSocketRef.current?.emit('owner:register', { ownerId });
@@ -133,6 +138,7 @@ export const useOwnerRealtime = ({
     });
 
     return () => {
+      clearTimeout(connectTimer);
       ownerSocketRef.current?.disconnect();
       ownerSocketRef.current = null;
     };

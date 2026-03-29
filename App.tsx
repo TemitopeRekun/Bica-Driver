@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import localforage from 'localforage';
-import { AppScreen, UserRole, UserProfile, ApprovalStatus, Trip, SystemSettings } from './types';
+import { AppScreen, UserRole, UserProfile, ApprovalStatus, Trip, SystemSettings, OwnerActivityTab, DriverActivityTab } from './types';
 import WelcomeScreen from './screens/WelcomeScreen';
 import SignUpScreen from './screens/SignUpScreen';
 import LoginScreen from './screens/LoginScreen';
 import RoleSelectionScreen from './screens/RoleSelectionScreen';
 import RequestRideScreen from './screens/RequestRideScreen';
 import DriverMainScreen from './screens/DriverMainScreen';
+import DriverActivityScreen from './screens/DriverActivityScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import AdminDashboardScreen from './screens/AdminDashboardScreen';
+import OwnerActivityScreen from './screens/OwnerActivityScreen';
 import SupportChatbot from './components/SupportChatbot';
 import { IMAGES } from './constants';
 import { CapacitorService } from './services/CapacitorService';
@@ -24,6 +26,8 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOADING);
   const [selectedSignupRole, setSelectedSignupRole] = useState<UserRole>(UserRole.UNSET);
+  const [ownerActivityTab, setOwnerActivityTab] = useState<OwnerActivityTab>('trips');
+  const [driverActivityTab, setDriverActivityTab] = useState<DriverActivityTab>('trips');
 
   // Settings loaded from backend
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
@@ -117,6 +121,16 @@ const App: React.FC = () => {
   const navigateTo = (screen: AppScreen) => {
     CapacitorService.triggerHaptic();
     setCurrentScreen(screen);
+  };
+
+  const openOwnerActivity = (tab: OwnerActivityTab) => {
+    setOwnerActivityTab(tab);
+    navigateTo(AppScreen.OWNER_ACTIVITY);
+  };
+
+  const openDriverActivity = (tab: DriverActivityTab) => {
+    setDriverActivityTab(tab);
+    navigateTo(AppScreen.DRIVER_ACTIVITY);
   };
 
   const handleStart = () => navigateTo(AppScreen.ROLE_SELECTION);
@@ -372,10 +386,17 @@ const App: React.FC = () => {
           <RequestRideScreen
             settings={systemSettings}
             onOpenProfile={() => navigateTo(AppScreen.PROFILE)}
-            onBack={handleLogout}
+            onOpenActivity={openOwnerActivity}
             onRideComplete={handleAddTrip}
             currentUser={currentUser}
             allUsers={ownerVisibleDrivers}
+          />
+        );
+      case AppScreen.OWNER_ACTIVITY:
+        return (
+          <OwnerActivityScreen
+            initialTab={ownerActivityTab}
+            onBack={() => navigateTo(AppScreen.MAIN_REQUEST)}
           />
         );
       case AppScreen.DRIVER_DASHBOARD:
@@ -383,10 +404,18 @@ const App: React.FC = () => {
           <DriverMainScreen
             user={currentUser}
             onOpenProfile={() => navigateTo(AppScreen.PROFILE)}
+            onOpenActivity={openDriverActivity}
             onBack={handleLogout}
             onUpdateEarnings={handleUpdateEarnings}
             onUpdateOnlineStatus={handleUpdateDriverOnlineStatus}
             onRideComplete={handleAddTrip}
+          />
+        );
+      case AppScreen.DRIVER_ACTIVITY:
+        return (
+          <DriverActivityScreen
+            initialTab={driverActivityTab}
+            onBack={() => navigateTo(AppScreen.DRIVER_DASHBOARD)}
           />
         );
       case AppScreen.PROFILE:
