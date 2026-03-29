@@ -8,7 +8,7 @@ export const Config = {
     return import.meta.env.DEV ? 'http://localhost:3001' : '';
   })(),
   apiKey: sanitizeEnvValue(import.meta.env.VITE_GEMINI_API_KEY),
-  mapboxToken: sanitizeEnvValue(import.meta.env.VITE_MAPBOX_TOKEN),
+  googleMapsApiKey: sanitizeEnvValue(import.meta.env.VITE_GOOGLE_MAPS_API_KEY),
   isProduction: import.meta.env.PROD,
   isSandbox: import.meta.env.DEV,
   platform: (window as any).Capacitor?.getPlatform?.() || 'web',
