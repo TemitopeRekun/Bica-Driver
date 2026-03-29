@@ -23,9 +23,12 @@ async function request<T>(
   requiresAuth = true,
 ): Promise<T> {
   const baseUrl = requireApiUrl();
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+  const headers: Record<string, string> = {};
+  // Only declare JSON content-type when sending a body — NestJS/Fastify rejects
+  // requests that have Content-Type: application/json but an empty body.
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (requiresAuth) {
     const token = getToken();

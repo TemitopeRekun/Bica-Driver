@@ -131,34 +131,26 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     onPickupChanged: () => setNoDriversFound(false),
   });
 
-  const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
-    seconds,
-    onExpire,
-  }) => {
-    const [remaining, setRemaining] = React.useState(seconds);
+  const CountUpTimer: React.FC = () => {
+    const [elapsed, setElapsed] = React.useState(0);
 
     React.useEffect(() => {
-      if (remaining <= 0) {
-        onExpire();
-        return;
-      }
-      const timer = setTimeout(() => setRemaining(prev => prev - 1), 1000);
-      return () => clearTimeout(timer);
-    }, [remaining]);
+      const timer = setInterval(() => setElapsed(prev => prev + 1), 1000);
+      return () => clearInterval(timer);
+    }, []);
+
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    const display = mins > 0
+      ? `${mins}m ${secs.toString().padStart(2, '0')}s`
+      : `${secs}s`;
 
     return (
-      <div className="mt-4 flex flex-col items-center gap-1">
-        <div
-          className="w-12 h-12 rounded-full border-4 border-primary/30 flex items-center justify-center"
-          style={{
-            background: `conic-gradient(#045828 ${(remaining / seconds) * 360}deg, transparent 0deg)`,
-          }}
-        >
-          <div className="w-8 h-8 bg-white dark:bg-surface-dark rounded-full flex items-center justify-center">
-            <span className="text-sm font-black text-primary">{remaining}</span>
-          </div>
+      <div className="mt-5 flex flex-col items-center gap-1">
+        <div className="px-5 py-2 rounded-2xl bg-primary/10 border border-primary/20">
+          <span className="text-2xl font-black text-primary tracking-tight">{display}</span>
         </div>
-        <span className="text-xs text-slate-400">seconds remaining</span>
+        <span className="text-xs text-slate-400">waiting for driver to accept</span>
       </div>
     );
   };
@@ -455,9 +447,9 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         distanceKm: parseFloat(estimatedDistance),
         estimatedMins: estimatedMins || undefined,
         driverId: bookedDriver.id,
-        vehicleMake: vehicleData.make,
-        vehicleModel: vehicleData.model,
-        vehicleYear: vehicleData.year,
+
+
+
         transmission: vehicleData.transmission,
       });
 
@@ -975,17 +967,11 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
               Waiting for {driverInfo?.name ?? 'Driver'}
             </h3>
             <p className="text-slate-500 text-sm">
-              Request sent — driver has 60 seconds to accept
+              Request sent — waiting for driver to accept
             </p>
 
-            {/* 60 second countdown */}
-            <CountdownTimer
-              seconds={60}
-              onExpire={() => {
-                // UI will update via WebSocket when backend auto-declines
-                // This just shows the user how long is left
-              }}
-            />
+            {/* Count-up timer — no auto-cancel */}
+            <CountUpTimer />
 
             <button
               onClick={resetRide}

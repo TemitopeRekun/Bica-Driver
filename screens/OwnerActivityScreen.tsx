@@ -262,7 +262,7 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
   const activeTheme = ACTIVITY_THEME[activeTab];
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background-light text-slate-900 dark:bg-background-dark dark:text-white">
+    <div className="relative min-h-screen bg-background-light text-slate-900 dark:bg-background-dark dark:text-white">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-emerald-500/10 via-amber-500/8 to-transparent" />
 
       <div className="sticky top-0 z-20 border-b border-slate-200 bg-background-light/88 backdrop-blur-md dark:border-slate-800 dark:bg-background-dark/88">

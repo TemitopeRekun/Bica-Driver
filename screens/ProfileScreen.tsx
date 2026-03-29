@@ -42,7 +42,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
   const isRoleSwitcherVisible = initialRole === UserRole.UNSET;
 
   return (
-    <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen pb-10 flex flex-col">
+    <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white min-h-screen pb-10">
       <div className="sticky top-0 z-50 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center p-4 justify-between max-w-md mx-auto">
           <button 
@@ -61,7 +61,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col gap-6 pb-8 overflow-y-auto no-scrollbar">
+      <div className="flex flex-col gap-6 pb-8">
         <div className="flex flex-col items-center pt-6 px-4">
           <div className="relative">
             <div 

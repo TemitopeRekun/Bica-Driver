@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useEffect, useRef } from 'react';
 import InteractiveMap from '../components/InteractiveMap';
 import { CapacitorService } from '../services/CapacitorService';
@@ -22,35 +22,27 @@ interface DriverMainScreenProps {
 import { CameraSource, CameraDirection } from '@capacitor/camera';
 
 
-// Outside DriverMainScreen — not recreated on every render
-const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
-  seconds,
-  onExpire,
-}) => {
-  const [remaining, setRemaining] = React.useState(seconds);
+// Outside DriverMainScreen  not recreated on every render
+const CountUpTimer: React.FC = () => {
+  const [elapsed, setElapsed] = React.useState(0);
 
   React.useEffect(() => {
-    if (remaining <= 0) {
-      onExpire();
-      return;
-    }
-    const timer = setTimeout(() => setRemaining(prev => prev - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [remaining]);
+    const timer = setInterval(() => setElapsed(prev => prev + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  const display = mins > 0
+    ? `${mins}m${secs.toString().padStart(2, '0')}s`
+    : `${secs}s`;
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <div
-        className="w-10 h-10 rounded-full border-4 border-primary/30 flex items-center justify-center"
-        style={{
-          background: `conic-gradient(#045828 ${(remaining / seconds) * 360}deg, transparent 0deg)`,
-        }}
-      >
-        <div className="w-7 h-7 bg-surface-dark rounded-full flex items-center justify-center">
-          <span className="text-xs font-black text-primary">{remaining}</span>
-        </div>
+      <div className="px-2 py-1 rounded-xl bg-primary/20 border border-primary/30">
+        <span className="text-xs font-black text-primary">{display}</span>
       </div>
-      <span className="text-[10px] text-slate-400">sec</span>
+      <span className="text-[10px] text-slate-400">waiting</span>
     </div>
   );
 };
@@ -588,16 +580,8 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                           <h4 className="font-bold text-white text-base">{req.ownerName}</h4>
                           <p className="text-slate-400 text-xs mt-0.5">Verified Car Owner</p>
                         </div>
-                        {/* 60s countdown on driver side too */}
-                        <div className="w-10 h-10 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center">
-                          <CountdownTimer
-                            seconds={60}
-                            onExpire={() => {
-                              // Backend already auto-declined — remove from list
-                              removeRideRequest(req.id);
-                            }}
-                          />
-                        </div>
+                        {/* Count-up timer */}
+                        <CountUpTimer />
                       </div>
 
                       {/* Trip details */}
@@ -967,6 +951,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
 };
 
 export default DriverMainScreen;
+
 
 
 
