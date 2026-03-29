@@ -9,12 +9,13 @@ interface ProfileScreenProps {
   initialRole: UserRole;
   onBack: () => void;
   onLogout: () => void;
-  onUpdateAvatar: (newAvatar: string) => void;
+  onUpdateAvatar: (newAvatar: string) => Promise<void>;
 }
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack, onLogout, onUpdateAvatar }) => {
   // The role is locked based on the initial selection for both Owners and Drivers.
   const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
 
   const handleFeatureAlert = (feature: string) => {
     CapacitorService.triggerHaptic();
@@ -25,7 +26,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
     CapacitorService.triggerHaptic();
     const photo = await CapacitorService.takePhoto();
     if (photo) {
-      onUpdateAvatar(photo);
+      setIsUpdatingAvatar(true);
+      try {
+        await onUpdateAvatar(photo);
+      } catch (error: any) {
+        alert(error.message || 'Could not update your avatar. Please try again.');
+      } finally {
+        setIsUpdatingAvatar(false);
+      }
     }
   };
 
@@ -63,9 +71,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
             </div>
             <button 
               onClick={handleCameraUpdate}
+              disabled={isUpdatingAvatar}
               className="absolute bottom-0 right-0 bg-primary text-white rounded-full p-2 shadow-md flex items-center justify-center ring-2 ring-background-light dark:ring-background-dark active:scale-90 transition-transform"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>photo_camera</span>
+              <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
+                {isUpdatingAvatar ? 'progress_activity' : 'photo_camera'}
+              </span>
             </button>
           </div>
           <div className="mt-4 flex flex-col items-center">

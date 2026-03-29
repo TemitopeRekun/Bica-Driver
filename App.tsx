@@ -301,6 +301,60 @@ const App: React.FC = () => {
     });
   };
 
+  const resolveAvatarUser = (response: any, existingUser: UserProfile): UserProfile | null => {
+    const backendUser = response?.user || response?.profile;
+    if (backendUser && typeof backendUser === 'object') {
+      return {
+        ...existingUser,
+        ...mapUser({ ...existingUser, ...backendUser }),
+      };
+    }
+
+    const avatarUrl = response?.avatarUrl;
+    if (typeof avatarUrl === 'string' && avatarUrl.trim()) {
+      return {
+        ...existingUser,
+        avatar: avatarUrl,
+        avatarUrl,
+      };
+    }
+
+    return null;
+  };
+
+  const applyUpdatedAvatar = (nextUser: UserProfile) => {
+    setCurrentUser(nextUser);
+    void localforage.setItem('bicadriver_current_user', nextUser);
+  };
+
+  const handleUpdateAvatar = async (image: string) => {
+    if (!currentUser) {
+      throw new Error('You must be logged in to update your avatar.');
+    }
+
+    const tryRequest = async (fn: () => Promise<any>) => {
+      const response = await fn();
+      const nextUser = resolveAvatarUser(response, currentUser);
+      if (!nextUser) {
+        throw new Error('Avatar upload completed but no avatarUrl was returned.');
+      }
+
+      applyUpdatedAvatar(nextUser);
+    };
+
+    try {
+      await tryRequest(() => api.post('/users/upload-avatar', { image }));
+    } catch (postError: any) {
+      try {
+        await tryRequest(() => api.patch('/users/avatar', { image }));
+      } catch (patchError: any) {
+        throw new Error(
+          patchError.message || postError.message || 'Could not update your avatar.',
+        );
+      }
+    }
+  };
+
   const renderScreen = (screen: AppScreen) => {
     switch (screen) {
       case AppScreen.LOADING:
@@ -343,7 +397,7 @@ const App: React.FC = () => {
             initialRole={currentUser.role}
             onBack={() => currentUser.role === UserRole.DRIVER ? navigateTo(AppScreen.DRIVER_DASHBOARD) : navigateTo(AppScreen.MAIN_REQUEST)}
             onLogout={handleLogout}
-            onUpdateAvatar={(a) => setCurrentUser(prev => prev ? { ...prev, avatar: a } : null)}
+            onUpdateAvatar={handleUpdateAvatar}
           />
         );
       case AppScreen.ADMIN_DASHBOARD:
@@ -385,7 +439,7 @@ const App: React.FC = () => {
               initialRole={currentUser.role}
               onBack={() => navigateTo(AppScreen.DRIVER_DASHBOARD)}
               onLogout={handleLogout}
-              onUpdateAvatar={(a) => setCurrentUser(prev => prev ? { ...prev, avatar: a } : null)}
+              onUpdateAvatar={handleUpdateAvatar}
             />
           </div>
         )}

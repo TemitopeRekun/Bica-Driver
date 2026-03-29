@@ -43,7 +43,8 @@ export const CapacitorService = {
   async takePhoto(source: CameraSource = CameraSource.Prompt, direction: CameraDirection = CameraDirection.Rear): Promise<string | null> {
     try {
       const image = await Camera.getPhoto({
-        quality: 90,
+        // Keep base64 payloads reasonably small for backend upload limits.
+        quality: 80,
         allowEditing: true,
         resultType: CameraResultType.Base64,
         source: source,
