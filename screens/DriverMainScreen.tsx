@@ -547,8 +547,8 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
 
       <div className="flex-1"></div>
 
-      <div className="relative z-20 w-full bg-surface-dark rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.6)] flex flex-col border-t border-white/5 transition-all duration-500">
-        <div className="p-6 pt-2 pb-10 flex flex-col gap-5">
+      <div className="relative z-20 w-full max-h-[72vh] bg-surface-dark rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.6)] flex flex-col border-t border-white/5 transition-all duration-500">
+        <div className="p-6 pt-2 pb-10 flex flex-col gap-5 overflow-y-auto no-scrollbar">
           {!activeRide ? (
             <>
               <div className="flex items-center justify-between">
@@ -884,7 +884,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
 
       {showSelfieModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-surface-dark border border-white/10 p-6 rounded-[2rem] w-full max-w-sm text-center flex flex-col">
+          <div className="bg-surface-dark border border-white/10 p-6 rounded-[2rem] w-full max-w-sm text-center flex flex-col max-h-[85vh] overflow-y-auto no-scrollbar">
             <span className="material-symbols-outlined text-4xl text-white mb-3 bg-white/10 p-4 rounded-full mx-auto">face</span>
             <h3 className="text-xl font-bold text-white mb-2">Verify Identity</h3>
             <p className="text-slate-400 text-xs mb-6">Take a quick selfie to confirm you are the driver for this ride.</p>

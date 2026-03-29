@@ -5,6 +5,7 @@ import { api } from '../services/api.service';
 import { Config } from '../services/Config';
 import { IMAGES } from '../constants';
 import { UserProfile } from '../types';
+import { Geolocation } from '@capacitor/geolocation';
 
 const API_URL = Config.apiUrl;
 
@@ -29,6 +30,19 @@ interface UseDriverRealtimeOptions {
 }
 
 const DEFAULT_DRIVER_POS: [number, number] = [6.4549, 3.3896];
+
+const isPermissionDeniedError = (error: unknown): boolean => {
+  const typedError = error as { code?: number | string; message?: string; cause?: { code?: number | string } };
+  const code = typedError?.code ?? typedError?.cause?.code;
+  if (code === 1 || code === 'PERMISSION_DENIED') return true;
+
+  const message = String(typedError?.message ?? error ?? '').toLowerCase();
+  return (
+    (message.includes('permission') && message.includes('denied')) ||
+    message.includes('location permission') ||
+    message.includes('not allowed')
+  );
+};
 
 export const useDriverRealtime = ({
   user,
@@ -181,17 +195,41 @@ export const useDriverRealtime = ({
         const { latitude, longitude } = pos.coords;
         await pushDriverLocation(latitude, longitude);
         await api.patch('/users/online', { isOnline: true });
+        setAvailabilityIssue(null);
       } catch (error) {
         console.error('Initial location failed:', error);
-        await api.patch('/users/online', { isOnline: false }).catch(() => {});
-        await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
-        if (socketRef.current?.connected) {
-          socketRef.current.disconnect();
+
+        let permissionDenied = isPermissionDeniedError(error);
+        if (!permissionDenied) {
+          try {
+            const permissions = await Geolocation.checkPermissions();
+            permissionDenied =
+              permissions.location === 'denied' || permissions.coarseLocation === 'denied';
+          } catch {
+            // If permission state cannot be determined, treat as transient.
+          }
         }
-        setAvailabilityIssue(
-          'Location access is required before owners can see you. Turn on location and try going online again.',
-        );
-        updateOnlineState(false);
+
+        if (permissionDenied) {
+          await api.patch('/users/online', { isOnline: false }).catch(() => {});
+          await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
+          if (socketRef.current?.connected) {
+            socketRef.current.disconnect();
+          }
+          setAvailabilityIssue(
+            'Location permission is disabled. Enable location permission and go online again.',
+          );
+          updateOnlineState(false);
+        } else {
+          // Transient issues (timeouts/network hiccups) should not force drivers offline.
+          if (!socketRef.current?.connected) {
+            socketRef.current.connect();
+          }
+          await api.patch('/users/online', { isOnline: true }).catch(() => {});
+          setAvailabilityIssue(
+            'We could not refresh live location yet. You are still online and retries will continue automatically.',
+          );
+        }
       } finally {
         setIsLocationRefreshing(false);
       }
@@ -205,6 +243,8 @@ export const useDriverRealtime = ({
         if (pos) {
           const { latitude, longitude } = pos.coords;
           await pushDriverLocation(latitude, longitude);
+          await api.patch('/users/online', { isOnline: true }).catch(() => {});
+          setAvailabilityIssue(null);
         }
       } catch (error) {
         console.error('Location interval failed:', error);

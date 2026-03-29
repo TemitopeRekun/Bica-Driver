@@ -597,7 +597,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
           onClick={() => setShowSourceSelector(null)}
         >
           <div
-            className="w-full max-w-md bg-white dark:bg-surface-dark rounded-[2rem] p-6 shadow-2xl animate-slide-up"
+            className="w-full max-w-md max-h-[85vh] overflow-y-auto no-scrollbar bg-white dark:bg-surface-dark rounded-[2rem] p-6 shadow-2xl animate-slide-up"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col items-center gap-6">

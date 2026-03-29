@@ -764,7 +764,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       <div className="flex-1"></div>
 
       {/* Bottom Sheet UI */}
-      <div className="relative z-20 px-4 pb-8">
+      <div className="relative z-20 px-4 pb-8 max-h-[72vh] overflow-y-auto no-scrollbar">
         {rideState === 'IDLE' && (
           <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-slide-up">
             <div className="mb-4 flex items-center justify-between gap-3">
@@ -1339,7 +1339,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       {/* Vehicle Details Modal */}
       {showVehicleForm && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center p-4 animate-fade-in">
-          <div className="w-full bg-surface-light dark:bg-surface-dark rounded-[2rem] p-6 shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-h-[85vh] overflow-y-auto no-scrollbar bg-surface-light dark:bg-surface-dark rounded-[2rem] p-6 shadow-2xl animate-slide-up" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-slate-900 dark:text-white">Vehicle Details</h3>
               <button

@@ -457,12 +457,12 @@ const App: React.FC = () => {
 
   return (
     <div className="flex justify-center items-start min-h-screen bg-slate-950">
-      <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-hidden relative">
-        <div key={baseScreen} className="h-full w-full screen-transition overflow-hidden">
+      <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative">
+        <div key={baseScreen} className="h-full w-full screen-transition overflow-y-auto overflow-x-hidden">
           {renderScreen(baseScreen)}
         </div>
         {isDriverProfileOverlay && currentUser && (
-          <div className="absolute inset-0 z-30 bg-background-light dark:bg-background-dark overflow-hidden">
+          <div className="absolute inset-0 z-30 bg-background-light dark:bg-background-dark overflow-y-auto overflow-x-hidden">
             <ProfileScreen
               user={currentUser}
               initialRole={currentUser.role}
