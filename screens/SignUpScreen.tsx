@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { UserRole, UserProfile } from '../types';
 import { CapacitorService } from '../services/CapacitorService';
 import { CameraSource } from '@capacitor/camera';
+import { api } from '../services/api.service';
 
 interface SignUpScreenProps {
   role: UserRole;
@@ -47,8 +48,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
 
   useEffect(() => {
     if (isDriver) {
-      fetch(`${(import.meta as any).env?.VITE_API_URL || 'http://localhost:3001'}/payments/banks`)
-        .then(r => r.json())
+      api.get<{ name: string; code: string }[]>('/payments/banks', false)
         .then(setBanks)
         .catch(console.error);
     }

@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { Config } from '../services/Config';
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+const API_URL = Config.apiUrl;
 
 interface UseAdminRealtimeOptions {
   enabled: boolean;
@@ -19,7 +20,7 @@ export const useAdminRealtime = ({ enabled, adminId, onRefresh }: UseAdminRealti
   }, [onRefresh]);
 
   useEffect(() => {
-    if (!enabled || !adminId) {
+    if (!enabled || !adminId || !API_URL) {
       adminSocketRef.current?.disconnect();
       adminSocketRef.current = null;
       if (adminRefreshTimer.current) {

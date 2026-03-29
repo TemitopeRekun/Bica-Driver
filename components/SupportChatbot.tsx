@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import { UserProfile } from '../types';
+import { Config } from '../services/Config';
 
 interface SupportChatbotProps {
   user: UserProfile;
@@ -35,7 +36,7 @@ const SupportChatbot: React.FC<SupportChatbotProps> = ({ user }) => {
   // Initialize chat session
   useEffect(() => {
     try {
-      const apiKey = (process.env as any).GEMINI_API_KEY;
+      const apiKey = Config.apiKey;
       if (apiKey) {
         const ai = new GoogleGenAI({ apiKey });
         chatRef.current = ai.chats.create({

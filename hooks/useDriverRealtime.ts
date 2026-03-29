@@ -2,10 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { CapacitorService } from '../services/CapacitorService';
 import { api } from '../services/api.service';
+import { Config } from '../services/Config';
 import { IMAGES } from '../constants';
 import { UserProfile } from '../types';
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+const API_URL = Config.apiUrl;
 
 export interface DriverRideRequest {
   id: string;
@@ -105,7 +106,7 @@ export const useDriverRealtime = ({
   }, [user?.id, user?.isOnline, user?.currentLocation?.lat, user?.currentLocation?.lng]);
 
   useEffect(() => {
-    if (approvalStatus !== 'APPROVED' || !user?.id) return;
+    if (approvalStatus !== 'APPROVED' || !user?.id || !API_URL) return;
 
     socketRef.current = io(`${API_URL}/rides`, {
       transports: ['websocket'],

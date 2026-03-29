@@ -1,8 +1,9 @@
 import { MutableRefObject, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { IMAGES } from '../constants';
+import { Config } from '../services/Config';
 
-const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+const API_URL = Config.apiUrl;
 
 interface UseOwnerRealtimeOptions {
   ownerId?: string;
@@ -73,7 +74,7 @@ export const useOwnerRealtime = ({
   }, [rideState]);
 
   useEffect(() => {
-    if (!ownerId) return;
+    if (!ownerId || !API_URL) return;
 
     ownerSocketRef.current = io(`${API_URL}/rides`, {
       transports: ['websocket'],
