@@ -1,4 +1,4 @@
-const BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+import { requireApiUrl } from './Config';
 
 // Get token from localStorage
 const getToken = (): string | null => {
@@ -22,9 +22,13 @@ async function request<T>(
   body?: any,
   requiresAuth = true,
 ): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+  const baseUrl = requireApiUrl();
+  const headers: Record<string, string> = {};
+  // Only declare JSON content-type when sending a body — NestJS/Fastify rejects
+  // requests that have Content-Type: application/json but an empty body.
+  if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (requiresAuth) {
     const token = getToken();
@@ -33,17 +37,32 @@ async function request<T>(
     }
   }
 
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(`${baseUrl}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  const data = await response.json();
+  const rawBody = await response.text();
+  let data: any = null;
+
+  if (rawBody) {
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      data = rawBody;
+    }
+  }
 
   if (!response.ok) {
-    // Throw the backend error message so UI can display it
-    throw new Error(data.message || 'Something went wrong');
+    const message =
+      typeof data === 'object' && data && 'message' in data
+        ? (data.message as string)
+        : typeof data === 'string' && data.trim()
+          ? data
+          : `Request failed with status ${response.status}`;
+
+    throw new Error(message);
   }
 
   return data as T;

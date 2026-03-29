@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import localforage from 'localforage';
-import { AppScreen, UserRole, UserProfile, ApprovalStatus, Trip, SystemSettings } from './types';
+import { AppScreen, UserRole, UserProfile, ApprovalStatus, Trip, SystemSettings, OwnerActivityTab, DriverActivityTab } from './types';
 import WelcomeScreen from './screens/WelcomeScreen';
 import SignUpScreen from './screens/SignUpScreen';
 import LoginScreen from './screens/LoginScreen';
 import RoleSelectionScreen from './screens/RoleSelectionScreen';
 import RequestRideScreen from './screens/RequestRideScreen';
 import DriverMainScreen from './screens/DriverMainScreen';
+import DriverActivityScreen from './screens/DriverActivityScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import AdminDashboardScreen from './screens/AdminDashboardScreen';
+import OwnerActivityScreen from './screens/OwnerActivityScreen';
 import SupportChatbot from './components/SupportChatbot';
 import { IMAGES } from './constants';
 import { CapacitorService } from './services/CapacitorService';
@@ -24,6 +26,8 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOADING);
   const [selectedSignupRole, setSelectedSignupRole] = useState<UserRole>(UserRole.UNSET);
+  const [ownerActivityTab, setOwnerActivityTab] = useState<OwnerActivityTab>('trips');
+  const [driverActivityTab, setDriverActivityTab] = useState<DriverActivityTab>('trips');
 
   // Settings loaded from backend
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
@@ -117,6 +121,16 @@ const App: React.FC = () => {
   const navigateTo = (screen: AppScreen) => {
     CapacitorService.triggerHaptic();
     setCurrentScreen(screen);
+  };
+
+  const openOwnerActivity = (tab: OwnerActivityTab) => {
+    setOwnerActivityTab(tab);
+    navigateTo(AppScreen.OWNER_ACTIVITY);
+  };
+
+  const openDriverActivity = (tab: DriverActivityTab) => {
+    setDriverActivityTab(tab);
+    navigateTo(AppScreen.DRIVER_ACTIVITY);
   };
 
   const handleStart = () => navigateTo(AppScreen.ROLE_SELECTION);
@@ -301,6 +315,60 @@ const App: React.FC = () => {
     });
   };
 
+  const resolveAvatarUser = (response: any, existingUser: UserProfile): UserProfile | null => {
+    const backendUser = response?.user || response?.profile;
+    if (backendUser && typeof backendUser === 'object') {
+      return {
+        ...existingUser,
+        ...mapUser({ ...existingUser, ...backendUser }),
+      };
+    }
+
+    const avatarUrl = response?.avatarUrl;
+    if (typeof avatarUrl === 'string' && avatarUrl.trim()) {
+      return {
+        ...existingUser,
+        avatar: avatarUrl,
+        avatarUrl,
+      };
+    }
+
+    return null;
+  };
+
+  const applyUpdatedAvatar = (nextUser: UserProfile) => {
+    setCurrentUser(nextUser);
+    void localforage.setItem('bicadriver_current_user', nextUser);
+  };
+
+  const handleUpdateAvatar = async (image: string) => {
+    if (!currentUser) {
+      throw new Error('You must be logged in to update your avatar.');
+    }
+
+    const tryRequest = async (fn: () => Promise<any>) => {
+      const response = await fn();
+      const nextUser = resolveAvatarUser(response, currentUser);
+      if (!nextUser) {
+        throw new Error('Avatar upload completed but no avatarUrl was returned.');
+      }
+
+      applyUpdatedAvatar(nextUser);
+    };
+
+    try {
+      await tryRequest(() => api.post('/users/upload-avatar', { image }));
+    } catch (postError: any) {
+      try {
+        await tryRequest(() => api.patch('/users/avatar', { image }));
+      } catch (patchError: any) {
+        throw new Error(
+          patchError.message || postError.message || 'Could not update your avatar.',
+        );
+      }
+    }
+  };
+
   const renderScreen = (screen: AppScreen) => {
     switch (screen) {
       case AppScreen.LOADING:
@@ -318,10 +386,17 @@ const App: React.FC = () => {
           <RequestRideScreen
             settings={systemSettings}
             onOpenProfile={() => navigateTo(AppScreen.PROFILE)}
-            onBack={handleLogout}
+            onOpenActivity={openOwnerActivity}
             onRideComplete={handleAddTrip}
             currentUser={currentUser}
             allUsers={ownerVisibleDrivers}
+          />
+        );
+      case AppScreen.OWNER_ACTIVITY:
+        return (
+          <OwnerActivityScreen
+            initialTab={ownerActivityTab}
+            onBack={() => navigateTo(AppScreen.MAIN_REQUEST)}
           />
         );
       case AppScreen.DRIVER_DASHBOARD:
@@ -329,10 +404,18 @@ const App: React.FC = () => {
           <DriverMainScreen
             user={currentUser}
             onOpenProfile={() => navigateTo(AppScreen.PROFILE)}
+            onOpenActivity={openDriverActivity}
             onBack={handleLogout}
             onUpdateEarnings={handleUpdateEarnings}
             onUpdateOnlineStatus={handleUpdateDriverOnlineStatus}
             onRideComplete={handleAddTrip}
+          />
+        );
+      case AppScreen.DRIVER_ACTIVITY:
+        return (
+          <DriverActivityScreen
+            initialTab={driverActivityTab}
+            onBack={() => navigateTo(AppScreen.DRIVER_DASHBOARD)}
           />
         );
       case AppScreen.PROFILE:
@@ -343,7 +426,7 @@ const App: React.FC = () => {
             initialRole={currentUser.role}
             onBack={() => currentUser.role === UserRole.DRIVER ? navigateTo(AppScreen.DRIVER_DASHBOARD) : navigateTo(AppScreen.MAIN_REQUEST)}
             onLogout={handleLogout}
-            onUpdateAvatar={(a) => setCurrentUser(prev => prev ? { ...prev, avatar: a } : null)}
+            onUpdateAvatar={handleUpdateAvatar}
           />
         );
       case AppScreen.ADMIN_DASHBOARD:
@@ -374,18 +457,18 @@ const App: React.FC = () => {
 
   return (
     <div className="flex justify-center items-start min-h-screen bg-slate-950">
-      <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-hidden relative">
-        <div key={baseScreen} className="h-full w-full screen-transition overflow-hidden">
+      <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative">
+        <div key={baseScreen} className="h-full w-full screen-transition overflow-y-auto overflow-x-hidden">
           {renderScreen(baseScreen)}
         </div>
         {isDriverProfileOverlay && currentUser && (
-          <div className="absolute inset-0 z-30 bg-background-light dark:bg-background-dark overflow-hidden">
+          <div className="absolute inset-0 z-30 bg-background-light dark:bg-background-dark overflow-y-auto overflow-x-hidden">
             <ProfileScreen
               user={currentUser}
               initialRole={currentUser.role}
               onBack={() => navigateTo(AppScreen.DRIVER_DASHBOARD)}
               onLogout={handleLogout}
-              onUpdateAvatar={(a) => setCurrentUser(prev => prev ? { ...prev, avatar: a } : null)}
+              onUpdateAvatar={handleUpdateAvatar}
             />
           </div>
         )}

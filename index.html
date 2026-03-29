@@ -10,10 +10,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
   
-  <!-- Leaflet CSS & JS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <script>
     tailwind.config = {
@@ -101,14 +97,8 @@
     .screen-transition {
       animation: fadeIn 0.4s ease-out, slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    
-    /* Leaflet Custom Styling */
-    .leaflet-control-container .leaflet-routing-container-hide {
-        display: none;
-    }
-    .custom-div-icon {
-      background: transparent;
-      border: none;
+    .gm-style iframe + div {
+      border: none !important;
     }
   </style>
 <script type="importmap">

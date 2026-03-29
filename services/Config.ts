@@ -1,38 +1,42 @@
-
 export const Config = {
-  // Directly use the environment variable. 
-  // We trim and sanitize to ensure common build-tool placeholders don't leak.
-  apiKey: (function() {
-    try {
-      let key = '';
-      if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
-        key = process.env.API_KEY;
-      }
-      
-      if (!key || typeof key !== 'string' || key.includes('process.env') || key === 'undefined') {
-        return '';
-      }
-      return key.trim().replace(/['"]+/g, '');
-    } catch (e) {
-      return '';
+  apiUrl: (function () {
+    const explicitApiUrl = sanitizeApiUrl(import.meta.env.VITE_API_URL);
+    if (explicitApiUrl) {
+      return explicitApiUrl;
     }
+
+    return import.meta.env.DEV ? 'http://localhost:3001' : '';
   })(),
-  mapboxToken: (function() {
-     try {
-       if (typeof process !== 'undefined' && process.env && process.env.MAPBOX_TOKEN) {
-         return process.env.MAPBOX_TOKEN;
-       }
-     } catch (e) {}
-     // Default public token for demo purposes only
-     return "pk.eyJ1IjoiYmljYWQiLCJhIjoiY203eGgwdm82MDV1ZzJrc2U5Z2R2eWw1dyJ9.dummy";
-  })(),
-  isProduction: (function() {
-    try {
-      return typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'production';
-    } catch (e) {
-      return false;
-    }
-  })(),
-  isSandbox: true,
-  platform: (window as any).Capacitor?.getPlatform() || 'web',
+  apiKey: sanitizeEnvValue(import.meta.env.VITE_GEMINI_API_KEY),
+  googleMapsApiKey: sanitizeEnvValue(import.meta.env.VITE_GOOGLE_MAPS_API_KEY),
+  isProduction: import.meta.env.PROD,
+  isSandbox: import.meta.env.DEV,
+  platform: (window as any).Capacitor?.getPlatform?.() || 'web',
+};
+
+function sanitizeEnvValue(value?: string): string {
+  if (!value || typeof value !== 'string') {
+    return '';
+  }
+
+  const trimmed = value.trim().replace(/['"]+/g, '');
+  if (!trimmed || trimmed === 'undefined' || trimmed.includes('process.env')) {
+    return '';
+  }
+
+  return trimmed;
+}
+
+function sanitizeApiUrl(value?: string): string {
+  return sanitizeEnvValue(value).replace(/\/+$/, '');
+}
+
+export const requireApiUrl = (): string => {
+  if (Config.apiUrl) {
+    return Config.apiUrl;
+  }
+
+  throw new Error(
+    'Missing VITE_API_URL. Set it to your public backend URL before deploying this app.',
+  );
 };

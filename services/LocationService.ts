@@ -34,9 +34,10 @@ export const LocationService = {
   // Calls GET /locations/search?q=query
   // Returns real Google Places results from backend
   async search(query: string, biasLat?: number, biasLng?: number): Promise<LocationData[]> {
-    if (!query || query.trim().length < 2) return [];
+    const normalizedQuery = query?.trim();
+    if (!normalizedQuery || normalizedQuery.length < 2) return [];
     try {
-      let url = `/locations/search?q=${encodeURIComponent(query)}`;
+      let url = `/locations/search?q=${encodeURIComponent(normalizedQuery)}`;
 
       // Pass pickup coords so backend biases results to pickup location
       if (Number.isFinite(biasLat) && Number.isFinite(biasLng)) {
@@ -44,10 +45,10 @@ export const LocationService = {
       }
 
       const results = await api.get<LocationData[]>(url, false);
-      return results;
+      return Array.isArray(results) ? results : [];
     } catch (error) {
       console.error('Location search failed:', error);
-      return [];
+      throw error;
     }
   },
 

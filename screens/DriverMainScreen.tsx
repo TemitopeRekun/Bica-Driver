@@ -1,8 +1,8 @@
-
+﻿
 import React, { useState, useEffect, useRef } from 'react';
 import InteractiveMap from '../components/InteractiveMap';
 import { CapacitorService } from '../services/CapacitorService';
-import { UserProfile, Trip, WalletSummary } from '../types';
+import { DriverActivityTab, UserProfile, Trip, WalletSummary } from '../types';
 import { api } from '../services/api.service';
 import { IMAGES } from '@/constants';
 import { DriverRideRequest, useDriverRealtime } from '../hooks/useDriverRealtime';
@@ -12,6 +12,7 @@ type RidePhase = 'pickup' | 'arrived' | 'trip' | 'completed';
 interface DriverMainScreenProps {
   user: UserProfile | null;
   onOpenProfile: () => void;
+  onOpenActivity: (tab: DriverActivityTab) => void;
   onBack: () => void;
   onUpdateEarnings: (amount: number) => void;
   onUpdateOnlineStatus: (isOnline: boolean) => void;
@@ -21,35 +22,27 @@ interface DriverMainScreenProps {
 import { CameraSource, CameraDirection } from '@capacitor/camera';
 
 
-// Outside DriverMainScreen — not recreated on every render
-const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
-  seconds,
-  onExpire,
-}) => {
-  const [remaining, setRemaining] = React.useState(seconds);
+// Outside DriverMainScreen  not recreated on every render
+const CountUpTimer: React.FC = () => {
+  const [elapsed, setElapsed] = React.useState(0);
 
   React.useEffect(() => {
-    if (remaining <= 0) {
-      onExpire();
-      return;
-    }
-    const timer = setTimeout(() => setRemaining(prev => prev - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [remaining]);
+    const timer = setInterval(() => setElapsed(prev => prev + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  const display = mins > 0
+    ? `${mins}m${secs.toString().padStart(2, '0')}s`
+    : `${secs}s`;
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <div
-        className="w-10 h-10 rounded-full border-4 border-primary/30 flex items-center justify-center"
-        style={{
-          background: `conic-gradient(#045828 ${(remaining / seconds) * 360}deg, transparent 0deg)`,
-        }}
-      >
-        <div className="w-7 h-7 bg-surface-dark rounded-full flex items-center justify-center">
-          <span className="text-xs font-black text-primary">{remaining}</span>
-        </div>
+      <div className="px-2 py-1 rounded-xl bg-primary/20 border border-primary/30">
+        <span className="text-xs font-black text-primary">{display}</span>
       </div>
-      <span className="text-[10px] text-slate-400">sec</span>
+      <span className="text-[10px] text-slate-400">waiting</span>
     </div>
   );
 };
@@ -57,7 +50,7 @@ const CountdownTimer: React.FC<{ seconds: number; onExpire: () => void }> = ({
 // ... existing imports
 
 const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
-  user, onOpenProfile, onBack, onUpdateEarnings, onUpdateOnlineStatus, onRideComplete
+  user, onOpenProfile, onOpenActivity, onBack, onUpdateEarnings, onUpdateOnlineStatus, onRideComplete
 }) => {
   const [activeRide, setActiveRide] = useState<DriverRideRequest | null>(null);
   const [ridePhase, setRidePhase] = useState<RidePhase>('pickup');
@@ -66,8 +59,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   const [showSelfieModal, setShowSelfieModal] = useState(false);
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
   const [pendingRide, setPendingRide] = useState<DriverRideRequest | null>(null);
-  const [recentTrips, setRecentTrips] = useState<Trip[]>([]);
-  const [isLoadingTrips, setIsLoadingTrips] = useState(false);
   const lastRulesAccepted = useRef<number>(0);
 
   const approvalStatus = user?.approvalStatus || 'PENDING';
@@ -75,6 +66,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   const {
     isOnline,
     isLocationRefreshing,
+    availabilityIssue,
     driverPos,
     liveRideRequests,
     enableOnline,
@@ -98,26 +90,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       console.error('Failed to load wallet summary:', error);
     }
   };
-  const loadRecentTrips = async () => {
-    setIsLoadingTrips(true);
-    try {
-      const trips = await api.get<any[]>('/rides/history');
-      setRecentTrips(trips.map((trip) => ({
-        ...trip,
-        ownerId: trip.ownerId || trip.owner?.id,
-        driverId: trip.driverId || trip.driver?.id,
-        ownerName: trip.owner?.name || trip.ownerName || 'Owner',
-        driverName: trip.driver?.name || trip.driverName || 'Driver',
-        date: trip.createdAt ? new Date(trip.createdAt).toLocaleString() : '',
-        location: `${trip.pickupAddress?.split(',')[0] || 'Unknown'} -> ${trip.destAddress?.split(',')[0] || 'Unknown'}`,
-      })));
-    } catch (error) {
-      console.error('Failed to load driver trip history:', error);
-      setRecentTrips([]);
-    } finally {
-      setIsLoadingTrips(false);
-    }
-  };
 
   const buildRideRequestFromTrip = (trip: any): DriverRideRequest => ({
     id: trip.id,
@@ -139,7 +111,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     let isMounted = true;
 
     const bootstrapDriverState = async () => {
-      await Promise.all([loadWalletSummary(), loadRecentTrips()]);
+      await loadWalletSummary();
 
       if (approvalStatus !== 'APPROVED') return;
 
@@ -394,17 +366,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     }).format(amount).replace('NGN', '₦');
   };
 
-  const formatShortDate = (value?: string | null) => {
-    if (!value) return 'Just now';
-    return new Date(value).toLocaleString([], {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
-
-
   if (approvalStatus === 'PENDING') {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center p-8 bg-background-dark text-center gap-6">
@@ -539,23 +500,66 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
             </div>
           </div>
         )}
+
+        {!activeRide && (
+          <div className="animate-fade-in grid grid-cols-2 gap-3">
+            <button
+              onClick={() => onOpenActivity('trips')}
+              className="group relative overflow-hidden rounded-[1.35rem] border border-cyan-400/25 bg-gradient-to-br from-cyan-500/20 via-sky-500/10 to-transparent px-4 py-3 text-left shadow-lg shadow-cyan-900/10 transition-all hover:border-cyan-300/40 hover:brightness-110 active:scale-[0.98]"
+            >
+              <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-cyan-400/15 to-transparent pointer-events-none" />
+              <div className="relative flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-cyan-400/15 text-cyan-300">
+                  <span className="material-symbols-outlined">route</span>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-200/80">Activity</p>
+                  <p className="text-sm font-black text-white">Trips</p>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => onOpenActivity('settlements')}
+              className="group relative overflow-hidden rounded-[1.35rem] border border-emerald-400/25 bg-gradient-to-br from-emerald-500/20 via-lime-400/10 to-transparent px-4 py-3 text-left shadow-lg shadow-emerald-900/10 transition-all hover:border-emerald-300/40 hover:brightness-110 active:scale-[0.98]"
+            >
+              <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-emerald-400/15 to-transparent pointer-events-none" />
+              <div className="relative flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-400/15 text-emerald-300">
+                  <span className="material-symbols-outlined">account_balance_wallet</span>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-200/80">Activity</p>
+                  <p className="text-sm font-black text-white">Settlements</p>
+                </div>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {!activeRide && availabilityIssue && (
+          <div className="animate-fade-in rounded-[1.35rem] border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 shadow-lg shadow-amber-900/10">
+            <p className="font-bold text-amber-200">Driver not visible yet</p>
+            <p className="mt-1 text-xs leading-relaxed text-amber-100/90">{availabilityIssue}</p>
+          </div>
+        )}
       </div>
 
       <div className="flex-1"></div>
 
-      <div className="relative z-20 w-full bg-surface-dark rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.6)] flex flex-col border-t border-white/5 transition-all duration-500">
-        <div className="p-6 pt-2 pb-10 flex flex-col gap-5">
+      <div className="relative z-20 w-full max-h-[72vh] bg-surface-dark rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.6)] flex flex-col border-t border-white/5 transition-all duration-500">
+        <div className="p-6 pt-2 pb-10 flex flex-col gap-5 overflow-y-auto no-scrollbar">
           {!activeRide ? (
             <>
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-xl font-extrabold text-white">Live Radar</h3>
-                  <p className="text-slate-400 text-xs font-medium">{isOnline ? 'Scanning for nearby jobs...' : 'Go online to receive jobs'}</p>
+                  <h3 className="text-xl font-extrabold text-white">Incoming Requests</h3>
+                  <p className="text-slate-400 text-xs font-medium">{isOnline ? 'Waiting for owner ride requests' : 'Go online to receive owner requests'}</p>
                 </div>
                 {isOnline && (
                   <div className="flex items-center gap-1.5 bg-primary/10 px-3 py-1.5 rounded-xl border border-primary/20">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary animate-ping"></div>
-                    <span className="text-primary text-[10px] font-black uppercase tracking-widest">Active</span>
+                    <span className="text-primary text-[10px] font-black uppercase tracking-widest">Available</span>
                   </div>
                 )}
               </div>
@@ -576,16 +580,8 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                           <h4 className="font-bold text-white text-base">{req.ownerName}</h4>
                           <p className="text-slate-400 text-xs mt-0.5">Verified Car Owner</p>
                         </div>
-                        {/* 60s countdown on driver side too */}
-                        <div className="w-10 h-10 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center">
-                          <CountdownTimer
-                            seconds={60}
-                            onExpire={() => {
-                              // Backend already auto-declined — remove from list
-                              removeRideRequest(req.id);
-                            }}
-                          />
-                        </div>
+                        {/* Count-up timer */}
+                        <CountUpTimer />
                       </div>
 
                       {/* Trip details */}
@@ -649,9 +645,9 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                       <span className="material-symbols-outlined text-4xl text-primary animate-pulse">radar</span>
                     </div>
                     <div>
-                      <h3 className="text-lg font-bold text-white mb-1">Scanning for rides</h3>
+                      <h3 className="text-lg font-bold text-white mb-1">Waiting for owner requests</h3>
                       <p className="text-slate-400 text-xs font-medium max-w-[200px] mx-auto leading-relaxed">
-                        You'll be notified instantly when an owner selects you.
+                        Stay online and keep your location fresh. Owners who select you will appear here instantly.
                       </p>
                     </div>
                   </div>
@@ -665,61 +661,12 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                   <div>
                     <h3 className="text-lg font-bold text-white mb-1">You're Offline</h3>
                     <p className="text-slate-400 text-xs font-medium max-w-[200px] mx-auto leading-relaxed">
-                      Switch to online mode above to start receiving ride requests.
+                      Switch to online mode above to start receiving owner requests.
                     </p>
                   </div>
                 </div>
               )}
 
-              <div className="grid gap-4">
-                <div className="rounded-3xl border border-white/5 bg-white/5 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Recent Settlements</p>
-                    <span className="text-[10px] text-slate-400">{walletSummary?.recentPayments?.length || 0} records</span>
-                  </div>
-                  {walletSummary?.recentPayments?.length ? (
-                    <div className="space-y-3">
-                      {walletSummary.recentPayments.slice(0, 3).map((payment) => (
-                        <div key={payment.id} className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-bold text-white">{formatCurrency(payment.driverAmount)}</p>
-                            <p className="text-xs text-slate-400">{formatShortDate(payment.paidAt)}</p>
-                          </div>
-                          <span className="text-[10px] uppercase tracking-widest text-primary">
-                            {payment.paymentMethod || 'Monnify'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400">No settlements recorded yet.</p>
-                  )}
-                </div>
-
-                <div className="rounded-3xl border border-white/5 bg-white/5 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Recent Trips</p>
-                    <span className="text-[10px] text-slate-400">{recentTrips.length} total</span>
-                  </div>
-                  {isLoadingTrips ? (
-                    <p className="text-sm text-slate-400">Loading trips...</p>
-                  ) : recentTrips.length > 0 ? (
-                    <div className="space-y-3">
-                      {recentTrips.slice(0, 3).map((trip) => (
-                        <div key={trip.id} className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-white truncate">{trip.location}</p>
-                            <p className="text-xs text-slate-400">{formatShortDate(trip.createdAt || trip.date)}</p>
-                          </div>
-                          <span className="text-xs font-bold text-primary">{formatCurrency(trip.amount)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400">No trips recorded yet.</p>
-                  )}
-                </div>
-              </div>
             </>
           ) : (
             <div className="flex flex-col gap-6 animate-slide-up">
@@ -906,7 +853,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                     }}
                     className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold active:scale-95 transition-all"
                   >
-                    Back to Radar
+                    Back to Requests
                   </button>
                 </div>
               )}
@@ -926,7 +873,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                     }}
                     className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold active:scale-95 transition-all"
                   >
-                    Back to Radar
+                    Back to Requests
                   </button>
                 </div>
               )}
@@ -937,7 +884,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
 
       {showSelfieModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-surface-dark border border-white/10 p-6 rounded-[2rem] w-full max-w-sm text-center flex flex-col">
+          <div className="bg-surface-dark border border-white/10 p-6 rounded-[2rem] w-full max-w-sm text-center flex flex-col max-h-[85vh] overflow-y-auto no-scrollbar">
             <span className="material-symbols-outlined text-4xl text-white mb-3 bg-white/10 p-4 rounded-full mx-auto">face</span>
             <h3 className="text-xl font-bold text-white mb-2">Verify Identity</h3>
             <p className="text-slate-400 text-xs mb-6">Take a quick selfie to confirm you are the driver for this ride.</p>
@@ -1004,6 +951,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
 };
 
 export default DriverMainScreen;
+
 
 
 

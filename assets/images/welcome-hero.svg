@@ -1,0 +1,33 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="900" rx="64" fill="#07111C"/>
+  <rect width="1200" height="900" rx="64" fill="url(#bg)"/>
+  <circle cx="190" cy="182" r="170" fill="#16A34A" fill-opacity="0.16"/>
+  <circle cx="1014" cy="190" r="136" fill="#F59E0B" fill-opacity="0.18"/>
+  <circle cx="998" cy="738" r="210" fill="#0EA5E9" fill-opacity="0.12"/>
+  <path d="M90 700C264 575 445 523 624 543C771 560 905 648 1098 616" stroke="white" stroke-opacity="0.14" stroke-width="8" stroke-linecap="round" stroke-dasharray="1 18"/>
+  <path d="M74 654C239 554 419 499 614 514C789 528 910 603 1120 575" stroke="#34D399" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="76" cy="654" r="16" fill="#34D399"/>
+  <circle cx="1120" cy="575" r="16" fill="#F59E0B"/>
+  <path d="M236 585C236 560 256 540 281 540H623C661 540 696 559 718 591L777 676H867C905 676 936 707 936 745V753C936 767 924 779 910 779H866C858 739 824 709 782 709C740 709 706 739 698 779H437C429 739 395 709 353 709C311 709 277 739 269 779H244C230 779 218 767 218 753V691C218 671 225 651 236 635V585Z" fill="#F8FAFC"/>
+  <path d="M306 584H608C633 584 656 596 671 617L708 669H284V607C284 594 293 584 306 584Z" fill="#0F172A"/>
+  <path d="M294 613C294 604 301 597 310 597H495V656H294V613Z" fill="#38BDF8" fill-opacity="0.9"/>
+  <path d="M511 597H603C621 597 637 605 649 619L671 646C675 651 671 659 664 659H511V597Z" fill="#86EFAC" fill-opacity="0.95"/>
+  <rect x="240" y="689" width="652" height="34" rx="17" fill="#0F172A" fill-opacity="0.10"/>
+  <circle cx="353" cy="779" r="66" fill="#0F172A"/>
+  <circle cx="353" cy="779" r="34" fill="#CBD5E1"/>
+  <circle cx="782" cy="779" r="66" fill="#0F172A"/>
+  <circle cx="782" cy="779" r="34" fill="#CBD5E1"/>
+  <g opacity="0.65">
+    <rect x="150" y="286" width="30" height="156" rx="15" fill="white" fill-opacity="0.12"/>
+    <rect x="205" y="340" width="30" height="102" rx="15" fill="white" fill-opacity="0.12"/>
+    <rect x="261" y="238" width="30" height="204" rx="15" fill="white" fill-opacity="0.12"/>
+    <rect x="315" y="306" width="30" height="136" rx="15" fill="white" fill-opacity="0.12"/>
+  </g>
+  <defs>
+    <linearGradient id="bg" x1="66" y1="54" x2="1120" y2="840" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1220"/>
+      <stop offset="0.55" stop-color="#0E2A1C"/>
+      <stop offset="1" stop-color="#0B1727"/>
+    </linearGradient>
+  </defs>
+</svg>
