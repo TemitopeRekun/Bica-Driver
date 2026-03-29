@@ -29,11 +29,21 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
   const [searchResults, setSearchResults] = useState<LocationData[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const pickupExistsRef = useRef(false);
+  const searchRequestIdRef = useRef(0);
 
   useEffect(() => {
     pickupExistsRef.current = Boolean(pickup);
   }, [pickup]);
+
+  const clearSearchState = useCallback(() => {
+    searchRequestIdRef.current += 1;
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchError(null);
+    setIsSearching(false);
+  }, []);
 
   const getSearchBias = useCallback((): { lat?: number; lng?: number } => {
     if (pickup) {
@@ -107,16 +117,27 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     setIsLocating(true);
     try {
       const position = await CapacitorService.getCurrentLocation();
-      if (position) {
-        const { latitude, longitude, accuracy } = position.coords;
-        const location = await LocationService.reverseGeocode(latitude, longitude);
-        setPickup({ ...location, accuracy: accuracy || 0 });
-        setMapCenter([latitude, longitude]);
-        setIsSearchingPickup(false);
-        onPickupChanged?.();
+      const latitude = position?.coords?.latitude;
+      const longitude = position?.coords?.longitude;
+      const accuracy = position?.coords?.accuracy;
+
+      if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        throw new Error('Current location is unavailable.');
       }
+
+      const location = await LocationService.reverseGeocode(latitude, longitude);
+      setPickup({ ...location, accuracy: Number.isFinite(accuracy) ? accuracy : 0 });
+      setMapCenter([latitude, longitude]);
+      clearSearchState();
+      setIsSearchingPickup(false);
+      onPickupChanged?.();
     } catch (error) {
-      alert('Location permission denied. Please enter pickup manually.');
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      if (message.includes('permission')) {
+        alert('Location permission denied. Please enter pickup manually.');
+      } else {
+        alert('We could not read your live location. Please ensure GPS is on and try again.');
+      }
     } finally {
       setIsLocating(false);
     }
@@ -140,27 +161,33 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
       setDestination(loc);
       setIsSearchingDest(false);
     }
-    setSearchQuery('');
+    clearSearchState();
   };
 
   const handleCategoryTap = async (categoryType: string) => {
     const queries: Record<string, string> = {
       Airport: 'airport',
-      Hotel: 'hotels',
+      Hotel: 'hotel',
       Commercial: 'restaurants dining',
       Shopping: 'shopping mall',
     };
 
     const query = queries[categoryType] || categoryType;
+    const requestId = ++searchRequestIdRef.current;
     setIsSearching(true);
+    setSearchError(null);
     const bias = getSearchBias();
 
     try {
       const results = await LocationService.search(query, bias.lat, bias.lng);
+      if (requestId !== searchRequestIdRef.current) return;
       setSearchResults(results);
     } catch {
+      if (requestId !== searchRequestIdRef.current) return;
       setSearchResults([]);
+      setSearchError('We could not load category locations right now.');
     } finally {
+      if (requestId !== searchRequestIdRef.current) return;
       setIsSearching(false);
     }
   };
@@ -171,8 +198,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     if (nextPickup) {
       setMapCenter([nextPickup.lat, nextPickup.lon]);
     }
-    setSearchQuery('');
-    setSearchResults([]);
+    clearSearchState();
     setIsSearchingPickup(false);
     setIsSearchingDest(false);
   };
@@ -180,8 +206,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
   const resetLocationSearch = () => {
     setPickup(null);
     setDestination(null);
-    setSearchQuery('');
-    setSearchResults([]);
+    clearSearchState();
     setEstimatedPrice(0);
     setEstimatedDistance('');
     setEstimatedMins(0);
@@ -228,20 +253,31 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
   }, [pickup, destination, refreshRoute]);
 
   useEffect(() => {
-    if (searchQuery.length < 2) {
+    const normalizedQuery = searchQuery.trim();
+
+    if (normalizedQuery.length < 2) {
+      searchRequestIdRef.current += 1;
       setSearchResults([]);
+      setSearchError(null);
+      setIsSearching(false);
       return;
     }
 
+    const requestId = ++searchRequestIdRef.current;
     setIsSearching(true);
+    setSearchError(null);
     const timer = setTimeout(async () => {
       const bias = getSearchBias();
       try {
-        const results = await LocationService.search(searchQuery, bias.lat, bias.lng);
+        const results = await LocationService.search(normalizedQuery, bias.lat, bias.lng);
+        if (requestId !== searchRequestIdRef.current) return;
         setSearchResults(results);
       } catch {
+        if (requestId !== searchRequestIdRef.current) return;
         setSearchResults([]);
+        setSearchError('We could not fetch place suggestions. Check your connection and try again.');
       } finally {
+        if (requestId !== searchRequestIdRef.current) return;
         setIsSearching(false);
       }
     }, 300);
@@ -264,6 +300,8 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     searchResults,
     isSearching,
     isLocating,
+    searchError,
+    clearSearchState,
     setIsSearchingPickup,
     setIsSearchingDest,
     setSearchQuery,

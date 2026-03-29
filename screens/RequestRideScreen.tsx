@@ -116,6 +116,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     searchResults,
     isSearching,
     isLocating,
+    searchError,
+    clearSearchState,
     setIsSearchingPickup,
     setIsSearchingDest,
     setSearchQuery,
@@ -578,7 +580,10 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     <div className="fixed inset-0 z-50 bg-background-light dark:bg-background-dark flex flex-col animate-slide-up">
       <div className="px-4 py-4 flex items-center gap-4 border-b border-slate-200 dark:border-slate-800">
         <button
-          onClick={() => type === 'pickup' ? setIsSearchingPickup(false) : setIsSearchingDest(false)}
+          onClick={() => {
+            clearSearchState();
+            type === 'pickup' ? setIsSearchingPickup(false) : setIsSearchingDest(false);
+          }}
           className="w-10 h-10 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors"
         >
           <span className="material-symbols-outlined text-slate-900 dark:text-white">arrow_back</span>
@@ -666,6 +671,16 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
               </div>
             </button>
           ))}
+          {!isSearching && searchResults.length === 0 && (searchQuery.trim().length >= 2 || Boolean(searchError)) && (
+            <div className="py-8 text-center">
+              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                {searchError || 'No matching locations found.'}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                Try a nearby landmark, street, or area name.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -811,7 +826,10 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
               {/* Pickup Input */}
               <button
-                onClick={() => setIsSearchingPickup(true)}
+                onClick={() => {
+                  clearSearchState();
+                  setIsSearchingPickup(true);
+                }}
                 className="flex items-center gap-4 relative z-10"
               >
                 <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-700">
@@ -826,7 +844,10 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
               {/* Destination Input */}
               <button
-                onClick={() => setIsSearchingDest(true)}
+                onClick={() => {
+                  clearSearchState();
+                  setIsSearchingDest(true);
+                }}
                 className="flex items-center gap-4 relative z-10"
               >
                 <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-700">
