@@ -307,6 +307,21 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   refreshAvailableDriversRef.current = fetchAvailableDrivers;
 
   useEffect(() => {
+    if (!pickup) {
+      setAvailableDrivers([]);
+      return;
+    }
+
+    if (rideState !== 'IDLE') return;
+
+    const timer = setTimeout(() => {
+      fetchAvailableDrivers().catch(() => {});
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [pickup?.lat, pickup?.lon, vehicleData.transmission, rideState]);
+
+  useEffect(() => {
     setScheduleDate(new Date().toISOString().split('T')[0]);
     return () => clearTimers();
   }, []);

@@ -14,10 +14,14 @@ const FALLBACK_MINUTES_PER_KM = 3;
 const MIN_FALLBACK_MINUTES = 5;
 const DEFAULT_MAP_CENTER: [number, number] = [6.4549, 3.4246];
 
+const isAbortError = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === 'AbortError';
+
 export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLocationSearchOptions) => {
   const [pickup, setPickup] = useState<LocationData | null>(null);
   const [destination, setDestination] = useState<LocationData | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_MAP_CENTER);
+  const [deviceGpsBias, setDeviceGpsBias] = useState<{ lat: number; lng: number } | null>(null);
   const [estimatedPrice, setEstimatedPrice] = useState<number>(0);
   const [estimatedDistance, setEstimatedDistance] = useState<string>('');
   const [isSearchingPickup, setIsSearchingPickup] = useState(false);
@@ -32,28 +36,31 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
   const [searchError, setSearchError] = useState<string | null>(null);
   const pickupExistsRef = useRef(false);
   const searchRequestIdRef = useRef(0);
+  const onPickupChangedRef = useRef(onPickupChanged);
+  const hasHydratedInitialLocationRef = useRef(false);
+  const searchAbortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     pickupExistsRef.current = Boolean(pickup);
   }, [pickup]);
 
+  useEffect(() => {
+    onPickupChangedRef.current = onPickupChanged;
+  }, [onPickupChanged]);
+
+  const cancelActiveSearch = useCallback(() => {
+    searchAbortControllerRef.current?.abort();
+    searchAbortControllerRef.current = null;
+  }, []);
+
   const clearSearchState = useCallback(() => {
+    cancelActiveSearch();
     searchRequestIdRef.current += 1;
     setSearchQuery('');
     setSearchResults([]);
     setSearchError(null);
     setIsSearching(false);
-  }, []);
-
-  const getSearchBias = useCallback((): { lat?: number; lng?: number } => {
-    if (pickup) {
-      return { lat: pickup.lat, lng: pickup.lon };
-    }
-    if (Number.isFinite(mapCenter[0]) && Number.isFinite(mapCenter[1])) {
-      return { lat: mapCenter[0], lng: mapCenter[1] };
-    }
-    return {};
-  }, [pickup, mapCenter]);
+  }, [cancelActiveSearch]);
 
   function deg2rad(deg: number) {
     return deg * (Math.PI / 180);
@@ -125,12 +132,13 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
         throw new Error('Current location is unavailable.');
       }
 
+      setDeviceGpsBias({ lat: latitude, lng: longitude });
       const location = await LocationService.reverseGeocode(latitude, longitude);
       setPickup({ ...location, accuracy: Number.isFinite(accuracy) ? accuracy : 0 });
       setMapCenter([latitude, longitude]);
       clearSearchState();
       setIsSearchingPickup(false);
-      onPickupChanged?.();
+      onPickupChangedRef.current?.();
     } catch (error) {
       const message = error instanceof Error ? error.message.toLowerCase() : '';
       if (message.includes('permission')) {
@@ -147,7 +155,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     if (id === 'pickup') {
       const newLocation = await LocationService.reverseGeocode(newPos[0], newPos[1]);
       setPickup({ ...newLocation, accuracy: 0 });
-      onPickupChanged?.();
+      onPickupChangedRef.current?.();
     }
   };
 
@@ -156,7 +164,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
       setPickup(loc);
       setIsSearchingPickup(false);
       setMapCenter([loc.lat, loc.lon]);
-      onPickupChanged?.();
+      onPickupChangedRef.current?.();
     } else {
       setDestination(loc);
       setIsSearchingDest(false);
@@ -172,21 +180,39 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
       Shopping: 'shopping mall',
     };
 
+    if (!pickup) {
+      setSearchResults([]);
+      setSearchError('Select pickup first to discover nearby categories.');
+      setIsSearching(false);
+      return;
+    }
+
+    cancelActiveSearch();
     const query = queries[categoryType] || categoryType;
     const requestId = ++searchRequestIdRef.current;
     setIsSearching(true);
     setSearchError(null);
-    const bias = getSearchBias();
+    const controller = new AbortController();
+    searchAbortControllerRef.current = controller;
 
     try {
-      const results = await LocationService.search(query, bias.lat, bias.lng);
+      const results = await LocationService.search(
+        query,
+        pickup.lat,
+        pickup.lon,
+        controller.signal,
+      );
       if (requestId !== searchRequestIdRef.current) return;
       setSearchResults(results);
-    } catch {
+    } catch (error) {
+      if (isAbortError(error)) return;
       if (requestId !== searchRequestIdRef.current) return;
       setSearchResults([]);
       setSearchError('We could not load category locations right now.');
     } finally {
+      if (searchAbortControllerRef.current === controller) {
+        searchAbortControllerRef.current = null;
+      }
       if (requestId !== searchRequestIdRef.current) return;
       setIsSearching(false);
     }
@@ -216,6 +242,9 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
   };
 
   useEffect(() => {
+    if (hasHydratedInitialLocationRef.current) return;
+    hasHydratedInitialLocationRef.current = true;
+
     let isMounted = true;
 
     const hydrateInitialLocation = async () => {
@@ -223,6 +252,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
       if (!pos || !isMounted) return;
 
       const nextCenter: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+      setDeviceGpsBias({ lat: pos.coords.latitude, lng: pos.coords.longitude });
 
       if (pickupExistsRef.current) return;
 
@@ -235,7 +265,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
 
       setPickup({ ...location, accuracy: pos.coords.accuracy || 0 });
       setMapCenter(nextCenter);
-      onPickupChanged?.();
+      onPickupChangedRef.current?.();
     };
 
     hydrateInitialLocation().catch((error) => {
@@ -245,7 +275,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     return () => {
       isMounted = false;
     };
-  }, [onPickupChanged]);
+  }, []);
 
   useEffect(() => {
     if (!pickup || !destination) return;
@@ -253,9 +283,22 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
   }, [pickup, destination, refreshRoute]);
 
   useEffect(() => {
+    const activeSearchMode = isSearchingDest
+      ? 'destination'
+      : isSearchingPickup
+        ? 'pickup'
+        : null;
+
+    if (!activeSearchMode) {
+      cancelActiveSearch();
+      setIsSearching(false);
+      return;
+    }
+
     const normalizedQuery = searchQuery.trim();
 
     if (normalizedQuery.length < 2) {
+      cancelActiveSearch();
       searchRequestIdRef.current += 1;
       setSearchResults([]);
       setSearchError(null);
@@ -267,23 +310,54 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     setIsSearching(true);
     setSearchError(null);
     const timer = setTimeout(async () => {
-      const bias = getSearchBias();
+      cancelActiveSearch();
+      const controller = new AbortController();
+      searchAbortControllerRef.current = controller;
+      const bias =
+        activeSearchMode === 'destination' && pickup
+          ? { lat: pickup.lat, lng: pickup.lon }
+          : activeSearchMode === 'pickup' && deviceGpsBias
+            ? deviceGpsBias
+            : null;
+
       try {
-        const results = await LocationService.search(normalizedQuery, bias.lat, bias.lng);
+        const results = await LocationService.search(
+          normalizedQuery,
+          bias?.lat,
+          bias?.lng,
+          controller.signal,
+        );
         if (requestId !== searchRequestIdRef.current) return;
         setSearchResults(results);
-      } catch {
+      } catch (error) {
+        if (isAbortError(error)) return;
         if (requestId !== searchRequestIdRef.current) return;
         setSearchResults([]);
         setSearchError('We could not fetch place suggestions. Check your connection and try again.');
       } finally {
+        if (searchAbortControllerRef.current === controller) {
+          searchAbortControllerRef.current = null;
+        }
         if (requestId !== searchRequestIdRef.current) return;
         setIsSearching(false);
       }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, getSearchBias]);
+  }, [
+    searchQuery,
+    isSearchingDest,
+    isSearchingPickup,
+    pickup,
+    deviceGpsBias,
+    cancelActiveSearch,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      cancelActiveSearch();
+    };
+  }, [cancelActiveSearch]);
 
   return {
     pickup,

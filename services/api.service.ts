@@ -1,5 +1,9 @@
 import { requireApiUrl } from './Config';
 
+interface RequestOptions {
+  signal?: AbortSignal;
+}
+
 // Get token from localStorage
 const getToken = (): string | null => {
   return localStorage.getItem('bica_token');
@@ -21,6 +25,7 @@ async function request<T>(
   path: string,
   body?: any,
   requiresAuth = true,
+  options?: RequestOptions,
 ): Promise<T> {
   const baseUrl = requireApiUrl();
   const headers: Record<string, string> = {};
@@ -41,6 +46,7 @@ async function request<T>(
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    signal: options?.signal,
   });
 
   const rawBody = await response.text();
@@ -70,15 +76,15 @@ async function request<T>(
 
 // Convenience methods
 export const api = {
-  get: <T>(path: string, requiresAuth = true) =>
-    request<T>('GET', path, undefined, requiresAuth),
+  get: <T>(path: string, requiresAuth = true, options?: RequestOptions) =>
+    request<T>('GET', path, undefined, requiresAuth, options),
 
-  post: <T>(path: string, body?: any, requiresAuth = true) =>
-    request<T>('POST', path, body, requiresAuth),
+  post: <T>(path: string, body?: any, requiresAuth = true, options?: RequestOptions) =>
+    request<T>('POST', path, body, requiresAuth, options),
 
-  patch: <T>(path: string, body?: any, requiresAuth = true) =>
-    request<T>('PATCH', path, body, requiresAuth),
+  patch: <T>(path: string, body?: any, requiresAuth = true, options?: RequestOptions) =>
+    request<T>('PATCH', path, body, requiresAuth, options),
 
-  delete: <T>(path: string, requiresAuth = true) =>
-    request<T>('DELETE', path, undefined, requiresAuth),
+  delete: <T>(path: string, requiresAuth = true, options?: RequestOptions) =>
+    request<T>('DELETE', path, undefined, requiresAuth, options),
 };
