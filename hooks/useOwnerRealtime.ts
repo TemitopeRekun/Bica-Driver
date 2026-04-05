@@ -92,7 +92,7 @@ export const useOwnerRealtime = ({
         (rideStateValueRef.current === 'ASSIGNED' || rideStateValueRef.current === 'IN_PROGRESS')
       ) {
         trackedDriverIdRef.current = driverInfoIdRef.current;
-        ownerSocketRef.current?.emit('track:driver', { driverId: driverInfoIdRef.current });
+        ownerSocketRef.current?.emit('trackdriver', { driverId: driverInfoIdRef.current });
       }
     });
 
@@ -130,7 +130,7 @@ export const useOwnerRealtime = ({
       }
     });
 
-    ownerSocketRef.current.on('location:updated', (data: any) => {
+    ownerSocketRef.current.on('locationupdated', (data: any) => {
       if (!trackedDriverIdRef.current || data.driverId !== trackedDriverIdRef.current) return;
       if (typeof data.lat === 'number' && typeof data.lng === 'number') {
         onLocationUpdatedRef.current(data.lat, data.lng);
@@ -151,7 +151,7 @@ export const useOwnerRealtime = ({
       (rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS')
     ) {
       trackedDriverIdRef.current = driverInfoId;
-      ownerSocketRef.current.emit('track:driver', { driverId: driverInfoId });
+      ownerSocketRef.current.emit('trackdriver', { driverId: driverInfoId });
     }
   }, [driverInfoId, rideState, trackedDriverIdRef]);
 };

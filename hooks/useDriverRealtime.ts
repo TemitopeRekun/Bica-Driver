@@ -76,20 +76,28 @@ export const useDriverRealtime = ({
 
   const pushDriverLocation = useCallback(async (latitude: number, longitude: number) => {
     if (!user?.id) return;
+
+    // A: Local UI update
     setDriverPos([latitude, longitude]);
+
     try {
+      // B: State persistence (canonical path)
       await api.patch('/users/location', { lat: latitude, lng: longitude });
+
+      // C: Live broadcast (socket distribute state)
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('driverlocation', {
+          driverId: user.id,
+          lat: latitude,
+          lng: longitude,
+        });
+      }
     } catch (error: any) {
       if (error.message?.includes('401') || error.message?.includes('403')) {
         onForcedLogout?.(error.message);
+      } else {
+        console.error('Failed to persist driver location:', error);
       }
-    }
-    if (socketRef.current?.connected) {
-      socketRef.current.emit('driver:location', {
-        driverId: user.id,
-        lat: latitude,
-        lng: longitude,
-      });
     }
   }, [user?.id, onForcedLogout]);
 
