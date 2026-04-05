@@ -52,11 +52,13 @@ export interface UserProfile {
   transmission?: 'Manual' | 'Automatic' | 'Both';
   isBlocked?: boolean;
   // Bank details — drivers only
-  bankName?: string;
-  bankCode?: string;
-  accountNumber?: string;
-  accountName?: string;
-  monnifySubAccountCode?: string;
+  bankName?: string | null;
+  bankCode?: string | null;
+  accountNumber?: string | null;
+  accountName?: string | null;
+  monnifySubAccountCode?: string | null;
+  subAccountActive?: boolean;
+  canRetrySubAccountSetup?: boolean;
   // Location
   currentLocation?: { lat: number; lng: number };
   locationLat?: number;

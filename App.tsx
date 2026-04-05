@@ -300,11 +300,23 @@ const App: React.FC = () => {
   const handleBlockUser = async (userId: string, blocked: boolean) => {
     try {
       await api.patch(`/users/${userId}/block`, { isBlocked: blocked });
+    } catch (error: any) {
+      alert(error.message);
+    }
+    if (currentUser?.role === UserRole.ADMIN) {
+      await loadAdminDashboard();
+    }
+  };
+
+  const handleRetryDriverSubAccount = async (driverId: string) => {
+    try {
+      const response = await api.post<any>(`/payments/sub-account/retry/${driverId}`);
+      alert(response.message || 'Sub-account setup updated successfully.');
       if (currentUser?.role === UserRole.ADMIN) {
         await loadAdminDashboard();
       }
     } catch (error: any) {
-      alert(error.message);
+      alert(error.message || 'Failed to retry sub-account setup.');
     }
   };
 
@@ -468,6 +480,7 @@ const App: React.FC = () => {
             error={adminDashboardError}
             onUpdateStatus={handleUpdateDriverStatus}
             onBlockUser={handleBlockUser}
+            onRetrySubAccount={handleRetryDriverSubAccount}
             onUpdateSettings={handleUpdateSettings}
             onRetry={loadAdminDashboard}
             onBack={() => navigateTo(AppScreen.WELCOME)}

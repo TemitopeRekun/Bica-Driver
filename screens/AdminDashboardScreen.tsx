@@ -14,6 +14,7 @@ interface AdminDashboardScreenProps {
   error?: string | null;
   onUpdateStatus: (userId: string, status: ApprovalStatus) => void;
   onBlockUser: (userId: string, blocked: boolean) => void;
+  onRetrySubAccount: (userId: string) => Promise<void>;
   onUpdateSettings: (settings: SystemSettings) => void;
   onRetry: () => Promise<void> | void;
   onBack: () => void;
@@ -25,7 +26,7 @@ type DriverFilter = 'All' | 'Pending' | 'Active' | 'Blocked';
 
 const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({ 
   users, trips, pendingPayments, paymentHistory, settings, isLoading, error,
-  onUpdateStatus, onBlockUser, onUpdateSettings, 
+  onUpdateStatus, onBlockUser, onRetrySubAccount, onUpdateSettings, 
   onRetry, onBack, onSimulate 
 }) => {
   const [activeSection, setActiveSection] = useState<AdminSection>('overview');
@@ -35,6 +36,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   const [selectedUserDetailsError, setSelectedUserDetailsError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [driverFilter, setDriverFilter] = useState<DriverFilter>('All');
+  const [retryingSubAccountIds, setRetryingSubAccountIds] = useState<Set<string>>(new Set());
   const [localSettings, setLocalSettings] = useState<SystemSettings>(settings);
   const modalUser =
     selectedUserDetails && selectedUserDetails.id === selectedUser?.id
@@ -140,6 +142,71 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
       default:
         return 'bg-orange-500/10 text-orange-500';
     }
+  };
+
+  const renderMonnifyStatus = (driver: UserProfile, isModal = false) => {
+    if (driver.role !== UserRole.DRIVER) return null;
+
+    const isRetrying = retryingSubAccountIds.has(driver.id);
+    const hasSubAccount = !!driver.subAccountActive;
+    const canRetry = !!driver.canRetrySubAccountSetup;
+
+    const handleRetry = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setRetryingSubAccountIds(prev => new Set(prev).add(driver.id));
+      try {
+        await onRetrySubAccount(driver.id);
+      } finally {
+        setRetryingSubAccountIds(prev => {
+          const next = new Set(prev);
+          next.delete(driver.id);
+          return next;
+        });
+      }
+    };
+
+    return (
+      <div className={`mt-2 p-3 rounded-2xl border ${hasSubAccount ? 'bg-green-500/5 border-green-500/20' : 'bg-orange-500/5 border-orange-500/20'}`}>
+        <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${hasSubAccount ? 'bg-green-500' : 'bg-orange-500 animate-pulse'}`}></span>
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              {hasSubAccount ? 'Sub Account Configured' : 'Sub Account Missing'}
+            </span>
+          </div>
+          {canRetry && !hasSubAccount && (
+            <button
+              onClick={handleRetry}
+              disabled={isRetrying}
+              className="px-2 py-1 bg-primary hover:bg-primary-dark disabled:bg-slate-400 text-white text-[9px] font-bold uppercase rounded-lg transition-colors flex items-center gap-1"
+            >
+              {isRetrying ? (
+                <span className="material-symbols-outlined text-[10px] animate-spin">progress_activity</span>
+              ) : (
+                <span className="material-symbols-outlined text-[10px]">refresh</span>
+              )}
+              {isRetrying ? 'Retrying...' : 'Retry Setup'}
+            </button>
+          )}
+        </div>
+
+        {hasSubAccount && driver.monnifySubAccountCode && (
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] text-slate-500 font-medium">Monnify Code:</span>
+            <code className="text-[10px] font-mono bg-white dark:bg-black/20 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-800" title={driver.monnifySubAccountCode}>
+              {driver.monnifySubAccountCode}
+            </code>
+          </div>
+        )}
+
+        {(driver.bankName || driver.accountNumber) && (
+          <div className="flex items-center gap-1 text-[10px] text-slate-500 font-medium italic">
+            <span className="material-symbols-outlined text-[12px]">account_balance</span>
+            {driver.bankName} • ****{driver.accountNumber?.slice(-4) || '****'}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const renderOverview = () => (
@@ -267,6 +334,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                )}
                {driver.approvalStatus === 'PENDING' && <span className="text-[10px] text-orange-500 font-bold uppercase">Review Needed</span>}
             </div>
+            {renderMonnifyStatus(driver)}
           </div>
           <span className="material-symbols-outlined text-slate-300">chevron_right</span>
         </div>
@@ -641,8 +709,9 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                 </div>
               )}
 
-              {/* ... (existing fields) ... */}
+              {/* Modal Body */}
               <div className="space-y-6">
+                 {modalUser.role === UserRole.DRIVER && renderMonnifyStatus(modalUser, true)}
                  {/* Only show Driver Specifics if driver */}
                  {modalUser.role === UserRole.DRIVER && (
                     <>
@@ -747,15 +816,23 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                 </button>
                 
                 {modalUser.role === UserRole.DRIVER && modalUser.approvalStatus !== 'APPROVED' && !modalUser.isBlocked && (
-                  <button 
-                    onClick={() => {
-                      onUpdateStatus(modalUser.id, 'APPROVED');
-                      setSelectedUser(null);
-                    }}
-                    className="flex-1 py-4 rounded-2xl bg-primary text-white font-black shadow-xl shadow-primary/25 hover:brightness-110 transition-all active:scale-[0.98]"
-                  >
-                    Approve Driver
-                  </button>
+                  <div className="flex-1 flex flex-col gap-1">
+                    <button 
+                      onClick={() => {
+                        onUpdateStatus(modalUser.id, 'APPROVED');
+                        setSelectedUser(null);
+                      }}
+                      disabled={!modalUser.subAccountActive}
+                      className={`w-full py-4 rounded-2xl font-black transition-all active:scale-[0.98] ${!modalUser.subAccountActive ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-primary text-white shadow-xl shadow-primary/25 hover:brightness-110'}`}
+                    >
+                      Approve Driver
+                    </button>
+                    {!modalUser.subAccountActive && (
+                      <p className="text-[9px] text-orange-500 font-bold text-center">
+                        Create a Monnify sub account before approving this driver.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

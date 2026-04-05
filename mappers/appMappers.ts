@@ -8,6 +8,13 @@ export const mapUser = (backendUser: any): UserProfile => ({
   licenseImage: backendUser.licenseImageUrl,
   selfieImage: backendUser.selfieImageUrl,
   ninImage: backendUser.ninImageUrl,
+  bankName: backendUser.bankName,
+  bankCode: backendUser.bankCode,
+  accountName: backendUser.accountName,
+  accountNumber: backendUser.accountNumber,
+  monnifySubAccountCode: backendUser.monnifySubAccountCode,
+  subAccountActive: backendUser.subAccountActive,
+  canRetrySubAccountSetup: backendUser.canRetrySubAccountSetup,
   currentLocation: backendUser.locationLat
     ? { lat: backendUser.locationLat, lng: backendUser.locationLng }
     : undefined,
