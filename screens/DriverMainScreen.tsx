@@ -6,6 +6,7 @@ import { DriverActivityTab, UserProfile, Trip, WalletSummary } from '../types';
 import { api } from '../services/api.service';
 import { IMAGES } from '@/constants';
 import { DriverRideRequest, useDriverRealtime } from '../hooks/useDriverRealtime';
+import TripProgressTimeline from '../components/Driver/TripProgressTimeline';
 
 type RidePhase = 'pickup' | 'arrived' | 'trip' | 'completed';
 
@@ -591,87 +592,95 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
               {isOnline ? (
                 liveRideRequests.length > 0 ? (
                   liveRideRequests.map(req => (
-                    <div key={req.id} className="bg-input-dark/40 p-5 rounded-3xl border border-white/5 flex flex-col gap-4 shadow-lg animate-slide-up">
-
-                      {/* Owner info */}
-                      <div className="flex items-center gap-4">
-                        <img
-                          src={req.avatar}
-                          className="w-12 h-12 rounded-full object-cover ring-2 ring-white/10"
-                          alt=""
-                        />
-                        <div className="flex-1">
-                          <h4 className="font-bold text-white text-base">{req.ownerName}</h4>
-                          <p className="text-slate-400 text-xs mt-0.5">Verified Car Owner</p>
-                        </div>
-                        {/* Count-up timer */}
-                        <CountUpTimer />
-                      </div>
-
-                      {/* Trip details */}
-                      <div className="space-y-2 bg-white/5 rounded-2xl p-3">
-                        <div className="flex items-start gap-2">
-                          <span className="material-symbols-outlined text-accent text-sm mt-0.5">trip_origin</span>
+                    <div key={req.id} className="bg-input-dark/40 p-5 rounded-3xl border border-white/5 flex flex-col gap-5 shadow-2xl animate-slide-up relative overflow-hidden group">
+                      
+                      {/* Top Header: Owner and Earnings */}
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={req.avatar}
+                            className="w-10 h-10 rounded-full object-cover ring-1 ring-white/10"
+                            alt=""
+                          />
                           <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold">Pickup</p>
-                            <p className="text-white text-sm font-medium">{req.pickup}</p>
+                            <h4 className="font-bold text-white text-sm">{req.ownerName}</h4>
+                            <div className="flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[12px] text-yellow-500 filled">star</span>
+                              <span className="text-[10px] text-slate-400 font-bold">4.9 · Verified</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="w-0.5 h-3 bg-slate-700 ml-[9px]"></div>
-                        <div className="flex items-start gap-2">
-                          <span className="material-symbols-outlined text-primary text-sm mt-0.5">flag</span>
-                          <div>
-                            <p className="text-[10px] text-slate-500 uppercase font-bold">Destination</p>
-                            <p className="text-white text-sm font-medium">{req.destination}</p>
-                          </div>
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-0.5">Est. Earnings</p>
+                          <p className="text-2xl font-black text-primary leading-none">₦{req.price}</p>
                         </div>
                       </div>
 
-                      {/* Fare and distance */}
-                      <div className="flex gap-3">
-                        <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
-                          <p className="text-[10px] text-slate-500 uppercase font-bold">Distance</p>
-                          <p className="text-white font-black">{req.distance}</p>
+                      {/* Route Summary */}
+                      <div className="flex gap-4 items-stretch bg-white/5 rounded-2xl p-4 border border-white/5">
+                        <div className="flex flex-col items-center gap-1 py-1">
+                          <div className="w-2 h-2 rounded-full bg-accent"></div>
+                          <div className="w-0.5 flex-1 bg-slate-700"></div>
+                          <div className="w-2 h-2 rounded-sm bg-primary"></div>
                         </div>
-                        <div className="flex-1 bg-primary/20 rounded-xl p-3 text-center border border-primary/30">
-                          <p className="text-[10px] text-primary uppercase font-bold">Your Earnings</p>
-                          <p className="text-primary font-black">₦{req.price}</p>
+                        <div className="flex-1 flex flex-col gap-3 justify-between">
+                          <div className="overflow-hidden">
+                            <p className="text-[9px] text-slate-500 uppercase font-black mb-0.5">Pickup</p>
+                            <p className="text-white text-xs font-bold truncate">{req.pickup}</p>
+                          </div>
+                          <div className="overflow-hidden">
+                            <p className="text-[9px] text-slate-500 uppercase font-black mb-0.5">Destination</p>
+                            <p className="text-white text-xs font-bold truncate">{req.destination}</p>
+                          </div>
                         </div>
-                        <div className="flex-1 bg-white/5 rounded-xl p-3 text-center">
-                          <p className="text-[10px] text-slate-500 uppercase font-bold">Est. Time</p>
-                          <p className="text-white font-black">
-                            {req.estimatedMins ? `${req.estimatedMins}m` : req.time}
+                        <div className="w-px bg-white/10 mx-1"></div>
+                        <div className="flex flex-col justify-center items-center px-2 min-w-[70px]">
+                          <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Impact</p>
+                          <p className="text-white font-black text-sm">{req.distance}</p>
+                          <p className="text-[10px] text-primary font-bold mt-1">
+                            {req.estimatedMins ? `${req.estimatedMins}m away` : req.time}
                           </p>
                         </div>
                       </div>
 
-                      {/* Accept / Decline */}
+                      {/* Decision Buttons */}
                       <div className="flex gap-3">
                         <button
                           onClick={() => handleDeclineRide(req)}
-                          className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 transition-all active:scale-95"
+                          className="flex-1 py-4 rounded-2xl bg-slate-800/50 text-slate-400 font-bold hover:bg-red-500/10 hover:text-red-500 transition-all active:scale-95 text-sm"
                         >
                           Decline
                         </button>
                         <button
                           onClick={() => handleAcceptRide(req)}
-                          className="flex-2 flex-grow py-3.5 rounded-2xl bg-primary text-white font-black shadow-lg shadow-primary/30 hover:brightness-110 active:scale-95 transition-all"
+                          className="flex-[2] py-4 rounded-2xl bg-primary text-white font-black shadow-lg shadow-primary/25 hover:brightness-110 active:scale-95 transition-all text-sm flex items-center justify-center gap-2"
                         >
                           Accept Ride
+                          <span className="material-symbols-outlined text-sm">arrow_forward</span>
                         </button>
+                      </div>
+
+                      {/* Expiry Timer Bar (Visual Polish) */}
+                      <div className="absolute bottom-0 left-0 h-1 bg-primary/20 w-full overflow-hidden">
+                         <div className="h-full bg-primary animate-shrink-width origin-left"></div>
                       </div>
                     </div>
                   ))
                 ) : (
                   // Scanning state — no requests yet
                   <div className="py-12 text-center flex flex-col items-center gap-6 animate-fade-in">
-                    <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/20 border-dashed">
-                      <span className="material-symbols-outlined text-4xl text-primary animate-pulse">radar</span>
+                    <div className="relative">
+                      <div className="w-24 h-24 rounded-full bg-primary/5 flex items-center justify-center border border-primary/20">
+                        <span className="material-symbols-outlined text-4xl text-primary">radar</span>
+                      </div>
+                      {/* Live Radar Rings */}
+                      <div className="absolute inset-0 rounded-full border border-primary/30 animate-ping"></div>
+                      <div className="absolute inset-0 rounded-full border border-primary/20 animate-ping [animation-delay:0.5s]"></div>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-white mb-1">Waiting for owner requests</h3>
-                      <p className="text-slate-400 text-xs font-medium max-w-[200px] mx-auto leading-relaxed">
-                        Stay online and keep your location fresh. Owners who select you will appear here instantly.
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-black text-white">Searching for Rides</h3>
+                      <p className="text-slate-400 text-sm font-medium max-w-[260px] mx-auto leading-relaxed">
+                        You're live and visible to nearby owners. Stay on this screen to catch the latest requests.
                       </p>
                     </div>
                   </div>
@@ -679,226 +688,257 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
               ) : (
                 // Offline state
                 <div className="py-12 text-center flex flex-col items-center gap-6 animate-fade-in">
-                  <div className="w-20 h-20 rounded-full bg-slate-800/50 flex items-center justify-center border-2 border-slate-700 border-dashed">
-                    <span className="material-symbols-outlined text-4xl text-slate-500">wifi_off</span>
+                  <div className="w-24 h-24 rounded-full bg-slate-800/30 flex items-center justify-center border border-slate-700/50 shadow-inner">
+                    <span className="material-symbols-outlined text-5xl text-slate-600">power_settings_new</span>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white mb-1">You're Offline</h3>
-                    <p className="text-slate-400 text-xs font-medium max-w-[200px] mx-auto leading-relaxed">
-                      Switch to online mode above to start receiving owner requests.
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-black text-white">You're Offline</h3>
+                    <p className="text-slate-500 text-sm font-medium max-w-[240px] mx-auto leading-relaxed">
+                      Your status is hidden from owners. Go online to start receiving ride requests.
                     </p>
                   </div>
+                  <button 
+                    onClick={toggleOnline}
+                    className="px-8 py-4 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all flex items-center gap-2"
+                  >
+                    <span className="material-symbols-outlined">sensors</span>
+                    Go Online Now
+                  </button>
                 </div>
               )}
 
             </>
           ) : (
             <div className="flex flex-col gap-6 animate-slide-up">
-              {/* ... Active Ride UI ... */}
-              <div className="flex items-center justify-between">
+              
+              {/* Timeline Header */}
+              <TripProgressTimeline milestone={ridePhase} />
+
+              <div className="flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/5">
                 <div className="flex items-center gap-3">
-                  <img src={activeRide.avatar} className="w-12 h-12 rounded-full object-cover ring-2 ring-primary" alt="" />
+                  <img src={activeRide.avatar} className="w-12 h-12 rounded-full object-cover ring-2 ring-primary/30" alt="" />
                   <div>
                     <h4 className="font-bold text-white text-base">{activeRide.ownerName}</h4>
-                    <p className="text-slate-400 text-xs">Verified Owner</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-primary active:scale-90">
-                    <span className="material-symbols-outlined text-[20px]">chat</span>
-                  </button>
-                  <button className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-green-500 active:scale-90">
-                    <span className="material-symbols-outlined text-[20px]">call</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <div className="flex flex-col items-center pt-1 shrink-0">
-                  <div className={`w-3 h-3 rounded-full border-2 ${ridePhase === 'pickup' || ridePhase === 'arrived' ? 'border-primary animate-pulse' : 'border-slate-500 bg-slate-500'}`}></div>
-                  <div className="w-0.5 flex-1 bg-slate-700 my-1"></div>
-                  <div className={`w-3 h-3 rounded-sm ${ridePhase === 'trip' ? 'bg-primary animate-pulse' : 'bg-slate-700'}`}></div>
-                </div>
-                <div className="flex-1 flex flex-col gap-4">
-                  <div onClick={() => openNavigation(activeRide.coords)} className="group cursor-pointer hover:bg-white/5 p-2 -ml-2 rounded-lg transition-colors">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Pick up</p>
-                      <span className="material-symbols-outlined text-[14px] text-primary opacity-0 group-hover:opacity-100 transition-opacity">navigation</span>
+                    <div className="flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                      <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Owner is waiting</p>
                     </div>
-                    <p className="text-sm font-bold text-white truncate flex items-center gap-2">
-                      {activeRide.pickup}
-                      <span className="material-symbols-outlined text-[14px] text-slate-500">open_in_new</span>
-                    </p>
                   </div>
-                  <div onClick={() => openNavigation(activeRide.destCoords)} className="group cursor-pointer hover:bg-white/5 p-2 -ml-2 rounded-lg transition-colors">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Drop off</p>
-                      <span className="material-symbols-outlined text-[14px] text-primary opacity-0 group-hover:opacity-100 transition-opacity">navigation</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center text-primary active:scale-90 transition-all border border-primary/20">
+                    <span className="material-symbols-outlined text-[22px]">chat</span>
+                  </button>
+                  <button className="w-11 h-11 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-500 active:scale-90 transition-all border border-green-500/20">
+                    <span className="material-symbols-outlined text-[22px]">call</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Route Card */}
+              <div className="bg-input-dark/40 rounded-3xl p-5 border border-white/5 space-y-5">
+                <div className="flex gap-4">
+                  <div className="flex flex-col items-center pt-1 shrink-0">
+                    <div className={`w-3 h-3 rounded-full border-2 ${ridePhase === 'pickup' || ridePhase === 'arrived' ? 'border-primary animate-pulse' : 'border-slate-600 bg-slate-600'}`}></div>
+                    <div className="w-0.5 flex-1 bg-slate-800 my-1"></div>
+                    <div className={`w-3 h-3 rounded-sm ${ridePhase === 'trip' ? 'bg-primary animate-pulse' : 'bg-slate-800'}`}></div>
+                  </div>
+                  <div className="flex-1 flex flex-col gap-6">
+                    <div onClick={() => openNavigation(activeRide.coords)} className="group cursor-pointer">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Pick up point</p>
+                        <span className="text-[10px] font-bold text-primary flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px]">navigation</span>
+                          Navigate
+                        </span>
+                      </div>
+                      <p className="text-sm font-bold text-white leading-snug">
+                        {activeRide.pickup}
+                      </p>
                     </div>
-                    <p className="text-sm font-bold text-white truncate flex items-center gap-2">
-                      {activeRide.destination}
-                      <span className="material-symbols-outlined text-[14px] text-slate-500">open_in_new</span>
-                    </p>
+                    <div onClick={() => openNavigation(activeRide.destCoords)} className="group cursor-pointer">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Destination</p>
+                        <span className="text-[10px] font-bold text-slate-500 group-hover:text-primary transition-colors flex items-center gap-1">
+                          <span className="material-symbols-outlined text-[14px]">map</span>
+                          Preview
+                        </span>
+                      </div>
+                      <p className="text-sm font-bold text-white leading-snug">
+                        {activeRide.destination}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <div className="flex-1 bg-white/5 rounded-2xl p-3">
+                    <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Trip Value</p>
+                    <p className="text-lg font-black text-white leading-none">₦{activeRide.price}</p>
+                  </div>
+                  <div className="flex-1 bg-white/5 rounded-2xl p-3 text-right">
+                    <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Total Distance</p>
+                    <p className="text-lg font-bold text-white leading-none">{activeRide.distance}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-input-dark/50 p-4 rounded-2xl flex justify-between items-center border border-white/5">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-slate-500 uppercase">Est. Earnings</span>
-                  <span className="text-xl font-black text-white">₦{activeRide.price}</span>
-                </div>
-                <div className="flex flex-col text-right">
-                  <span className="text-[10px] font-black text-slate-500 uppercase">Distance</span>
-                  <span className="text-sm font-bold text-white">{activeRide.distance}</span>
-                </div>
-              </div>
-
-              {ridePhase === 'pickup' && (
-                <button onClick={handleArrival} className="w-full bg-primary text-white font-black py-4 rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all">
-                  I Have Arrived
-                </button>
-              )}
-              {ridePhase === 'arrived' && (
-                <button onClick={handleStartTrip} className="w-full bg-green-500 text-white font-black py-4 rounded-2xl shadow-xl shadow-green-500/20 active:scale-95 transition-all">
-                  Start Trip
-                </button>
-              )}
-              {ridePhase === 'trip' && (
-                <>
-                  {/* Live trip timer */}
-                  <div className="bg-input-dark/50 p-4 rounded-2xl border border-white/5 flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] font-black text-slate-500 uppercase">Trip Duration</span>
-                      <span className="text-2xl font-black text-white font-mono">
+              {/* Dynamic Action Area */}
+              <div className="space-y-4">
+                {ridePhase === 'pickup' && (
+                  <button 
+                    onClick={handleArrival} 
+                    className="w-full bg-primary text-white font-black py-5 rounded-3xl shadow-2xl shadow-primary/30 active:scale-95 transition-all flex items-center justify-center gap-3 text-lg"
+                  >
+                    <span className="material-symbols-outlined">location_on</span>
+                    I Have Arrived
+                  </button>
+                )}
+                
+                {ridePhase === 'arrived' && (
+                  <div className="flex flex-col gap-3">
+                    <div className="bg-green-500/10 p-4 rounded-2xl border border-green-500/20 text-center">
+                      <p className="text-xs font-bold text-green-500">Wait for the owner before starting the trip</p>
+                    </div>
+                    <button 
+                      onClick={handleStartTrip} 
+                      className="w-full bg-green-500 text-white font-black py-5 rounded-3xl shadow-2xl shadow-green-500/30 active:scale-95 transition-all flex items-center justify-center gap-3 text-lg"
+                    >
+                      <span className="material-symbols-outlined">play_arrow</span>
+                      Start Trip
+                    </button>
+                  </div>
+                )}
+                
+                {ridePhase === 'trip' && (
+                  <div className="flex flex-col gap-4">
+                    {/* Premium Live Timer */}
+                    <div className="bg-primary/5 p-6 rounded-[2rem] border border-primary/10 flex flex-col items-center gap-2">
+                      <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em]">Live Trip Counter</span>
+                      <span className="text-5xl font-black text-white font-mono tracking-tighter">
                         {formatTimer(tripTimer)}
                       </span>
+                      <div className="flex items-center gap-4 mt-2">
+                        <div className="flex flex-col items-center">
+                          <span className="text-[9px] text-slate-500 uppercase font-black">Est. Duration</span>
+                          <span className="text-xs font-bold text-white">
+                            {activeRide.estimatedMins ? `${activeRide.estimatedMins}m` : '---'}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex flex-col text-right">
-                      <span className="text-[10px] font-black text-slate-500 uppercase">Est. Time</span>
-                      <span className="text-sm font-bold text-slate-400">
-                        {activeRide.estimatedMins ? `~${activeRide.estimatedMins} mins` : 'Calculating...'}
-                      </span>
+
+                    <button
+                      onClick={handleCompleteTrip}
+                      className="w-full bg-blue-600 text-white font-black py-5 rounded-3xl shadow-2xl shadow-blue-600/30 active:scale-95 transition-all flex items-center justify-center gap-3 text-lg"
+                    >
+                      <span className="material-symbols-outlined">flag</span>
+                      Complete Trip
+                    </button>
+                  </div>
+                )}
+              </div>
+              {ridePhase === 'completed' && (
+                <div className="flex flex-col gap-6 animate-scale-in">
+                  
+                  {/* Victory Header */}
+                  <div className="text-center py-8 bg-primary/5 rounded-[2.5rem] border border-primary/10 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full -mr-16 -mt-16 blur-3xl"></div>
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-primary/20 rounded-full -ml-12 -mb-12 blur-2xl"></div>
+                    
+                    <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center text-white mx-auto mb-4 shadow-[0_0_40px_rgba(34,197,94,0.4)]">
+                      <span className="material-symbols-outlined text-4xl filled">verified</span>
                     </div>
+                    <h3 className="text-2xl font-black text-white">Trip Complete!</h3>
+                    <p className="text-primary text-sm font-bold mt-1">Earnings updated in your wallet</p>
                   </div>
 
-                  <button
-                    onClick={handleCompleteTrip}
-                    className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-600/20 active:scale-95 transition-all"
-                  >
-                    Complete Trip
-                  </button>
-                </>
-              )}
-              {ridePhase === 'completed' && fareBreakdown && (
-                <div className="flex flex-col gap-4 animate-scale-in">
-                  {/* Success header */}
-                  <div className="text-center py-4">
-                    <div className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center text-white mx-auto mb-3 shadow-lg shadow-green-500/40">
-                      <span className="material-symbols-outlined text-3xl filled">verified</span>
+                  {fareBreakdown ? (
+                    <div className="space-y-4">
+                      {/* Trip Metadata */}
+                      <div className="bg-white/5 rounded-2xl p-4 border border-white/5 flex gap-4">
+                        <div className="flex-1 text-center">
+                          <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Total Distance</p>
+                          <p className="text-sm font-bold text-white">{fareBreakdown.distanceKm ?? 0} km</p>
+                        </div>
+                        <div className="w-px bg-white/10"></div>
+                        <div className="flex-1 text-center">
+                          <p className="text-[9px] text-slate-500 uppercase font-black mb-1">Trip Duration</p>
+                          <p className="text-sm font-bold text-white">{fareBreakdown.actualMins ?? fareBreakdown.totalMins ?? 0} mins</p>
+                        </div>
+                      </div>
+
+                      {/* Financial Summary */}
+                      <div className="bg-input-dark/50 rounded-2xl border border-white/10 overflow-hidden shadow-xl">
+                        <div className="px-5 py-4 border-b border-white/5 flex justify-between items-center bg-white/5">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Financial Summary</p>
+                          <span className="text-[10px] font-bold text-primary px-2 py-0.5 bg-primary/10 rounded-full italic">Verified</span>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                          <div className="space-y-3 opacity-80">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400 text-xs">Base Trip Fare</span>
+                              <span className="text-white font-bold text-xs">
+                                {formatCurrency(fareBreakdown.baseFare ?? 0)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400 text-xs">Distance & Time</span>
+                              <span className="text-white font-bold text-xs">
+                                {formatCurrency((fareBreakdown.distanceComponent ?? 0) + (fareBreakdown.timeComponent ?? 0))}
+                              </span>
+                            </div>
+                            {fareBreakdown.commissionAmount > 0 && (
+                              <div className="flex justify-between items-center text-red-400/60">
+                                <span className="text-xs">BICA Commission</span>
+                                <span className="font-bold text-xs">
+                                  -{formatCurrency(fareBreakdown.commissionAmount)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+                            <div>
+                              <p className="text-[10px] font-black text-primary uppercase mb-0.5">Your Take-home</p>
+                              <p className="text-2xl font-black text-white">
+                                {formatCurrency(fareBreakdown.driverEarnings ?? 0)}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Total Paid</p>
+                              <p className="text-sm font-bold text-slate-300">
+                                {formatCurrency(fareBreakdown.finalFare ?? 0)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-green-500 text-xl font-black">Trip Complete!</p>
-                    <p className="text-slate-400 text-xs mt-1">Earnings added to your wallet</p>
+                  ) : (
+                    <div className="bg-white/5 p-6 rounded-2xl border border-white/5 text-center">
+                      <p className="text-slate-400 text-sm">Processing final trip details...</p>
+                    </div>
+                  )}
+
+                  <div className="pt-2">
+                    <button
+                      onClick={() => {
+                        setActiveRide(null);
+                        setRidePhase('pickup');
+                        setFareBreakdown(null);
+                        setTripTimer(0);
+                      }}
+                      className="w-full py-5 rounded-3xl bg-white text-background-dark font-black shadow-xl active:scale-[0.98] transition-all text-base flex items-center justify-center gap-2 hover:bg-slate-100"
+                    >
+                      Done & Ready for Next
+                      <span className="material-symbols-outlined text-base">refresh</span>
+                    </button>
+                    <p className="text-center text-[10px] text-slate-500 mt-5 leading-relaxed px-8">
+                      The owner has been notified. Earnings are typically reflected in your wallet instantly.
+                    </p>
                   </div>
-
-                  {/* Fare breakdown */}
-                  <div className="bg-input-dark/50 rounded-2xl border border-white/10 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-white/5">
-                      <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Trip Summary</p>
-                    </div>
-
-                    <div className="px-4 py-3 space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 text-sm">Base fare</span>
-                        <span className="text-white font-bold text-sm">
-                          {formatCurrency(fareBreakdown.baseFare ?? 0)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 text-sm">Distance charge</span>
-                        <span className="text-white font-bold text-sm">
-                          {formatCurrency(fareBreakdown.distanceComponent ?? 0)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 text-sm">Time charge</span>
-                        <span className="text-white font-bold text-sm">
-                          {formatCurrency(fareBreakdown.timeComponent ?? 0)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center text-xs text-slate-500">
-                        <span>
-                          Actual: {fareBreakdown.actualMins ?? fareBreakdown.totalMins ?? 0} mins
-                        </span>
-                        <span>
-                          Estimated: {fareBreakdown.estimatedMins ?? 0} mins
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Divider */}
-                    <div className="mx-4 border-t border-white/10"></div>
-
-                    <div className="px-4 py-3 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 text-sm">Total fare</span>
-                        <span className="text-white font-bold">
-                          {formatCurrency(fareBreakdown.finalFare)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 text-sm">BICA commission</span>
-                        <span className="text-slate-400 text-sm">
-                          -{formatCurrency(fareBreakdown.commissionAmount)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-white/10">
-                        <span className="text-primary font-black text-sm uppercase tracking-wide">Your earnings</span>
-                        <span className="text-primary font-black text-xl">
-                          {formatCurrency(fareBreakdown.driverEarnings)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-center text-slate-400 text-xs">
-                    Owner has been notified to make payment
-                  </p>
-
-                  <button
-                    onClick={() => {
-                      setActiveRide(null);
-                      setRidePhase('pickup');
-                      setFareBreakdown(null);
-                      setTripTimer(0);
-                    }}
-                    className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold active:scale-95 transition-all"
-                  >
-                    Back to Requests
-                  </button>
-                </div>
-              )}
-
-              {ridePhase === 'completed' && !fareBreakdown && (
-                <div className="w-full py-6 text-center bg-green-500/10 border-2 border-green-500/30 rounded-[2rem] animate-scale-in flex flex-col items-center gap-2">
-                  <div className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center text-white mb-2 shadow-lg shadow-green-500/40">
-                    <span className="material-symbols-outlined text-3xl filled">verified</span>
-                  </div>
-                  <p className="text-green-500 text-xl font-black">Trip Success!</p>
-                  <button
-                    onClick={() => {
-                      setActiveRide(null);
-                      setRidePhase('pickup');
-                      setFareBreakdown(null);
-                      setTripTimer(0);
-                    }}
-                    className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold active:scale-95 transition-all"
-                  >
-                    Back to Requests
-                  </button>
                 </div>
               )}
             </div>
