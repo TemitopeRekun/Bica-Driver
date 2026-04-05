@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import localforage from 'localforage';
-import { AppScreen, UserRole, UserProfile, ApprovalStatus, Trip, SystemSettings, OwnerActivityTab, DriverActivityTab } from './types';
+import { AppScreen, UserRole, UserProfile, ApprovalStatus, Trip, SystemSettings, OwnerActivityTab, DriverActivityTab, AuthResponse } from './types';
 import WelcomeScreen from './screens/WelcomeScreen';
 import SignUpScreen from './screens/SignUpScreen';
 import LoginScreen from './screens/LoginScreen';
@@ -71,7 +71,7 @@ const App: React.FC = () => {
         // Check for saved session
         const savedUser = await localforage.getItem<UserProfile>('bicadriver_current_user');
         if (savedUser && typeof savedUser === 'object' && savedUser.id !== 'admin_preview') {
-          // Verify the token is still valid
+          // Verify the token is still valid AND approved
           try {
             const freshUser = await api.get<any>('/auth/me');
             const mapped = mapUser(freshUser);
@@ -84,10 +84,13 @@ const App: React.FC = () => {
                   ? AppScreen.DRIVER_DASHBOARD
                   : AppScreen.MAIN_REQUEST,
             );
-          } catch {
-            // Token expired — clear session
+          } catch (e) {
+            // Token expired or driver unapproved/blocked — clear session completely
+            console.warn('Session restoration failed:', e);
             clearToken();
             await localforage.removeItem('bicadriver_current_user');
+            setCurrentUser(null);
+            // navigateTo(AppScreen.WELCOME) is default fallback-ish
           }
         }
       } catch (e) {
@@ -169,21 +172,27 @@ const App: React.FC = () => {
         accountName: userData.accountName,
       };
 
-      const response = await api.post<{ token: string; user: any }>(
+      const response = await api.post<AuthResponse>(
         '/auth/register',
         body,
-        false,
+        false
       );
 
-      saveToken(response.token);
-      const mapped = mapUser(response.user);
-      setCurrentUser(mapped);
-      await localforage.setItem('bicadriver_current_user', mapped);
+      if (response.token) {
+        saveToken(response.token);
+        const mapped = mapUser(response.user);
+        setCurrentUser(mapped);
+        await localforage.setItem('bicadriver_current_user', mapped);
 
-      if (mapped.role === UserRole.DRIVER) {
-        navigateTo(AppScreen.DRIVER_DASHBOARD);
+        if (mapped.role === UserRole.DRIVER) {
+          navigateTo(AppScreen.DRIVER_DASHBOARD);
+        } else {
+          navigateTo(AppScreen.MAIN_REQUEST);
+        }
       } else {
-        navigateTo(AppScreen.MAIN_REQUEST);
+        // Driver registration pending approval (no token)
+        alert(response.message || 'Registration submitted. Your driver account is pending admin approval.');
+        navigateTo(AppScreen.LOGIN);
       }
     } catch (error: any) {
       alert(error.message || 'Registration failed. Please try again.');
@@ -196,32 +205,42 @@ const App: React.FC = () => {
       return;
     }
 
-    // Admin shortcut — still hits real backend
     try {
-      const response = await api.post<{ token: string; user: any }>(
+      const response = await api.post<AuthResponse>(
         '/auth/login',
         { email, password },
         false,
       );
 
+      if (!response.token) {
+        alert(response.message || 'Login failed. Please contact support.');
+        clearToken();
+        return;
+      }
+
       saveToken(response.token);
       const mapped = mapUser(response.user);
+      
+      // Defense-in-depth: if backend somehow returns a token for an unapproved driver
+      if (mapped.role === UserRole.DRIVER && mapped.approvalStatus !== 'APPROVED') {
+        alert('Access Denied: Your driver account is not yet approved.');
+        clearToken();
+        return;
+      }
+
       setCurrentUser(mapped);
       await localforage.setItem('bicadriver_current_user', mapped);
 
       if (mapped.role === UserRole.ADMIN) {
         navigateTo(AppScreen.ADMIN_DASHBOARD);
       } else if (mapped.role === UserRole.DRIVER) {
-        if (mapped.approvalStatus === 'REJECTED') {
-          alert('Login Denied: Your driver application was rejected. Please contact support.');
-          clearToken();
-          return;
-        }
         navigateTo(AppScreen.DRIVER_DASHBOARD);
       } else {
         navigateTo(AppScreen.MAIN_REQUEST);
       }
     } catch (error: any) {
+      // Clear token just in case
+      clearToken();
       alert(error.message || 'Invalid credentials. Please try again.');
     }
   };
@@ -233,7 +252,13 @@ const App: React.FC = () => {
     navigateTo(AppScreen.WELCOME);
   };
 
+  const handleForcedLogout = async (message?: string) => {
+    alert(message || 'Your session is no longer valid. Please log in again.');
+    await handleLogout();
+  };
+
   // Admin simulate — kept for admin dashboard functionality
+
   const handleSimulate = (role: UserRole) => {
     const adminUser: UserProfile = {
       id: 'admin_preview',
@@ -406,6 +431,7 @@ const App: React.FC = () => {
             onOpenProfile={() => navigateTo(AppScreen.PROFILE)}
             onOpenActivity={openDriverActivity}
             onBack={handleLogout}
+            onForcedLogout={handleForcedLogout}
             onUpdateEarnings={handleUpdateEarnings}
             onUpdateOnlineStatus={handleUpdateDriverOnlineStatus}
             onRideComplete={handleAddTrip}
@@ -416,6 +442,7 @@ const App: React.FC = () => {
           <DriverActivityScreen
             initialTab={driverActivityTab}
             onBack={() => navigateTo(AppScreen.DRIVER_DASHBOARD)}
+            onForcedLogout={handleForcedLogout}
           />
         );
       case AppScreen.PROFILE:

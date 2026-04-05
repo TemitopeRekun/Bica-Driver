@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState, useEffect, useRef } from 'react';
 import InteractiveMap from '../components/InteractiveMap';
 import { CapacitorService } from '../services/CapacitorService';
@@ -14,6 +14,7 @@ interface DriverMainScreenProps {
   onOpenProfile: () => void;
   onOpenActivity: (tab: DriverActivityTab) => void;
   onBack: () => void;
+  onForcedLogout: (message?: string) => void;
   onUpdateEarnings: (amount: number) => void;
   onUpdateOnlineStatus: (isOnline: boolean) => void;
   onRideComplete: (trip: Trip) => void;
@@ -50,7 +51,7 @@ const CountUpTimer: React.FC = () => {
 // ... existing imports
 
 const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
-  user, onOpenProfile, onOpenActivity, onBack, onUpdateEarnings, onUpdateOnlineStatus, onRideComplete
+  user, onOpenProfile, onOpenActivity, onBack, onForcedLogout, onUpdateEarnings, onUpdateOnlineStatus, onRideComplete
 }) => {
   const [activeRide, setActiveRide] = useState<DriverRideRequest | null>(null);
   const [ridePhase, setRidePhase] = useState<RidePhase>('pickup');
@@ -77,6 +78,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     user,
     approvalStatus,
     onOnlineStatusChange: onUpdateOnlineStatus,
+    onForcedLogout,
   });
 
   const [tripTimer, setTripTimer] = useState<number>(0); // seconds elapsed
@@ -86,8 +88,11 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     try {
       const summary = await api.get<WalletSummary>('/payments/wallet');
       setWalletSummary(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load wallet summary:', error);
+      if (error.message?.includes('401') || error.message?.includes('403')) {
+        onForcedLogout(error.message);
+      }
     }
   };
 
@@ -151,8 +156,11 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
         }
 
         setRidePhase('pickup');
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to restore driver ride context:', error);
+        if (error.message?.includes('401') || error.message?.includes('403')) {
+          onForcedLogout(error.message);
+        }
       }
     };
 
@@ -229,7 +237,11 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       setPendingRide(null);
       setSelfieImage(null);
     } catch (error: any) {
-      alert(error.message || 'Failed to accept ride. It may have been cancelled.');
+      if (error.message?.includes('401') || error.message?.includes('403')) {
+        onForcedLogout(error.message);
+      } else {
+        alert(error.message || 'Failed to accept ride. It may have been cancelled.');
+      }
       setShowSelfieModal(false);
       setPendingRide(null);
       setSelfieImage(null);
@@ -278,7 +290,11 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       }, 1000);
 
     } catch (error: any) {
-      alert(error.message || 'Failed to start trip. Please try again.');
+      if (error.message?.includes('401') || error.message?.includes('403')) {
+        onForcedLogout(error.message);
+      } else {
+        alert(error.message || 'Failed to start trip. Please try again.');
+      }
     }
   };
 
@@ -327,7 +343,11 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
 
     } catch (error: any) {
       clearInterval(timerInterval.current);
-      alert(error.message || 'Failed to complete trip. Please try again.');
+      if (error.message?.includes('401') || error.message?.includes('403')) {
+        onForcedLogout(error.message);
+      } else {
+        alert(error.message || 'Failed to complete trip. Please try again.');
+      }
     }
   };
 
@@ -338,7 +358,11 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       // Remove from list
       removeRideRequest(ride.id);
     } catch (error: any) {
-      alert(error.message || 'Failed to decline ride');
+      if (error.message?.includes('401') || error.message?.includes('403')) {
+        onForcedLogout(error.message);
+      } else {
+        alert(error.message || 'Failed to decline ride');
+      }
     }
   };
 

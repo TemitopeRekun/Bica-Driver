@@ -65,6 +65,21 @@ export interface UserProfile {
   updatedAt?: string;
 }
 
+export type AuthUser = UserProfile | any;
+
+export type AuthResponse =
+  | {
+      token: string;
+      user: AuthUser;
+      message?: string;
+    }
+  | {
+      token?: undefined;
+      user: AuthUser;
+      message: string; // used for driver registration pending approval
+    };
+
+
 export interface Trip {
   id: string;
   driverId?: string;

@@ -6,6 +6,7 @@ import { DriverActivityTab, PaymentHistoryRecord, Trip, WalletSummary } from '..
 interface DriverActivityScreenProps {
   initialTab: DriverActivityTab;
   onBack: () => void;
+  onForcedLogout: (message?: string) => void;
 }
 
 const ACTIVITY_THEME = {
@@ -48,6 +49,7 @@ const ACTIVITY_THEME = {
 const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   initialTab,
   onBack,
+  onForcedLogout,
 }) => {
   const [activeTab, setActiveTab] = useState<DriverActivityTab>(initialTab);
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -96,6 +98,14 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
 
     if (failedSections.length > 0) {
       setError(`Could not load ${failedSections.join(' and ')} right now.`);
+      
+      // Check if any of the rejections were 401/403
+      const authError = [tripsResult, settlementsResult, walletResult].find(
+        (res) => res.status === 'rejected' && (res.reason.message?.includes('401') || res.reason.message?.includes('403'))
+      );
+      if (authError && authError.status === 'rejected') {
+        onForcedLogout(authError.reason.message);
+      }
     }
 
     setIsLoading(false);
