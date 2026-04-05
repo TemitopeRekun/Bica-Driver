@@ -28,7 +28,9 @@ async function request<T>(
   options?: RequestOptions,
 ): Promise<T> {
   const baseUrl = requireApiUrl();
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    'ngrok-skip-browser-warning': 'true',
+  };
   // Only declare JSON content-type when sending a body — NestJS/Fastify rejects
   // requests that have Content-Type: application/json but an empty body.
   if (body !== undefined) {
