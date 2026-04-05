@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { UserProfile, UserRole, ApprovalStatus, Trip, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord } from '../types';
 import { mapUser } from '../mappers/appMappers';
 import { api } from '../services/api.service';
+import { useToast } from '../hooks/useToast';
 
 interface AdminDashboardScreenProps {
   users: UserProfile[];
@@ -30,6 +31,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   onUpdateStatus, onBlockUser, onRetrySubAccount, onUpdateSettings, 
   onRetry, onBack, onSimulate 
 }) => {
+  const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<AdminSection>('overview');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [selectedUserDetails, setSelectedUserDetails] = useState<UserProfile | null>(null);
@@ -127,7 +129,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
 
   const handleSaveSettings = () => {
     onUpdateSettings(localSettings);
-    alert("System Settings Updated Successfully!");
+    toast.success("System Settings Updated Successfully!");
   };
 
   const getTripStatusClass = (status: Trip['status']) => {

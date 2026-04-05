@@ -7,6 +7,7 @@ import { api } from '../services/api.service';
 import { IMAGES } from '@/constants';
 import { DriverRideRequest, useDriverRealtime } from '../hooks/useDriverRealtime';
 import TripProgressTimeline from '../components/Driver/TripProgressTimeline';
+import { useToast } from '../hooks/useToast';
 
 type RidePhase = 'pickup' | 'arrived' | 'trip' | 'completed';
 
@@ -54,6 +55,7 @@ const CountUpTimer: React.FC = () => {
 const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
   user, onOpenProfile, onOpenActivity, onBack, onForcedLogout, onUpdateEarnings, onUpdateOnlineStatus, onRideComplete
 }) => {
+  const { toast } = useToast();
   const [activeRide, setActiveRide] = useState<DriverRideRequest | null>(null);
   const [ridePhase, setRidePhase] = useState<RidePhase>('pickup');
   const [walletSummary, setWalletSummary] = useState<WalletSummary | null>(null);
@@ -241,7 +243,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       if (error.message?.includes('401') || error.message?.includes('403')) {
         onForcedLogout(error.message);
       } else {
-        alert(error.message || 'Failed to accept ride. It may have been cancelled.');
+        toast.error(error.message || 'Failed to accept ride. It may have been cancelled.');
       }
       setShowSelfieModal(false);
       setPendingRide(null);
@@ -294,7 +296,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       if (error.message?.includes('401') || error.message?.includes('403')) {
         onForcedLogout(error.message);
       } else {
-        alert(error.message || 'Failed to start trip. Please try again.');
+        toast.error(error.message || 'Failed to start trip. Please try again.');
       }
     }
   };
@@ -347,7 +349,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       if (error.message?.includes('401') || error.message?.includes('403')) {
         onForcedLogout(error.message);
       } else {
-        alert(error.message || 'Failed to complete trip. Please try again.');
+        toast.error(error.message || 'Failed to complete trip. Please try again.');
       }
     }
   };
@@ -362,7 +364,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       if (error.message?.includes('401') || error.message?.includes('403')) {
         onForcedLogout(error.message);
       } else {
-        alert(error.message || 'Failed to decline ride');
+        toast.error(error.message || 'Failed to decline ride');
       }
     }
   };

@@ -23,6 +23,7 @@ import { api } from '@/services/api.service';
 import { useOwnerRealtime } from '../hooks/useOwnerRealtime';
 import { useOwnerLocationSearch } from '../hooks/useOwnerLocationSearch';
 import { DISCOVERY_CATEGORIES } from '../constants';
+import { useToast } from '../hooks/useToast';
 
 // Refactored Components
 import RideStoryTimeline from '../components/RequestRide/RideStoryTimeline';
@@ -63,6 +64,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   currentUser,
   allUsers
 }) => {
+  const { toast } = useToast();
   const [rideState, setRideState] = useState<RideState>('IDLE');
   const [currentTripId, setCurrentTripId] = useState<string | null>(null);
   // Booking Type State
@@ -274,7 +276,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         window.open(payment.checkoutUrl, '_blank');
       }
     } catch (error: any) {
-      alert(error.message || 'Payment initiation failed. Please try again.');
+      toast.error(error.message || 'Payment initiation failed. Please try again.');
     } finally {
       setIsInitiatingPayment(false);
     }
@@ -376,7 +378,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       setLastMilestoneUpdate(new Date().toISOString());
     },
     onDriverDeclined: (data) => {
-      alert(data.message || 'Driver declined. Please choose another driver.');
+      toast.error(data.message || 'Driver declined. Please choose another driver.');
       setSelectedDriver(null);
       setDriverInfo(null);
       trackedDriverIdRef.current = null;
@@ -428,7 +430,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const handleConfirmRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vehicleData.make || !vehicleData.model || !vehicleData.year) {
-      alert('Please fill in all vehicle details to proceed.');
+      toast.warning('Please fill in all vehicle details to proceed.');
       return;
     }
     setShowVehicleForm(false);
@@ -463,7 +465,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     const bookedDriver = driver || selectedDriver;
 
     if (!pickup || !destination || !bookedDriver) {
-      alert('Missing trip details. Please try again.');
+      toast.error('Missing trip details. Please try again.');
       setRideState('IDLE');
       return;
     }
@@ -491,7 +493,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
         transmission: vehicleData.transmission,
       });
-
       setCurrentTripId(trip.id);
       setDriverInfo({
         id: trip.driverId,
@@ -505,9 +506,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         tripId: trip.id,
       });
       setRideState('SEARCHING');
-
     } catch (error: any) {
-      alert(error.message || 'Could not book ride. Please try again.');
+      toast.error(error.message || 'Could not book ride. Please try again.');
       setRideState('IDLE');
       setNoDriversFound(true);
     }
@@ -566,7 +566,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     await CapacitorService.triggerHaptic();
     try {
       await navigator.clipboard.writeText(text);
-      alert(`${label} copied to clipboard!`);
+      toast.success(`${label} copied to clipboard!`);
     } catch (err) {
       console.error('Failed to copy', err);
     }
@@ -576,7 +576,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     CapacitorService.triggerHaptic();
     if (bookingType === 'schedule') {
       if (!scheduleDate || !scheduleTime) {
-        alert('Please select both date and time for your scheduled ride.');
+        toast.warning('Please select both date and time for your scheduled ride.');
         return;
       }
     }

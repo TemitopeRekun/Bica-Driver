@@ -92,8 +92,9 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
         toast.warning("Please provide your bank details.");
         return;
       }
+    } else {
       if (!formData.carType || !formData.carModel || !formData.carYear || !formData.address || !formData.nationality || !formData.age || !formData.gender) {
-        alert("Please complete all profile details including Address, Nationality, Age, Gender, Car Type, Car Model and Car Year.");
+        toast.warning("Please complete all profile details including Address, Nationality, Age, Gender, Car Type, Car Model and Car Year.");
         return;
       }
     }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { CapacitorService } from '../services/CapacitorService';
 import { LocationService, LocationData } from '../services/LocationService';
 import { SystemSettings } from '../types';
+import { useToast } from './useToast';
 
 interface UseOwnerLocationSearchOptions {
   settings: SystemSettings;
@@ -18,6 +19,7 @@ const isAbortError = (error: unknown): boolean =>
   error instanceof DOMException && error.name === 'AbortError';
 
 export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLocationSearchOptions) => {
+  const { toast } = useToast();
   const [pickup, setPickup] = useState<LocationData | null>(null);
   const [destination, setDestination] = useState<LocationData | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_MAP_CENTER);
@@ -26,7 +28,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
   const [estimatedDistance, setEstimatedDistance] = useState<string>('');
   const [isSearchingPickup, setIsSearchingPickup] = useState(false);
   const [isSearchingDest, setIsSearchingDest] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setNoSearchQuery] = useState('');
   const [isFetchingRoute, setIsFetchingRoute] = useState(false);
   const [estimatedMins, setEstimatedMins] = useState<number>(0);
   const [fareRange, setFareRange] = useState<{ low: number; high: number } | null>(null);
@@ -39,6 +41,9 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
   const onPickupChangedRef = useRef(onPickupChanged);
   const hasHydratedInitialLocationRef = useRef(false);
   const searchAbortControllerRef = useRef<AbortController | null>(null);
+
+  // Added/Renamed state to match expected use in the file
+  const [searchQueryState, setSearchQuery] = useState('');
 
   useEffect(() => {
     pickupExistsRef.current = Boolean(pickup);
@@ -142,9 +147,9 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     } catch (error) {
       const message = error instanceof Error ? error.message.toLowerCase() : '';
       if (message.includes('permission')) {
-        alert('Location permission denied. Please enter pickup manually.');
+        toast.error('Location permission denied. Please enter pickup manually.');
       } else {
-        alert('We could not read your live location. Please ensure GPS is on and try again.');
+        toast.error('We could not read your live location. Please ensure GPS is on and try again.');
       }
     } finally {
       setIsLocating(false);
@@ -295,7 +300,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
       return;
     }
 
-    const normalizedQuery = searchQuery.trim();
+    const normalizedQuery = searchQueryState.trim();
 
     if (normalizedQuery.length < 2) {
       cancelActiveSearch();
@@ -345,7 +350,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
 
     return () => clearTimeout(timer);
   }, [
-    searchQuery,
+    searchQueryState,
     isSearchingDest,
     isSearchingPickup,
     pickup,
@@ -367,7 +372,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     estimatedDistance,
     isSearchingPickup,
     isSearchingDest,
-    searchQuery,
+    searchQuery: searchQueryState,
     isFetchingRoute,
     estimatedMins,
     fareRange,
