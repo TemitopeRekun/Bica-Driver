@@ -7,3 +7,10 @@ export const IMAGES = {
   USER_AVATAR: "https://lh3.googleusercontent.com/aida-public/AB6AXuBHV6MTdzVBcqPYHNA3aa-PETHR8Wwh3dq2MQubxdptmF41VB2A5j2I2iH3hCHN0NW2LzpefIoTTVV5m6Svuo6lsbdS8ek60uMdhsCQXZZ1SHcy1v8SjRPnJeqN-uJlNkDyMz2qH6W_o2zY-R65SV_mrjoa_6Ay0GV8CCEbm6M_XkOMt4t88YEtC2tmK6xaiTBq-mub1XEUfTyWJpv8RjQH1vYvXxCYoeetVhY_NWDBrGXkHJXkWoXwkIH_PXLktBH0IWhv87xT1Hg",
   CAR_IMAGE: "https://lh3.googleusercontent.com/aida-public/AB6AXuAzmXKp8fjrB9NcjdSt8xxX2uaHfqnoiCzLed1TKBcxZdlc_0iDkTjCiSVJbAG-RSbv2XHNkn7vOcLU35TLBiPoFixP_mBlstT-Y1AGGDMoCMSlmuGoPyCwRoCtr2pKLLSjUzRA9ksIiyaDcUe92THfeKNSuxQJHw4QGxspzRCUZeSsD5LeebB5EFTVmSQ3MKYbWlN3Co54VaWXbkF2PgLtopzIF5NNL24Nwyfl1AqxzhTREAzYE0CPFTV2sv3PufvWNLZRGs0dvL8"
 } as const;
+
+export const DISCOVERY_CATEGORIES = [
+  { label: 'Airports', icon: 'flight_takeoff', type: 'Airport' },
+  { label: 'Hotels', icon: 'hotel', type: 'Hotel' },
+  { label: 'Dining', icon: 'restaurant', type: 'Commercial' },
+  { label: 'Malls', icon: 'shopping_cart', type: 'Shopping' }
+] as const;

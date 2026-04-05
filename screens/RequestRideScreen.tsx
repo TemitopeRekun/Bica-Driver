@@ -22,6 +22,17 @@ import {
 import { api } from '@/services/api.service';
 import { useOwnerRealtime } from '../hooks/useOwnerRealtime';
 import { useOwnerLocationSearch } from '../hooks/useOwnerLocationSearch';
+import { DISCOVERY_CATEGORIES } from '../constants';
+
+// Refactored Components
+import RideStoryTimeline from '../components/RequestRide/RideStoryTimeline';
+import CountUpTimer from '../components/RequestRide/CountUpTimer';
+import LocationSearchModal from '../components/RequestRide/LocationSearchModal';
+import DriverPickerModal from '../components/RequestRide/DriverPickerModal';
+import VehicleDetailsModal from '../components/RequestRide/VehicleDetailsModal';
+import TripPaymentSummary from '../components/RequestRide/TripPaymentSummary';
+import DriverStatusCard from '../components/RequestRide/DriverStatusCard';
+
 
 interface RequestRideScreenProps {
   onOpenProfile: () => void;
@@ -35,77 +46,10 @@ interface RequestRideScreenProps {
 type RideState = 'IDLE' | 'SEARCHING' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'SCHEDULED';
 
 
-  const RideStoryTimeline: React.FC<{ milestone: string; lastUpdate: string }> = ({ milestone, lastUpdate }) => {
-    const steps = [
-      { id: 'requested', label: 'Requested', icon: 'hail', microcopy: 'Waiting for a driver to confirm' },
-      { id: 'assigned', label: 'Driver Assigned', icon: 'person_pin_circle', microcopy: 'Driver is heading to your pickup' },
-      { id: 'arrived', label: 'Driver Arrived', icon: 'local_taxi', microcopy: 'Your driver has arrived – head to your car' },
-      { id: 'in_progress', label: 'In Progress', icon: 'distance', microcopy: 'Enjoy your ride' },
-      { id: 'completed', label: 'Completed', icon: 'check_circle', microcopy: 'Trip completed – proceed to payment' },
-    ];
-
-    const currentStepIndex = steps.findIndex(s => s.id === milestone);
-    const progressPercent = (currentStepIndex / (steps.length - 1)) * 100;
-
-    return (
-      <div className="mb-6 px-2">
-        <div className="flex justify-between relative mb-8">
-          <div className="absolute top-5 left-0 right-0 h-0.5 bg-slate-200 dark:bg-slate-800 z-0 mx-6"></div>
-          <div 
-            className="absolute top-5 left-0 h-0.5 bg-primary transition-all duration-700 z-0 mx-6" 
-            style={{ width: progressPercent + "%" }}
-          ></div>
-          
-          {steps.map((step, index) => {
-            const isCompleted = index < currentStepIndex;
-            const isCurrent = index === currentStepIndex;
-            
-            return (
-              <div key={step.id} className="flex flex-col items-center z-10 w-1/5">
-                <div className={"w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 " + (
-                  isCurrent ? 'bg-primary text-white scale-110 shadow-lg shadow-primary/30' : 
-                  isCompleted ? 'bg-primary/20 text-primary' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                )}>
-                  <span className="material-symbols-outlined text-lg">
-                    {isCompleted ? 'check' : step.icon}
-                  </span>
-                </div>
-                <span className={"text-[10px] mt-2 font-bold text-center " + (
-                  isCurrent ? 'text-primary' : 'text-slate-400'
-                )}>
-                  {step.label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-        
-        <div className="bg-primary/5 dark:bg-primary/10 rounded-2xl p-4 border border-primary/10 flex items-center gap-4 animate-fade-in">
-          <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center text-primary shadow-sm">
-            <span className="material-symbols-outlined filled animate-pulse">
-              {steps[currentStepIndex]?.icon || 'info'}
-            </span>
-          </div>
-          <div className="flex-1">
-            <h4 className="text-sm font-black text-slate-900 dark:text-white">
-              {steps[currentStepIndex]?.microcopy}
-            </h4>
-            <p className="text-[10px] text-slate-500 mt-0.5 uppercase font-bold tracking-wider">
-              Updated: {new Date(lastUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  };
+// RideStoryTimeline extracted
 
 
-const DISCOVERY_CATEGORIES = [
-  { label: 'Airports', icon: 'flight_takeoff', type: 'Airport' },
-  { label: 'Hotels', icon: 'hotel', type: 'Hotel' },
-  { label: 'Dining', icon: 'restaurant', type: 'Commercial' },
-  { label: 'Malls', icon: 'shopping_cart', type: 'Shopping' }
-];
+// DISCOVERY_CATEGORIES moved to constants.tsx
 
 
 
@@ -204,29 +148,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     onPickupChanged: () => setNoDriversFound(false),
   });
 
-  const CountUpTimer: React.FC = () => {
-    const [elapsed, setElapsed] = React.useState(0);
-
-    React.useEffect(() => {
-      const timer = setInterval(() => setElapsed(prev => prev + 1), 1000);
-      return () => clearInterval(timer);
-    }, []);
-
-    const mins = Math.floor(elapsed / 60);
-    const secs = elapsed % 60;
-    const display = mins > 0
-      ? `${mins}m ${secs.toString().padStart(2, '0')}s`
-      : `${secs}s`;
-
-    return (
-      <div className="mt-5 flex flex-col items-center gap-1">
-        <div className="px-5 py-2 rounded-2xl bg-primary/10 border border-primary/20">
-          <span className="text-2xl font-black text-primary tracking-tight">{display}</span>
-        </div>
-        <span className="text-xs text-slate-400">waiting for driver to accept</span>
-      </div>
-    );
-  };
+  // CountUpTimer extracted
 
   const buildLocationFromTrip = (
     id: string,
@@ -681,115 +603,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
 
 
-  const renderSearchModal = (type: 'pickup' | 'dest') => (
-    <div className="fixed inset-0 z-50 bg-background-light dark:bg-background-dark flex flex-col animate-slide-up">
-      <div className="px-4 py-4 flex items-center gap-4 border-b border-slate-200 dark:border-slate-800">
-        <button
-          onClick={() => {
-            clearSearchState();
-            type === 'pickup' ? setIsSearchingPickup(false) : setIsSearchingDest(false);
-          }}
-          className="w-10 h-10 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors"
-        >
-          <span className="material-symbols-outlined text-slate-900 dark:text-white">arrow_back</span>
-        </button>
-        <div className="flex-1 bg-slate-100 dark:bg-surface-dark rounded-xl flex items-center px-4 h-12">
-          <span className="material-symbols-outlined text-slate-400 mr-2">search</span>
-          <input
-            autoFocus
-            className="bg-transparent border-none w-full text-base font-medium focus:ring-0 p-0 text-slate-900 dark:text-white"
-            placeholder={type === 'pickup' ? "Where are you?" : "Where to?"}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-4">
-        {type === 'pickup' && searchQuery === '' && (
-          <div className="mb-6">
-            <button
-              onClick={handleUseMyLocation}
-              disabled={isLocating}
-              className="w-full flex items-center gap-4 p-3 rounded-xl bg-primary/10 hover:bg-primary/20 transition-colors text-left mb-2"
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                {isLocating ? (
-                  <span className="material-symbols-outlined text-primary animate-spin">refresh</span>
-                ) : (
-                  <span className="material-symbols-outlined text-primary">my_location</span>
-                )}
-              </div>
-              <div>
-                <p className="font-bold text-primary text-sm">Use My Live Location</p>
-                <p className="text-xs text-slate-500">Tap to set pickup to your current position</p>
-              </div>
-            </button>
-            <p className="text-[10px] text-slate-400 px-2 text-center">
-              Location is only used for this ride request.
-            </p>
-          </div>
-        )}
-
-        {searchQuery === '' && (
-          <div className="mb-6">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Categories</h3>
-            <div className="grid grid-cols-4 gap-4">
-              {DISCOVERY_CATEGORIES.map(cat => (
-                <button
-                  key={cat.label}
-                  onClick={() => handleCategoryTap(cat.type)}
-                  className="flex flex-col items-center gap-2"
-                >
-                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-                    <span className="material-symbols-outlined">{cat.icon}</span>
-                  </div>
-                  <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{cat.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Locations</h3>
-        <div className="space-y-2">
-          {isSearching && (
-            <div className="flex items-center justify-center py-8">
-              <span className="material-symbols-outlined animate-spin text-primary">refresh</span>
-            </div>
-          )}
-          {!isSearching && searchResults.map(loc => (
-            <button
-              key={loc.id}
-              onClick={() => handleSelectLocation(loc, type)}
-              className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-surface-dark transition-colors text-left"
-            >
-              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-slate-500 text-lg">location_on</span>
-              </div>
-              <div>
-                <p className="font-bold text-slate-900 dark:text-white text-sm">{getLocationPrimaryText(loc)}</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] bg-slate-200 dark:bg-slate-700 px-1.5 rounded text-slate-500 font-bold uppercase">{loc.category}</span>
-                  <p className="text-xs text-slate-500">{getLocationSecondaryText(loc)}</p>
-                </div>
-              </div>
-            </button>
-          ))}
-          {!isSearching && searchResults.length === 0 && (searchQuery.trim().length >= 2 || Boolean(searchError)) && (
-            <div className="py-8 text-center">
-              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                {searchError || 'No matching locations found.'}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">
-                Try a nearby landmark, street, or area name.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  // renderSearchModal logic moved to LocationSearchModal component
 
   const markers: any[] = [];
   if (pickup) markers.push({ id: 'pickup', position: [pickup.lat, pickup.lon], title: 'Pickup', icon: 'pickup', draggable: true });
@@ -822,8 +636,34 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   return (
     <div className="h-screen w-full flex flex-col relative bg-background-light dark:bg-background-dark overflow-hidden">
       {/* Search Modals */}
-      {isSearchingPickup && renderSearchModal('pickup')}
-      {isSearchingDest && renderSearchModal('dest')}
+      {isSearchingPickup && (
+        <LocationSearchModal
+          type="pickup"
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          onClose={() => setIsSearchingPickup(false)}
+          onUseMyLocation={handleUseMyLocation}
+          isLocating={isLocating}
+          onCategoryTap={handleCategoryTap}
+          isSearching={isSearching}
+          searchResults={searchResults}
+          onSelectLocation={handleSelectLocation}
+          searchError={searchError}
+        />
+      )}
+      {isSearchingDest && (
+        <LocationSearchModal
+          type="dest"
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          onClose={() => setIsSearchingDest(false)}
+          onCategoryTap={handleCategoryTap}
+          isSearching={isSearching}
+          searchResults={searchResults}
+          onSelectLocation={handleSelectLocation}
+          searchError={searchError}
+        />
+      )}
 
       {/* Map Layer */}
       <div className="absolute inset-0 z-0">
