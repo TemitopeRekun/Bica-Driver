@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { UserRole, UserProfile } from '../types';
 import { CapacitorService } from '../services/CapacitorService';
+import { useToast } from '../hooks/useToast';
 import { CameraSource } from '@capacitor/camera';
 import { api } from '../services/api.service';
 
@@ -13,6 +14,7 @@ interface SignUpScreenProps {
 }
 
 const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onGoToLogin }) => {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -44,7 +46,137 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
     accountNumber: '',
     accountName: '',
   });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  // Refs for focusing/scrolling to errors
+  const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
   const isDriver = role === UserRole.DRIVER;
+
+  // Sanitization: digits only
+  const filterDigits = (val: string) => val.replace(/\D/g, '');
+
+  const validateField = (
+    name: string,
+    value: any,
+    currentFormData: any,
+    currentBankData: any,
+    userRole: UserRole
+  ): string => {
+    const trimmedVal = typeof value === 'string' ? value.trim() : value;
+    const isDriverRole = userRole === UserRole.DRIVER;
+
+    switch (name) {
+      case 'fullName':
+        if (!trimmedVal) return 'Full name is required';
+        if (trimmedVal.length < 2) return 'Name must be at least 2 characters';
+        return '';
+
+      case 'email':
+        if (!trimmedVal) return 'Email is required';
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmedVal)) return 'Enter a valid email address';
+        return '';
+
+      case 'phone':
+        const digits = filterDigits(value);
+        if (!digits) return 'Phone number is required';
+        if (digits.length !== 11) return 'Phone number must be exactly 11 digits';
+        return '';
+
+      case 'password':
+        if (!value) return 'Password is required';
+        if (value.length < 6) return 'Password must be at least 6 characters';
+        return '';
+
+      case 'age':
+        if (!value) return 'Age is required';
+        const ageNum = parseInt(value, 10);
+        if (isNaN(ageNum) || ageNum < 18) return 'You must be at least 18 years old';
+        return '';
+
+      case 'address':
+        if (!trimmedVal) return 'Home address is required';
+        return '';
+
+      // Driver Specific
+      case 'nin':
+        if (isDriverRole) {
+          const ninDigits = filterDigits(value);
+          if (!ninDigits) return 'NIN is required';
+          if (ninDigits.length !== 11) return 'NIN must be exactly 11 digits';
+        }
+        return '';
+
+      case 'bankCode':
+        if (isDriverRole && !value) return 'Please select your bank';
+        return '';
+
+      case 'accountNumber':
+        if (isDriverRole) {
+          const accDigits = filterDigits(value);
+          if (!accDigits) return 'Account number is required';
+          if (accDigits.length !== 10) return 'Account number must be 10 digits';
+        }
+        return '';
+
+      case 'accountName':
+        if (isDriverRole && !trimmedVal) return 'Account name is required';
+        return '';
+
+      // Owner Specific
+      case 'nationality':
+        if (!isDriverRole && !trimmedVal) return 'Nationality is required';
+        return '';
+
+      case 'gender':
+        if (!isDriverRole && !value) return 'Gender is required';
+        return '';
+
+      case 'carType':
+        if (!isDriverRole && !trimmedVal) return 'Car type is required';
+        return '';
+
+      case 'carModel':
+        if (!isDriverRole && !trimmedVal) return 'Car model is required';
+        return '';
+
+      case 'carYear':
+        if (!isDriverRole) {
+          const yearDigits = filterDigits(value);
+          if (!yearDigits) return 'Car year is required';
+          if (yearDigits.length !== 4) return 'Enter a 4-digit year';
+          const yearNum = parseInt(yearDigits, 10);
+          const currentYear = new Date().getFullYear();
+          if (yearNum < 1990 || yearNum > currentYear + 1) {
+            return `Year must be between 1990 and ${currentYear + 1}`;
+          }
+        }
+        return '';
+
+      case 'transmission':
+        if (!value) return 'Transmission type is required';
+        return '';
+
+      default:
+        return '';
+    }
+  };
+
+  const handleBlur = (name: string, value: any) => {
+    setTouched(prev => ({ ...prev, [name]: true }));
+    const error = validateField(name, value, formData, bankFormData, role);
+    setErrors(prev => ({ ...prev, [name]: error }));
+  };
+
+  const scrollToFirstError = (allErrors: Record<string, string>) => {
+    const firstErrorField = Object.keys(allErrors).find(key => allErrors[key]);
+    if (firstErrorField && fieldRefs.current[firstErrorField]) {
+      fieldRefs.current[firstErrorField]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
 
   useEffect(() => {
     if (isDriver) {
@@ -72,56 +204,90 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
-    if (!formData.fullName || !formData.email || !formData.phone || !formData.password) {
-      alert("Please fill in all required fields.");
-      return;
-    }
+    const newErrors: Record<string, string> = {};
+    const commonFields = ['fullName', 'email', 'phone', 'password', 'age', 'address'];
+    const driverFields = ['nin', 'bankCode', 'accountNumber', 'accountName'];
+    const ownerFields = ['nationality', 'gender', 'carType', 'carModel', 'carYear'];
+
+    // 1. Validate common fields
+    commonFields.forEach(field => {
+      const error = validateField(field, (formData as any)[field], formData, bankFormData, role);
+      if (error) newErrors[field] = error;
+    });
+
+    // 2. Validate role specific fields
     if (isDriver) {
-      if (!formData.licenseImage || !formData.selfieImage || !formData.ninImage || !formData.backgroundCheckAccepted) {
-        alert("Please complete all driver requirements including Driver License, Selfie, NIN image, and background check consent.");
+      driverFields.forEach(field => {
+        const value = field.startsWith('bank') || field === 'accountNumber' || field === 'accountName'
+          ? (bankFormData as any)[field]
+          : (formData as any)[field];
+        const error = validateField(field, value, formData, bankFormData, role);
+        if (error) newErrors[field] = error;
+      });
+
+      // Special checks for images and consent
+      if (!formData.licenseImage || !formData.selfieImage || !formData.ninImage) {
+        toast.warning("Please upload all required driver documents.");
         return;
       }
-      if (!formData.nin || !formData.address || !formData.age) {
-        alert("Please fill in all personal details including Address, Age and NIN.");
-        return;
-      }
-      if (!bankFormData.bankCode || !bankFormData.accountNumber || !bankFormData.accountName) {
-        alert("Please provide your bank details.");
+      if (!formData.backgroundCheckAccepted) {
+        toast.warning("You must consent to the background check to register as a driver.");
         return;
       }
     } else {
-      if (!formData.carType || !formData.carModel || !formData.carYear || !formData.address || !formData.nationality || !formData.age || !formData.gender) {
-        alert("Please complete all profile details including Address, Nationality, Age, Gender, Car Type, Car Model and Car Year.");
-        return;
-      }
+      ownerFields.forEach(field => {
+        const error = validateField(field, (formData as any)[field], formData, bankFormData, role);
+        if (error) newErrors[field] = error;
+      });
     }
 
+    if (Object.values(newErrors).some(err => err)) {
+      setErrors(newErrors);
+      setTouched(Object.keys(newErrors).reduce((acc, key) => ({ ...acc, [key]: true }), {}));
+      scrollToFirstError(newErrors);
+      toast.error("Please fix the errors in the form before submitting.");
+      return;
+    }
+
+    // Submit with trimmed data
+    const trimmedFormData = {
+      ...formData,
+      fullName: formData.fullName.trim(),
+      email: formData.email.trim(),
+      address: formData.address.trim(),
+      nationality: formData.nationality.trim(),
+      carType: formData.carType.trim(),
+      carModel: formData.carModel.trim(),
+    };
+
+    const trimmedBankData = {
+      ...bankFormData,
+      accountName: bankFormData.accountName.trim(),
+    };
 
     onSignUp({
-      name: formData.fullName,
-      email: formData.email,
-      phone: formData.phone,
-      password: formData.password,
-      carType: formData.carType,
-      carModel: formData.carModel,
-      carYear: formData.carYear,
-      licenseImage: formData.licenseImage,
-      selfieImage: formData.selfieImage,
-      backgroundCheckAccepted: formData.backgroundCheckAccepted,
-      avatar: formData.selfieImage, // Use selfie as avatar for drivers
-      // New Fields
-      gender: formData.gender,
-      address: formData.address,
-      nationality: formData.nationality,
-      age: formData.age,
-      nin: formData.nin,
-      ninImage: formData.ninImage,
-      bankName: bankFormData.bankName,
-      bankCode: bankFormData.bankCode,
-      accountNumber: bankFormData.accountNumber,
-      accountName: bankFormData.accountName,
-      transmission: formData.transmission
+      name: trimmedFormData.fullName,
+      email: trimmedFormData.email,
+      phone: trimmedFormData.phone,
+      password: trimmedFormData.password,
+      carType: trimmedFormData.carType,
+      carModel: trimmedFormData.carModel,
+      carYear: trimmedFormData.carYear,
+      licenseImage: trimmedFormData.licenseImage,
+      selfieImage: trimmedFormData.selfieImage,
+      backgroundCheckAccepted: trimmedFormData.backgroundCheckAccepted,
+      avatar: trimmedFormData.selfieImage,
+      gender: trimmedFormData.gender,
+      address: trimmedFormData.address,
+      nationality: trimmedFormData.nationality,
+      age: trimmedFormData.age,
+      nin: trimmedFormData.nin,
+      ninImage: trimmedFormData.ninImage,
+      bankName: trimmedBankData.bankName,
+      bankCode: trimmedBankData.bankCode,
+      accountNumber: trimmedBankData.accountNumber,
+      accountName: trimmedBankData.accountName,
+      transmission: trimmedFormData.transmission
     });
   };
 
@@ -154,49 +320,66 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5 w-full">
           {/* Common Fields */}
-          <div className="flex flex-col gap-1.5 animate-slide-up stagger-1 opacity-0" style={{ animationFillMode: 'forwards' }}>
+          <div ref={el => fieldRefs.current['fullName'] = el} className="flex flex-col gap-1.5 animate-slide-up stagger-1 opacity-0" style={{ animationFillMode: 'forwards' }}>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Full Name</label>
-            <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-              <span className="material-symbols-outlined text-slate-400 mr-3">person</span>
+            <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.fullName && touched.fullName ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50'}`}>
+              <span className={`material-symbols-outlined mr-3 ${errors.fullName && touched.fullName ? 'text-red-400' : 'text-slate-400'}`}>person</span>
               <input
                 required
                 className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                 placeholder="Enter your full name"
                 type="text"
                 value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, fullName: e.target.value });
+                  if (errors.fullName) setErrors(prev => ({ ...prev, fullName: '' }));
+                }}
+                onBlur={(e) => handleBlur('fullName', e.target.value)}
               />
             </div>
+            {errors.fullName && touched.fullName && <p className="text-red-500 text-xs ml-1 font-medium select-none">{errors.fullName}</p>}
           </div>
 
-          <div className="flex flex-col gap-1.5 animate-slide-up stagger-1 opacity-0" style={{ animationFillMode: 'forwards' }}>
+          <div ref={el => fieldRefs.current['email'] = el} className="flex flex-col gap-1.5 animate-slide-up stagger-1 opacity-0" style={{ animationFillMode: 'forwards' }}>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Email Address</label>
-            <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-              <span className="material-symbols-outlined text-slate-400 mr-3">mail</span>
+            <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.email && touched.email ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50'}`}>
+              <span className={`material-symbols-outlined mr-3 ${errors.email && touched.email ? 'text-red-400' : 'text-slate-400'}`}>mail</span>
               <input
                 required
                 className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                 placeholder="email@example.com"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, email: e.target.value });
+                  if (errors.email) setErrors(prev => ({ ...prev, email: '' }));
+                }}
+                onBlur={(e) => handleBlur('email', e.target.value)}
               />
             </div>
+            {errors.email && touched.email && <p className="text-red-500 text-xs ml-1 font-medium select-none">{errors.email}</p>}
           </div>
 
-          <div className="flex flex-col gap-1.5 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
+          <div ref={el => fieldRefs.current['phone'] = el} className="flex flex-col gap-1.5 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Phone Number</label>
-            <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-              <span className="material-symbols-outlined text-slate-400 mr-3">phone_iphone</span>
+            <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.phone && touched.phone ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50'}`}>
+              <span className={`material-symbols-outlined mr-3 ${errors.phone && touched.phone ? 'text-red-400' : 'text-slate-400'}`}>phone_iphone</span>
               <input
                 required
                 className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
-                placeholder="+234 000 000 0000"
-                type="tel"
+                placeholder="0000 000 0000"
+                type="text"
+                inputMode="numeric"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) => {
+                  const filtered = filterDigits(e.target.value).slice(0, 11);
+                  setFormData({ ...formData, phone: filtered });
+                  if (errors.phone) setErrors(prev => ({ ...prev, phone: '' }));
+                }}
+                onBlur={(e) => handleBlur('phone', e.target.value)}
               />
             </div>
+            {errors.phone && touched.phone && <p className="text-red-500 text-xs ml-1 font-medium select-none">{errors.phone}</p>}
           </div>
 
           {/* Role Specific Fields */}
@@ -204,14 +387,18 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
             // OWNER FIELDS
             <>
               <div className="grid grid-cols-2 gap-4 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
-                <div className="flex flex-col gap-1.5">
+                <div ref={el => fieldRefs.current['gender'] = el} className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Gender</label>
-                  <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-3 h-14 border border-slate-200 dark:border-slate-800">
+                  <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-3 h-14 border transition-all ${errors.gender && touched.gender ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800'}`}>
                     <select
                       required
                       className="bg-transparent border-none text-slate-900 dark:text-white text-base font-medium w-full focus:ring-0 p-0"
                       value={formData.gender}
-                      onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, gender: e.target.value });
+                        if (errors.gender) setErrors(prev => ({ ...prev, gender: '' }));
+                      }}
+                      onBlur={(e) => handleBlur('gender', e.target.value)}
                     >
                       <option value="" disabled className="dark:bg-surface-dark">Select</option>
                       <option value="Male" className="dark:bg-surface-dark">Male</option>
@@ -219,107 +406,149 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
                       <option value="Prefer not to say" className="dark:bg-surface-dark">Other</option>
                     </select>
                   </div>
+                  {errors.gender && touched.gender && <p className="text-red-500 text-[10px] ml-1 font-medium">{errors.gender}</p>}
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div ref={el => fieldRefs.current['age'] = el} className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Age</label>
-                  <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800">
+                  <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.age && touched.age ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800'}`}>
                     <input
                       required
                       className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                       placeholder="e.g. 35"
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={formData.age}
-                      onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                      onChange={(e) => {
+                        const filtered = filterDigits(e.target.value).slice(0, 3);
+                        setFormData({ ...formData, age: filtered });
+                        if (errors.age) setErrors(prev => ({ ...prev, age: '' }));
+                      }}
+                      onBlur={(e) => handleBlur('age', e.target.value)}
                     />
                   </div>
+                  {errors.age && touched.age && <p className="text-red-500 text-[10px] ml-1 font-medium">{errors.age}</p>}
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
+              <div ref={el => fieldRefs.current['nationality'] = el} className="flex flex-col gap-1.5 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Nationality</label>
-                <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-                  <span className="material-symbols-outlined text-slate-400 mr-3">flag</span>
+                <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.nationality && touched.nationality ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50'}`}>
+                  <span className={`material-symbols-outlined mr-3 ${errors.nationality && touched.nationality ? 'text-red-400' : 'text-slate-400'}`}>flag</span>
                   <input
                     required
                     className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                     placeholder="e.g. Nigerian"
                     type="text"
                     value={formData.nationality}
-                    onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, nationality: e.target.value });
+                      if (errors.nationality) setErrors(prev => ({ ...prev, nationality: '' }));
+                    }}
+                    onBlur={(e) => handleBlur('nationality', e.target.value)}
                   />
                 </div>
+                {errors.nationality && touched.nationality && <p className="text-red-500 text-xs ml-1 font-medium">{errors.nationality}</p>}
               </div>
 
-              <div className="flex flex-col gap-1.5 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
+              <div ref={el => fieldRefs.current['address'] = el} className="flex flex-col gap-1.5 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Address</label>
-                <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-                  <span className="material-symbols-outlined text-slate-400 mr-3">home</span>
+                <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.address && touched.address ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50'}`}>
+                  <span className={`material-symbols-outlined mr-3 ${errors.address && touched.address ? 'text-red-400' : 'text-slate-400'}`}>home</span>
                   <input
                     required
                     className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                     placeholder="e.g. 123 Victoria Island"
                     type="text"
                     value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, address: e.target.value });
+                      if (errors.address) setErrors(prev => ({ ...prev, address: '' }));
+                    }}
+                    onBlur={(e) => handleBlur('address', e.target.value)}
                   />
                 </div>
+                {errors.address && touched.address && <p className="text-red-500 text-xs ml-1 font-medium">{errors.address}</p>}
               </div>
 
-              <div className="flex flex-col gap-1.5 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
+              <div ref={el => fieldRefs.current['carType'] = el} className="flex flex-col gap-1.5 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Type of Car</label>
-                <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-                  <span className="material-symbols-outlined text-slate-400 mr-3">directions_car</span>
+                <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.carType && touched.carType ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50'}`}>
+                  <span className={`material-symbols-outlined mr-3 ${errors.carType && touched.carType ? 'text-red-400' : 'text-slate-400'}`}>directions_car</span>
                   <input
                     required
                     className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                     placeholder="e.g. Mercedes S-Class, BMW 7 Series"
                     type="text"
                     value={formData.carType}
-                    onChange={(e) => setFormData({ ...formData, carType: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, carType: e.target.value });
+                      if (errors.carType) setErrors(prev => ({ ...prev, carType: '' }));
+                    }}
+                    onBlur={(e) => handleBlur('carType', e.target.value)}
                   />
                 </div>
+                {errors.carType && touched.carType && <p className="text-red-500 text-xs ml-1 font-medium">{errors.carType}</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
+                <div ref={el => fieldRefs.current['carModel'] = el} className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Model</label>
-                  <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary transition-all">
+                  <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.carModel && touched.carModel ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary'}`}>
                     <input
+                      required
                       className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                       placeholder="e.g. Camry, S-Class"
                       type="text"
                       value={formData.carModel || ''}
-                      onChange={(e) => setFormData({ ...formData, carModel: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, carModel: e.target.value });
+                        if (errors.carModel) setErrors(prev => ({ ...prev, carModel: '' }));
+                      }}
+                      onBlur={(e) => handleBlur('carModel', e.target.value)}
                     />
                   </div>
+                  {errors.carModel && touched.carModel && <p className="text-red-500 text-[10px] ml-1 font-medium">{errors.carModel}</p>}
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div ref={el => fieldRefs.current['carYear'] = el} className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Year</label>
-                  <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary transition-all">
+                  <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.carYear && touched.carYear ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary'}`}>
                     <input
+                      required
                       className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                       placeholder="e.g. 2022"
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={formData.carYear || ''}
-                      onChange={(e) => setFormData({ ...formData, carYear: e.target.value })}
+                      onChange={(e) => {
+                        const filtered = filterDigits(e.target.value).slice(0, 4);
+                        setFormData({ ...formData, carYear: filtered });
+                        if (errors.carYear) setErrors(prev => ({ ...prev, carYear: '' }));
+                      }}
+                      onBlur={(e) => handleBlur('carYear', e.target.value)}
                     />
                   </div>
+                  {errors.carYear && touched.carYear && <p className="text-red-500 text-[10px] ml-1 font-medium">{errors.carYear}</p>}
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5">
+              <div ref={el => fieldRefs.current['transmission'] = el} className="flex flex-col gap-1.5 mb-4">
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Transmission</label>
-                <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-3 h-14 border border-slate-200 dark:border-slate-800">
+                <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-3 h-14 border transition-all ${errors.transmission && touched.transmission ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800'}`}>
                   <select
                     required
                     className="bg-transparent border-none text-slate-900 dark:text-white text-base font-medium w-full focus:ring-0 p-0"
                     value={formData.transmission}
-                    onChange={(e) => setFormData({ ...formData, transmission: e.target.value as any })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, transmission: e.target.value as any });
+                      if (errors.transmission) setErrors(prev => ({ ...prev, transmission: '' }));
+                    }}
+                    onBlur={(e) => handleBlur('transmission', e.target.value)}
                   >
                     <option value="Automatic" className="dark:bg-surface-dark">Automatic</option>
                     <option value="Manual" className="dark:bg-surface-dark">Manual</option>
                   </select>
                 </div>
+                {errors.transmission && touched.transmission && <p className="text-red-500 text-xs ml-1 font-medium">{errors.transmission}</p>}
               </div>
 
             </>
@@ -327,73 +556,97 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
             // DRIVER FIELDS
             <>
               <div className="grid grid-cols-2 gap-4 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
-                <div className="flex flex-col gap-1.5">
+                <div ref={el => fieldRefs.current['age'] = el} className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Age</label>
-                  <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800">
+                  <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.age && touched.age ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800'}`}>
                     <input
                       required
                       className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                       placeholder="Age"
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={formData.age}
-                      onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                      onChange={(e) => {
+                        const filtered = filterDigits(e.target.value).slice(0, 3);
+                        setFormData({ ...formData, age: filtered });
+                        if (errors.age) setErrors(prev => ({ ...prev, age: '' }));
+                      }}
+                      onBlur={(e) => handleBlur('age', e.target.value)}
                     />
                   </div>
+                  {errors.age && touched.age && <p className="text-red-500 text-[10px] ml-1 font-medium">{errors.age}</p>}
                 </div>
-                <div className="flex flex-col gap-1.5">
+                <div ref={el => fieldRefs.current['transmission'] = el} className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Transmission</label>
-                  <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-3 h-14 border border-slate-200 dark:border-slate-800">
+                  <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-3 h-14 border transition-all ${errors.transmission && touched.transmission ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800'}`}>
                     <select
                       required
                       className="bg-transparent border-none text-slate-900 dark:text-white text-base font-medium w-full focus:ring-0 p-0"
                       value={formData.transmission}
-                      onChange={(e) => setFormData({ ...formData, transmission: e.target.value as any })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, transmission: e.target.value as any });
+                        if (errors.transmission) setErrors(prev => ({ ...prev, transmission: '' }));
+                      }}
+                      onBlur={(e) => handleBlur('transmission', e.target.value)}
                     >
                       <option value="Manual" className="dark:bg-surface-dark">Manual</option>
                       <option value="Automatic" className="dark:bg-surface-dark">Automatic</option>
                       <option value="Both" className="dark:bg-surface-dark">Both</option>
                     </select>
                   </div>
+                  {errors.transmission && touched.transmission && <p className="text-red-500 text-[10px] ml-1 font-medium">{errors.transmission}</p>}
                 </div>
               </div>
 
-              <div className="flex flex-col gap-1.5 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
+              <div ref={el => fieldRefs.current['address'] = el} className="flex flex-col gap-1.5 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Home Address</label>
-                <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-                  <span className="material-symbols-outlined text-slate-400 mr-3">home_pin</span>
+                <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.address && touched.address ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50'}`}>
+                  <span className={`material-symbols-outlined mr-3 ${errors.address && touched.address ? 'text-red-400' : 'text-slate-400'}`}>home_pin</span>
                   <input
                     required
                     className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                     placeholder="e.g. 10 Admiralty Way"
                     type="text"
                     value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, address: e.target.value });
+                      if (errors.address) setErrors(prev => ({ ...prev, address: '' }));
+                    }}
+                    onBlur={(e) => handleBlur('address', e.target.value)}
                   />
                 </div>
+                {errors.address && touched.address && <p className="text-red-500 text-xs ml-1 font-medium">{errors.address}</p>}
               </div>
 
-              <div className="flex flex-col gap-1.5 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
+              <div ref={el => fieldRefs.current['nin'] = el} className="flex flex-col gap-1.5 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
                 <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">NIN Number</label>
-                <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-                  <span className="material-symbols-outlined text-slate-400 mr-3">fingerprint</span>
+                <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.nin && touched.nin ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50'}`}>
+                  <span className={`material-symbols-outlined mr-3 ${errors.nin && touched.nin ? 'text-red-400' : 'text-slate-400'}`}>fingerprint</span>
                   <input
                     required
                     className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                     placeholder="National Identity Number"
                     type="text"
+                    inputMode="numeric"
                     value={formData.nin}
-                    onChange={(e) => setFormData({ ...formData, nin: e.target.value })}
+                    onChange={(e) => {
+                      const filtered = filterDigits(e.target.value).slice(0, 11);
+                      setFormData({ ...formData, nin: filtered });
+                      if (errors.nin) setErrors(prev => ({ ...prev, nin: '' }));
+                    }}
+                    onBlur={(e) => handleBlur('nin', e.target.value)}
                   />
                 </div>
+                {errors.nin && touched.nin && <p className="text-red-500 text-xs ml-1 font-medium">{errors.nin}</p>}
               </div>
 
               {/* Bank Details — Driver Only */}
               <div className="flex flex-col gap-4 animate-slide-up stagger-2 opacity-0" style={{ animationFillMode: 'forwards' }}>
                 <p className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">Bank Details</p>
 
-                <div className="flex flex-col gap-1.5">
+                <div ref={el => fieldRefs.current['bankCode'] = el} className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Bank</label>
-                  <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-3 h-14 border border-slate-200 dark:border-slate-800">
+                  <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-3 h-14 border transition-all ${errors.bankCode && touched.bankCode ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800'}`}>
                     <select
                       required
                       className="bg-transparent border-none text-slate-900 dark:text-white text-base font-medium w-full focus:ring-0 p-0"
@@ -405,7 +658,9 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
                           bankCode: e.target.value,
                           bankName: bank?.name || '',
                         }));
+                        if (errors.bankCode) setErrors(prev => ({ ...prev, bankCode: '' }));
                       }}
+                      onBlur={(e) => handleBlur('bankCode', e.target.value)}
                     >
                       <option value="" disabled className="dark:bg-surface-dark">Select your bank</option>
                       {banks.map(bank => (
@@ -415,37 +670,49 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
                       ))}
                     </select>
                   </div>
+                  {errors.bankCode && touched.bankCode && <p className="text-red-500 text-xs ml-1 font-medium">{errors.bankCode}</p>}
                 </div>
 
-                <div className="flex flex-col gap-1.5">
+                <div ref={el => fieldRefs.current['accountNumber'] = el} className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Account Number</label>
-                  <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-                    <span className="material-symbols-outlined text-slate-400 mr-3">account_balance</span>
+                  <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.accountNumber && touched.accountNumber ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50'}`}>
+                    <span className={`material-symbols-outlined mr-3 ${errors.accountNumber && touched.accountNumber ? 'text-red-400' : 'text-slate-400'}`}>account_balance</span>
                     <input
                       required
-                      maxLength={10}
                       className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                       placeholder="10-digit account number"
                       type="text"
+                      inputMode="numeric"
                       value={bankFormData.accountNumber}
-                      onChange={(e) => setBankFormData(prev => ({ ...prev, accountNumber: e.target.value }))}
+                      onChange={(e) => {
+                        const filtered = filterDigits(e.target.value).slice(0, 10);
+                        setBankFormData(prev => ({ ...prev, accountNumber: filtered }));
+                        if (errors.accountNumber) setErrors(prev => ({ ...prev, accountNumber: '' }));
+                      }}
+                      onBlur={(e) => handleBlur('accountNumber', e.target.value)}
                     />
                   </div>
+                  {errors.accountNumber && touched.accountNumber && <p className="text-red-500 text-xs ml-1 font-medium">{errors.accountNumber}</p>}
                 </div>
 
-                <div className="flex flex-col gap-1.5">
+                <div ref={el => fieldRefs.current['accountName'] = el} className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Account Name</label>
-                  <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-                    <span className="material-symbols-outlined text-slate-400 mr-3">person</span>
+                  <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.accountName && touched.accountName ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50'}`}>
+                    <span className={`material-symbols-outlined mr-3 ${errors.accountName && touched.accountName ? 'text-red-400' : 'text-slate-400'}`}>person</span>
                     <input
                       required
                       className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                       placeholder="Name on your bank account"
                       type="text"
                       value={bankFormData.accountName}
-                      onChange={(e) => setBankFormData(prev => ({ ...prev, accountName: e.target.value }))}
+                      onChange={(e) => {
+                        setBankFormData(prev => ({ ...prev, accountName: e.target.value }));
+                        if (errors.accountName) setErrors(prev => ({ ...prev, accountName: '' }));
+                      }}
+                      onBlur={(e) => handleBlur('accountName', e.target.value)}
                     />
                   </div>
+                  {errors.accountName && touched.accountName && <p className="text-red-500 text-xs ml-1 font-medium">{errors.accountName}</p>}
                 </div>
               </div>
 
@@ -544,17 +811,21 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
             </>
           )}
 
-          <div className="flex flex-col gap-1.5 animate-slide-up stagger-3 opacity-0" style={{ animationFillMode: 'forwards' }}>
+          <div ref={el => fieldRefs.current['password'] = el} className="flex flex-col gap-1.5 animate-slide-up stagger-3 opacity-0" style={{ animationFillMode: 'forwards' }}>
             <label className="text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1">Password</label>
-            <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50 transition-all">
-              <span className="material-symbols-outlined text-slate-400 mr-3">lock</span>
+            <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${errors.password && touched.password ? 'border-red-500 ring-1 ring-red-500/20' : 'border-slate-200 dark:border-slate-800 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/50'}`}>
+              <span className={`material-symbols-outlined mr-3 ${errors.password && touched.password ? 'text-red-400' : 'text-slate-400'}`}>lock</span>
               <input
                 required
                 className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                 placeholder="Create a password"
                 type={showPassword ? "text" : "password"}
                 value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, password: e.target.value });
+                  if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+                }}
+                onBlur={(e) => handleBlur('password', e.target.value)}
               />
               <button
                 type="button"
@@ -566,6 +837,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
                 </span>
               </button>
             </div>
+            {errors.password && touched.password && <p className="text-red-500 text-xs ml-1 font-medium">{errors.password}</p>}
           </div>
 
           <button

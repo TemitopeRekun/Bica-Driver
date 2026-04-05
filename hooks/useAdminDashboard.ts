@@ -14,6 +14,7 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
   const [adminPaymentHistory, setAdminPaymentHistory] = useState<PaymentHistoryRecord[]>([]);
   const [adminDashboardLoading, setAdminDashboardLoading] = useState(false);
   const [adminDashboardError, setAdminDashboardError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const onSettingsLoadedRef = useRef(options.onSettingsLoaded);
 
   useEffect(() => {
@@ -40,6 +41,7 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
       setAdminPendingPayments(pendingPayments.map(mapPendingPaymentTrip));
       setAdminPaymentHistory(paymentHistory.map(mapPaymentHistory));
       onSettingsLoadedRef.current?.(dashboard.settings);
+      setLastUpdated(new Date());
     } catch (error: any) {
       setAdminDashboardError(error.message || 'Could not load admin dashboard.');
       throw error;
@@ -55,6 +57,7 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
     adminPaymentHistory,
     adminDashboardLoading,
     adminDashboardError,
+    lastUpdated,
     setAdminDashboardError,
     loadAdminDashboard,
   };

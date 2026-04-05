@@ -24,3 +24,12 @@ View your app in AI Studio: https://ai.studio/apps/73d9c49c-1ad4-42fe-9255-8c190
 The Vite dev server now defaults to `http://localhost:5173` to avoid clashing with backend services that commonly use port `3000`.
 
 Local development can still fall back to `http://localhost:3001` when `VITE_API_URL` is omitted, but deployed builds should always set `VITE_API_URL` explicitly.
+<<<<<<< HEAD
+=======
+
+## CORS Note
+
+If your frontend origin is not `http://localhost:3000` or `http://localhost:5173`, your backend `CORS_ORIGINS` must include the exact frontend origin.
+
+When testing with ngrok, include the active ngrok frontend URL in `CORS_ORIGINS` and update it whenever the ngrok link changes.
+>>>>>>> main

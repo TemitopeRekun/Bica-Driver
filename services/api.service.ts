@@ -1,4 +1,11 @@
 import { requireApiUrl } from './Config';
+<<<<<<< HEAD
+=======
+
+interface RequestOptions {
+  signal?: AbortSignal;
+}
+>>>>>>> main
 
 // Get token from localStorage
 const getToken = (): string | null => {
@@ -21,9 +28,16 @@ async function request<T>(
   path: string,
   body?: any,
   requiresAuth = true,
+  options?: RequestOptions,
 ): Promise<T> {
   const baseUrl = requireApiUrl();
+<<<<<<< HEAD
   const headers: Record<string, string> = {};
+=======
+  const headers: Record<string, string> = {
+    'ngrok-skip-browser-warning': 'true',
+  };
+>>>>>>> main
   // Only declare JSON content-type when sending a body — NestJS/Fastify rejects
   // requests that have Content-Type: application/json but an empty body.
   if (body !== undefined) {
@@ -41,6 +55,7 @@ async function request<T>(
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    signal: options?.signal,
   });
 
   const rawBody = await response.text();
@@ -70,15 +85,20 @@ async function request<T>(
 
 // Convenience methods
 export const api = {
-  get: <T>(path: string, requiresAuth = true) =>
-    request<T>('GET', path, undefined, requiresAuth),
+  get: <T>(path: string, requiresAuth = true, options?: RequestOptions) =>
+    request<T>('GET', path, undefined, requiresAuth, options),
 
-  post: <T>(path: string, body?: any, requiresAuth = true) =>
-    request<T>('POST', path, body, requiresAuth),
+  post: <T>(path: string, body?: any, requiresAuth = true, options?: RequestOptions) =>
+    request<T>('POST', path, body, requiresAuth, options),
 
-  patch: <T>(path: string, body?: any, requiresAuth = true) =>
-    request<T>('PATCH', path, body, requiresAuth),
+  patch: <T>(path: string, body?: any, requiresAuth = true, options?: RequestOptions) =>
+    request<T>('PATCH', path, body, requiresAuth, options),
 
+<<<<<<< HEAD
   delete: <T>(path: string, requiresAuth = true) =>
     request<T>('DELETE', path, undefined, requiresAuth),
+=======
+  delete: <T>(path: string, requiresAuth = true, options?: RequestOptions) =>
+    request<T>('DELETE', path, undefined, requiresAuth, options),
+>>>>>>> main
 };

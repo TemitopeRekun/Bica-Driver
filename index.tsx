@@ -4,6 +4,8 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { defineCustomElements } from '@ionic/pwa-elements/loader';
 
+import { ToastProvider } from './components/Toast/ToastProvider';
+
 // Initialize PWA Elements
 defineCustomElements(window);
 
@@ -15,6 +17,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <ToastProvider>
+      <App />
+    </ToastProvider>
   </React.StrictMode>
 );

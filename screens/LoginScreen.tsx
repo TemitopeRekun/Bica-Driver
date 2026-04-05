@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useToast } from '../hooks/useToast';
 
 interface LoginScreenProps {
   onLogin: (email: string, password: string) => void;
@@ -8,6 +9,7 @@ interface LoginScreenProps {
 }
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack, onGoToSignUp }) => {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -69,7 +71,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, onBack, onGoToSignUp
               <button 
                 type="button"
                 className="text-primary text-xs font-bold hover:underline"
-                onClick={() => alert("Forgot password functionality coming soon.")}
+                onClick={() => toast.info("Forgot password functionality coming soon.")}
               >
                 Forgot Password?
               </button>

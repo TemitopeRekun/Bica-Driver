@@ -22,6 +22,18 @@ import {
 import { api } from '@/services/api.service';
 import { useOwnerRealtime } from '../hooks/useOwnerRealtime';
 import { useOwnerLocationSearch } from '../hooks/useOwnerLocationSearch';
+import { DISCOVERY_CATEGORIES } from '../constants';
+import { useToast } from '../hooks/useToast';
+
+// Refactored Components
+import RideStoryTimeline from '../components/RequestRide/RideStoryTimeline';
+import CountUpTimer from '../components/RequestRide/CountUpTimer';
+import LocationSearchModal from '../components/RequestRide/LocationSearchModal';
+import DriverPickerModal from '../components/RequestRide/DriverPickerModal';
+import VehicleDetailsModal from '../components/RequestRide/VehicleDetailsModal';
+import TripPaymentSummary from '../components/RequestRide/TripPaymentSummary';
+import DriverStatusCard from '../components/RequestRide/DriverStatusCard';
+
 
 interface RequestRideScreenProps {
   onOpenProfile: () => void;
@@ -34,12 +46,11 @@ interface RequestRideScreenProps {
 
 type RideState = 'IDLE' | 'SEARCHING' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'SCHEDULED';
 
-const DISCOVERY_CATEGORIES = [
-  { label: 'Airports', icon: 'flight_takeoff', type: 'Airport' },
-  { label: 'Hotels', icon: 'hotel', type: 'Hotel' },
-  { label: 'Dining', icon: 'restaurant', type: 'Commercial' },
-  { label: 'Malls', icon: 'shopping_cart', type: 'Shopping' }
-];
+
+// RideStoryTimeline extracted
+
+
+// DISCOVERY_CATEGORIES moved to constants.tsx
 
 
 
@@ -53,6 +64,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   currentUser,
   allUsers
 }) => {
+  const { toast } = useToast();
   const [rideState, setRideState] = useState<RideState>('IDLE');
   const [currentTripId, setCurrentTripId] = useState<string | null>(null);
   // Booking Type State
@@ -100,6 +112,14 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const [driverInfo, setDriverInfo] = useState<any>(null);
   const [trackedDriverPos, setTrackedDriverPos] = useState<[number, number] | null>(null);
   const [noDriversFound, setNoDriversFound] = useState(false);
+<<<<<<< HEAD
+=======
+
+  // OWNER RIDE STORY STATE
+  const [rideMilestone, setRideMilestone] = useState<'requested' | 'assigned' | 'arrived' | 'in_progress' | 'completed'>('requested');
+  const [lastMilestoneUpdate, setLastMilestoneUpdate] = useState<string>(new Date().toISOString());
+
+>>>>>>> main
   const timerRefs = useRef<any[]>([]);
   const {
     pickup,
@@ -133,6 +153,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     onPickupChanged: () => setNoDriversFound(false),
   });
 
+<<<<<<< HEAD
   const CountUpTimer: React.FC = () => {
     const [elapsed, setElapsed] = React.useState(0);
 
@@ -156,6 +177,9 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       </div>
     );
   };
+=======
+  // CountUpTimer extracted
+>>>>>>> main
 
   const buildLocationFromTrip = (
     id: string,
@@ -245,18 +269,28 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     switch (trip.status) {
       case 'PENDING_ACCEPTANCE':
         setRideState('SEARCHING');
+        setRideMilestone('requested');
+        setLastMilestoneUpdate(trip.updatedAt || new Date().toISOString());
         break;
       case 'ASSIGNED':
         setRideState('ASSIGNED');
+        setRideMilestone('assigned');
+        setLastMilestoneUpdate(trip.updatedAt || new Date().toISOString());
         break;
       case 'IN_PROGRESS':
         setRideState('IN_PROGRESS');
+        setRideMilestone('in_progress');
+        setLastMilestoneUpdate(trip.updatedAt || new Date().toISOString());
         break;
       case 'COMPLETED':
         setRideState('COMPLETED');
+        setRideMilestone('completed');
+        setLastMilestoneUpdate(trip.completedAt || trip.updatedAt || new Date().toISOString());
         break;
       default:
         setRideState('IDLE');
+        setRideMilestone('requested');
+        setLastMilestoneUpdate(new Date().toISOString());
         break;
     }
   };
@@ -271,7 +305,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         window.open(payment.checkoutUrl, '_blank');
       }
     } catch (error: any) {
-      alert(error.message || 'Payment initiation failed. Please try again.');
+      toast.error(error.message || 'Payment initiation failed. Please try again.');
     } finally {
       setIsInitiatingPayment(false);
     }
@@ -305,6 +339,21 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   showDriverPickerRef.current = showDriverPicker;
   transmissionRef.current = vehicleData.transmission;
   refreshAvailableDriversRef.current = fetchAvailableDrivers;
+
+  useEffect(() => {
+    if (!pickup) {
+      setAvailableDrivers([]);
+      return;
+    }
+
+    if (rideState !== 'IDLE') return;
+
+    const timer = setTimeout(() => {
+      fetchAvailableDrivers().catch(() => {});
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [pickup?.lat, pickup?.lon, vehicleData.transmission, rideState]);
 
   useEffect(() => {
     setScheduleDate(new Date().toISOString().split('T')[0]);
@@ -354,9 +403,11 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         timeAway: estimatedArrivalMins || 5,
       }));
       setRideState('ASSIGNED');
+      setRideMilestone('assigned');
+      setLastMilestoneUpdate(new Date().toISOString());
     },
     onDriverDeclined: (data) => {
-      alert(data.message || 'Driver declined. Please choose another driver.');
+      toast.error(data.message || 'Driver declined. Please choose another driver.');
       setSelectedDriver(null);
       setDriverInfo(null);
       trackedDriverIdRef.current = null;
@@ -372,6 +423,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       setCurrentPaymentStatus('UNPAID');
       setPaymentStatusMessage('Please complete payment below.');
       setRideState('COMPLETED');
+      setRideMilestone('completed');
+      setLastMilestoneUpdate(new Date().toISOString());
     },
     onPaymentUpdated: (data) => {
       if (data.tripId !== currentTripId) return;
@@ -380,6 +433,19 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     },
     onLocationUpdated: (lat, lng) => {
       setTrackedDriverPos([lat, lng]);
+    },
+    onRideProgress: (payload) => {
+      // Map backend milestones to owner-facing steps
+      if (payload.milestone === 'assigned') setRideMilestone('assigned');
+      else if (payload.milestone === 'arrived') setRideMilestone('arrived');
+      else if (payload.milestone === 'inprogress') setRideMilestone('in_progress');
+      else if (payload.milestone === 'completed') setRideMilestone('completed');
+
+      if (payload.timestamp) {
+        setLastMilestoneUpdate(payload.timestamp);
+      } else {
+        setLastMilestoneUpdate(new Date().toISOString());
+      }
     },
   });
 
@@ -393,7 +459,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const handleConfirmRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!vehicleData.make || !vehicleData.model || !vehicleData.year) {
-      alert('Please fill in all vehicle details to proceed.');
+      toast.warning('Please fill in all vehicle details to proceed.');
       return;
     }
     setShowVehicleForm(false);
@@ -428,12 +494,14 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     const bookedDriver = driver || selectedDriver;
 
     if (!pickup || !destination || !bookedDriver) {
-      alert('Missing trip details. Please try again.');
+      toast.error('Missing trip details. Please try again.');
       setRideState('IDLE');
       return;
     }
 
     setRideState('SEARCHING');
+    setRideMilestone('requested');
+    setLastMilestoneUpdate(new Date().toISOString());
     setNoDriversFound(false);
     setCurrentPaymentStatus(null);
     setPaymentStatusMessage('');
@@ -454,7 +522,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
         transmission: vehicleData.transmission,
       });
-
       setCurrentTripId(trip.id);
       setDriverInfo({
         id: trip.driverId,
@@ -468,9 +535,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         tripId: trip.id,
       });
       setRideState('SEARCHING');
-
     } catch (error: any) {
-      alert(error.message || 'Could not book ride. Please try again.');
+      toast.error(error.message || 'Could not book ride. Please try again.');
       setRideState('IDLE');
       setNoDriversFound(true);
     }
@@ -529,7 +595,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     await CapacitorService.triggerHaptic();
     try {
       await navigator.clipboard.writeText(text);
-      alert(`${label} copied to clipboard!`);
+      toast.success(`${label} copied to clipboard!`);
     } catch (err) {
       console.error('Failed to copy', err);
     }
@@ -539,7 +605,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     CapacitorService.triggerHaptic();
     if (bookingType === 'schedule') {
       if (!scheduleDate || !scheduleTime) {
-        alert('Please select both date and time for your scheduled ride.');
+        toast.warning('Please select both date and time for your scheduled ride.');
         return;
       }
     }
@@ -576,6 +642,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
 
 
+<<<<<<< HEAD
   const renderSearchModal = (type: 'pickup' | 'dest') => (
     <div className="fixed inset-0 z-50 bg-background-light dark:bg-background-dark flex flex-col animate-slide-up">
       <div className="px-4 py-4 flex items-center gap-4 border-b border-slate-200 dark:border-slate-800">
@@ -685,6 +752,9 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       </div>
     </div>
   );
+=======
+  // renderSearchModal logic moved to LocationSearchModal component
+>>>>>>> main
 
   const markers: any[] = [];
   if (pickup) markers.push({ id: 'pickup', position: [pickup.lat, pickup.lon], title: 'Pickup', icon: 'pickup', draggable: true });
@@ -717,8 +787,34 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   return (
     <div className="h-screen w-full flex flex-col relative bg-background-light dark:bg-background-dark overflow-hidden">
       {/* Search Modals */}
-      {isSearchingPickup && renderSearchModal('pickup')}
-      {isSearchingDest && renderSearchModal('dest')}
+      {isSearchingPickup && (
+        <LocationSearchModal
+          type="pickup"
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          onClose={() => setIsSearchingPickup(false)}
+          onUseMyLocation={handleUseMyLocation}
+          isLocating={isLocating}
+          onCategoryTap={handleCategoryTap}
+          isSearching={isSearching}
+          searchResults={searchResults}
+          onSelectLocation={handleSelectLocation}
+          searchError={searchError}
+        />
+      )}
+      {isSearchingDest && (
+        <LocationSearchModal
+          type="dest"
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          onClose={() => setIsSearchingDest(false)}
+          onCategoryTap={handleCategoryTap}
+          isSearching={isSearching}
+          searchResults={searchResults}
+          onSelectLocation={handleSelectLocation}
+          searchError={searchError}
+        />
+      )}
 
       {/* Map Layer */}
       <div className="absolute inset-0 z-0">
@@ -971,19 +1067,39 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         )}
 
         {rideState === 'SEARCHING' && (
-          <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-slide-up">
-            <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-4 relative">
-              <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
-              {driverInfo?.avatar ? (
-                <img
-                  src={driverInfo.avatar}
-                  className="w-12 h-12 rounded-full object-cover"
-                  alt=""
-                />
-              ) : (
-                <span className="material-symbols-outlined text-primary text-3xl">person</span>
-              )}
+          <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-slide-up">
+            <RideStoryTimeline milestone={rideMilestone} lastUpdate={lastMilestoneUpdate} />
+            <div className="text-center py-4">
+              <div className="w-20 h-20 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-4 relative font-bold">
+                <div className="absolute inset-0 rounded-full border-4 border-primary border-t-transparent animate-spin"></div>
+                {driverInfo?.avatar ? (
+                  <img
+                    src={driverInfo.avatar}
+                    className="w-12 h-12 rounded-full object-cover"
+                    alt=""
+                  />
+                ) : (
+                  <span className="material-symbols-outlined text-primary text-3xl">person</span>
+                )}
+              </div>
+              <h3 className="text-xl font-bold mb-1">
+                Waiting for {driverInfo?.name ?? 'Driver'}
+              </h3>
+              <p className="text-slate-500 text-sm">
+                Request sent — waiting for driver to accept
+              </p>
+
+              {/* Count-up timer — no auto-cancel */}
+              <CountUpTimer />
+
+              <button
+                onClick={resetRide}
+                className="mt-6 text-slate-400 font-bold text-sm hover:text-slate-600"
+              >
+                Cancel Request
+              </button>
             </div>
+<<<<<<< HEAD
             <h3 className="text-xl font-bold mb-1">
               Waiting for {driverInfo?.name ?? 'Driver'}
             </h3>
@@ -1000,6 +1116,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
             >
               Cancel Request
             </button>
+=======
+>>>>>>> main
           </div>
         )}
 
@@ -1035,6 +1153,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
         {(rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS') && driverInfo && (
           <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-slide-up">
+            
+            <RideStoryTimeline milestone={rideMilestone} lastUpdate={lastMilestoneUpdate} />
             <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-3 w-3">
@@ -1042,11 +1162,11 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                 </span>
                 <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  {rideState === 'ASSIGNED' ? 'Driver Found!' : 'Trip in progress'}
+                  {rideMilestone === 'assigned' ? 'Your driver is on the way to your pickup' : rideMilestone === 'arrived' ? 'Your driver has arrived  head to your pickup point' : rideMilestone === 'in_progress' ? 'Trip in progress' : rideMilestone === 'completed' ? 'Trip completed  please complete your payment' : 'Waiting for a driver to accept your request'}
                 </span>
               </div>
               <span className="text-xs font-bold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-500">
-                {rideState === 'ASSIGNED' ? `${driverInfo.timeAway} mins away` : `Heading to Destination`}
+                {rideMilestone === 'assigned' ? driverInfo.timeAway + ' mins away' : rideMilestone === 'arrived' ? 'At pickup location' : rideMilestone === 'in_progress' ? 'Heading to Destination' : rideMilestone === 'completed' ? 'Arrived at destination' : ''}
               </span>
             </div>
 
@@ -1137,50 +1257,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
               </div>
             )}
 
-            {/* Fare breakdown — shown to owner too */}
             {currentTripFareBreakdown && (
-              <div className="bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Final Fare Breakdown</p>
-                </div>
-
-                <div className="px-4 py-3 space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 text-sm">Base fare</span>
-                    <span className="font-bold text-sm">
-                      NGN {(currentTripFareBreakdown.baseFare ?? settings.baseFare).toLocaleString()}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 text-sm">Distance charge</span>
-                    <span className="font-bold text-sm">
-                      NGN {(currentTripFareBreakdown.distanceComponent ?? 0).toLocaleString()}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 text-sm">Time charge</span>
-                    <span className="font-bold text-sm">
-                      NGN {(currentTripFareBreakdown.timeComponent ?? 0).toLocaleString()}
-                    </span>
-                  </div>
-
-                  <div className="flex justify-between text-xs text-slate-400">
-                    <span>Actual trip time: {currentTripFareBreakdown.actualMins ?? currentTripFareBreakdown.totalMins ?? 0} mins</span>
-                    <span>Estimated route time: {currentTripFareBreakdown.estimatedMins ?? 0} mins</span>
-                  </div>
-                </div>
-
-                <div className="mx-4 border-t border-slate-200 dark:border-slate-700"></div>
-
-                <div className="px-4 py-3 flex justify-between items-center">
-                  <span className="font-black text-slate-900 dark:text-white">Total</span>
-                  <span className="text-2xl font-black text-primary">
-                    NGN {currentTripFareBreakdown.finalFare.toLocaleString()}
-                  </span>
-                </div>
-              </div>
+              <TripPaymentSummary fareBreakdown={currentTripFareBreakdown} />
             )}
 
             {/* Pay button */}

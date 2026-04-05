@@ -29,24 +29,46 @@ export interface RouteData {
   };
 }
 
+const isAbortError = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === 'AbortError';
+
 export const LocationService = {
 
   // Calls GET /locations/search?q=query
   // Returns real Google Places results from backend
+<<<<<<< HEAD
   async search(query: string, biasLat?: number, biasLng?: number): Promise<LocationData[]> {
+=======
+  async search(
+    query: string,
+    biasLat?: number,
+    biasLng?: number,
+    signal?: AbortSignal,
+  ): Promise<LocationData[]> {
+>>>>>>> main
     const normalizedQuery = query?.trim();
     if (!normalizedQuery || normalizedQuery.length < 2) return [];
     try {
       let url = `/locations/search?q=${encodeURIComponent(normalizedQuery)}`;
 
       // Pass pickup coords so backend biases results to pickup location
-      if (Number.isFinite(biasLat) && Number.isFinite(biasLng)) {
+      const hasBiasLat = Number.isFinite(biasLat);
+      const hasBiasLng = Number.isFinite(biasLng);
+      if (hasBiasLat && hasBiasLng) {
         url += `&biasLat=${biasLat}&biasLng=${biasLng}`;
       }
 
+<<<<<<< HEAD
       const results = await api.get<LocationData[]>(url, false);
+=======
+      const results = await api.get<LocationData[]>(url, false, { signal });
+>>>>>>> main
       return Array.isArray(results) ? results : [];
     } catch (error) {
+      if (isAbortError(error)) {
+        throw error;
+      }
+
       console.error('Location search failed:', error);
       throw error;
     }
@@ -84,7 +106,19 @@ export const LocationService = {
 
 export const getLocationPrimaryText = (location?: LocationData | null): string => {
   if (!location) return 'Unknown Location';
-  return location.display_name || location.area || location.city || location.formatted_address || 'Unknown Location';
+
+  const streetLabel = [location.street_number, location.street].filter(Boolean).join(' ').trim();
+  const formatted = location.formatted_address?.trim();
+
+  return (
+    formatted ||
+    streetLabel ||
+    location.display_name ||
+    location.area ||
+    location.city ||
+    location.description ||
+    'Unknown Location'
+  );
 };
 
 export const getLocationSecondaryText = (location?: LocationData | null): string => {
@@ -95,7 +129,11 @@ export const getLocationSecondaryText = (location?: LocationData | null): string
     .filter(Boolean)
     .join(', ');
 
-  return structured || location.description || location.formatted_address || '';
+  if (structured && structured !== location.formatted_address?.trim()) {
+    return structured;
+  }
+
+  return location.description || '';
 };
 
 export const getLocationAddress = (location?: LocationData | null): string => {
@@ -105,7 +143,9 @@ export const getLocationAddress = (location?: LocationData | null): string => {
 
 export const getLocationShortText = (location?: LocationData | null): string => {
   if (!location) return 'Unknown';
+  const formattedFirst = location.formatted_address?.split(',')[0]?.trim();
   return (
+    formattedFirst ||
     location.display_name?.split(',')[0] ||
     location.area ||
     location.city ||

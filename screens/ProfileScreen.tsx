@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { useToast } from '../hooks/useToast';
 import { UserProfile, UserRole } from '../types';
 import { IMAGES } from '../constants';
 import { CapacitorService } from '../services/CapacitorService';
@@ -13,13 +14,14 @@ interface ProfileScreenProps {
 }
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack, onLogout, onUpdateAvatar }) => {
+  const { toast } = useToast();
   // The role is locked based on the initial selection for both Owners and Drivers.
   const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
 
   const handleFeatureAlert = (feature: string) => {
     CapacitorService.triggerHaptic();
-    alert(`${feature} is not available in the demo.`);
+    toast.info(`${feature} is not available in the demo.`);
   };
 
   const handleCameraUpdate = async () => {
@@ -30,7 +32,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
       try {
         await onUpdateAvatar(photo);
       } catch (error: any) {
+<<<<<<< HEAD
         alert(error.message || 'Could not update your avatar. Please try again.');
+=======
+        toast.error(error.message || 'Could not update your avatar. Please try again.');
+>>>>>>> main
       } finally {
         setIsUpdatingAvatar(false);
       }

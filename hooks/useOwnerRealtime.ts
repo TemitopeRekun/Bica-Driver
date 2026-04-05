@@ -18,6 +18,7 @@ interface UseOwnerRealtimeOptions {
   onDriverDeclined: (payload: { message?: string }) => void;
   onTripCompleted: (payload: { fareBreakdown?: any }) => void;
   onPaymentUpdated: (payload: { tripId: string; paymentStatus: string; paidAt: string | null; transactionReference: string | null; message: string }) => void;
+  onRideProgress?: (payload: { tripId: string; milestone: 'assigned' | 'arrived' | 'inprogress' | 'in_progress' | 'completed'; timestamp?: string; status?: any }) => void;
   onLocationUpdated: (lat: number, lng: number) => void;
 }
 
@@ -34,6 +35,7 @@ export const useOwnerRealtime = ({
   onDriverDeclined,
   onTripCompleted,
   onPaymentUpdated,
+  onRideProgress,
   onLocationUpdated,
 }: UseOwnerRealtimeOptions) => {
   const ownerSocketRef = useRef<Socket | null>(null);
@@ -41,6 +43,7 @@ export const useOwnerRealtime = ({
   const onDriverDeclinedRef = useRef(onDriverDeclined);
   const onTripCompletedRef = useRef(onTripCompleted);
   const onPaymentUpdatedRef = useRef(onPaymentUpdated);
+  const onRideProgressRef = useRef(onRideProgress);
   const onLocationUpdatedRef = useRef(onLocationUpdated);
   const driverInfoIdRef = useRef(driverInfoId);
   const rideStateValueRef = useRef(rideState);
@@ -60,6 +63,10 @@ export const useOwnerRealtime = ({
   useEffect(() => {
     onPaymentUpdatedRef.current = onPaymentUpdated;
   }, [onPaymentUpdated]);
+
+  useEffect(() => {
+    onRideProgressRef.current = onRideProgress;
+  }, [onRideProgress]);
 
   useEffect(() => {
     onLocationUpdatedRef.current = onLocationUpdated;
@@ -92,7 +99,7 @@ export const useOwnerRealtime = ({
         (rideStateValueRef.current === 'ASSIGNED' || rideStateValueRef.current === 'IN_PROGRESS')
       ) {
         trackedDriverIdRef.current = driverInfoIdRef.current;
-        ownerSocketRef.current?.emit('track:driver', { driverId: driverInfoIdRef.current });
+        ownerSocketRef.current?.emit('trackdriver', { driverId: driverInfoIdRef.current });
       }
     });
 
@@ -121,6 +128,12 @@ export const useOwnerRealtime = ({
     ownerSocketRef.current.on('payment:updated', (data: any) => {
       onPaymentUpdatedRef.current(data);
     });
+    
+// Owner realtime hook for ride progress and tracking signals
+    ownerSocketRef.current.on('ride:progress', (data: any) => {
+      // payload: { tripId, milestone, timestamp, status }
+      onRideProgressRef.current?.(data);
+    });
 
     ownerSocketRef.current.on('driver:availability', () => {
       if ((showDriverPickerRef.current || rideStateRef.current === 'IDLE') && pickupRef.current) {
@@ -130,7 +143,7 @@ export const useOwnerRealtime = ({
       }
     });
 
-    ownerSocketRef.current.on('location:updated', (data: any) => {
+    ownerSocketRef.current.on('locationupdated', (data: any) => {
       if (!trackedDriverIdRef.current || data.driverId !== trackedDriverIdRef.current) return;
       if (typeof data.lat === 'number' && typeof data.lng === 'number') {
         onLocationUpdatedRef.current(data.lat, data.lng);
@@ -151,7 +164,7 @@ export const useOwnerRealtime = ({
       (rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS')
     ) {
       trackedDriverIdRef.current = driverInfoId;
-      ownerSocketRef.current.emit('track:driver', { driverId: driverInfoId });
+      ownerSocketRef.current.emit('trackdriver', { driverId: driverInfoId });
     }
   }, [driverInfoId, rideState, trackedDriverIdRef]);
 };

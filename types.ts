@@ -52,11 +52,13 @@ export interface UserProfile {
   transmission?: 'Manual' | 'Automatic' | 'Both';
   isBlocked?: boolean;
   // Bank details — drivers only
-  bankName?: string;
-  bankCode?: string;
-  accountNumber?: string;
-  accountName?: string;
-  monnifySubAccountCode?: string;
+  bankName?: string | null;
+  bankCode?: string | null;
+  accountNumber?: string | null;
+  accountName?: string | null;
+  monnifySubAccountCode?: string | null;
+  subAccountActive?: boolean;
+  canRetrySubAccountSetup?: boolean;
   // Location
   currentLocation?: { lat: number; lng: number };
   locationLat?: number;
@@ -64,6 +66,21 @@ export interface UserProfile {
   createdAt?: string;
   updatedAt?: string;
 }
+
+export type AuthUser = UserProfile | any;
+
+export type AuthResponse =
+  | {
+      token: string;
+      user: AuthUser;
+      message?: string;
+    }
+  | {
+      token?: undefined;
+      user: AuthUser;
+      message: string; // used for driver registration pending approval
+    };
+
 
 export interface Trip {
   id: string;
@@ -186,11 +203,13 @@ export interface PaymentStatusResponse {
 
 export interface PendingPaymentTrip extends Trip {
   owner: {
+    id: string;
     name: string;
     email: string;
     phone: string;
   };
   driver: {
+    id: string;
     name: string;
   } | null;
 }

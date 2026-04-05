@@ -27,6 +27,7 @@ interface UseDriverRealtimeOptions {
   user: UserProfile | null;
   approvalStatus: string;
   onOnlineStatusChange?: (isOnline: boolean) => void;
+  onForcedLogout?: (message?: string) => void;
 }
 
 const DEFAULT_DRIVER_POS: [number, number] = [6.4549, 3.3896];
@@ -48,6 +49,7 @@ export const useDriverRealtime = ({
   user,
   approvalStatus,
   onOnlineStatusChange,
+  onForcedLogout,
 }: UseDriverRealtimeOptions) => {
   const [isOnline, setIsOnline] = useState(Boolean(user?.isOnline));
   const [isLocationRefreshing, setIsLocationRefreshing] = useState(false);
@@ -74,16 +76,30 @@ export const useDriverRealtime = ({
 
   const pushDriverLocation = useCallback(async (latitude: number, longitude: number) => {
     if (!user?.id) return;
+
+    // A: Local UI update
     setDriverPos([latitude, longitude]);
-    await api.patch('/users/location', { lat: latitude, lng: longitude });
-    if (socketRef.current?.connected) {
-      socketRef.current.emit('driver:location', {
-        driverId: user.id,
-        lat: latitude,
-        lng: longitude,
-      });
+
+    try {
+      // B: State persistence (canonical path)
+      await api.patch('/users/location', { lat: latitude, lng: longitude });
+
+      // C: Live broadcast (socket distribute state)
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('driverlocation', {
+          driverId: user.id,
+          lat: latitude,
+          lng: longitude,
+        });
+      }
+    } catch (error: any) {
+      if (error.message?.includes('401') || error.message?.includes('403')) {
+        onForcedLogout?.(error.message);
+      } else {
+        console.error('Failed to persist driver location:', error);
+      }
     }
-  }, [user?.id]);
+  }, [user?.id, onForcedLogout]);
 
   const enableOnline = useCallback(() => {
     setAvailabilityIssue(null);
@@ -91,11 +107,22 @@ export const useDriverRealtime = ({
   }, [updateOnlineState]);
 
   const disableOnline = useCallback(async () => {
+<<<<<<< HEAD
     await api.patch('/users/online', { isOnline: false });
     await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
+=======
+    try {
+      await api.patch('/users/online', { isOnline: false });
+      await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
+    } catch (error: any) {
+      if (error.message?.includes('401') || error.message?.includes('403')) {
+        onForcedLogout?.(error.message);
+      }
+    }
+>>>>>>> main
     setAvailabilityIssue(null);
     updateOnlineState(false);
-  }, [updateOnlineState]);
+  }, [updateOnlineState, onForcedLogout]);
 
   const removeRideRequest = useCallback((rideId: string) => {
     setLiveRideRequests((prev) => prev.filter((ride) => ride.id !== rideId));
@@ -196,9 +223,20 @@ export const useDriverRealtime = ({
         await pushDriverLocation(latitude, longitude);
         await api.patch('/users/online', { isOnline: true });
         setAvailabilityIssue(null);
+<<<<<<< HEAD
       } catch (error) {
         console.error('Initial location failed:', error);
 
+=======
+      } catch (error: any) {
+        console.error('Initial location failed:', error);
+
+        if (error.message?.includes('401') || error.message?.includes('403')) {
+          onForcedLogout?.(error.message);
+          return;
+        }
+
+>>>>>>> main
         let permissionDenied = isPermissionDeniedError(error);
         if (!permissionDenied) {
           try {
