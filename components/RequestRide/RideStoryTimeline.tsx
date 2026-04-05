@@ -1,11 +1,15 @@
+// Owner ride story timeline with robust milestone handling and date formatting
 import React from 'react';
 
 interface RideStoryTimelineProps {
-  milestone: string;
-  lastUpdate: string;
+  milestone?: string;
+  lastUpdate?: string;
 }
 
-const RideStoryTimeline: React.FC<RideStoryTimelineProps> = ({ milestone, lastUpdate }) => {
+const RideStoryTimeline: React.FC<RideStoryTimelineProps> = ({ 
+  milestone = 'requested', 
+  lastUpdate 
+}) => {
   const steps = [
     { id: 'requested', label: 'Requested', icon: 'hail', microcopy: 'Waiting for a driver to confirm' },
     { id: 'assigned', label: 'Driver Assigned', icon: 'person_pin_circle', microcopy: 'Driver is heading to your pickup' },
@@ -14,8 +18,19 @@ const RideStoryTimeline: React.FC<RideStoryTimelineProps> = ({ milestone, lastUp
     { id: 'completed', label: 'Completed', icon: 'check_circle', microcopy: 'Trip completed – proceed to payment' },
   ];
 
-  const currentStepIndex = steps.findIndex(s => s.id === milestone);
+  const currentStepIndex = Math.max(0, steps.findIndex(s => s.id === milestone));
   const progressPercent = (currentStepIndex / (steps.length - 1)) * 100;
+
+  const formatLastUpdate = (update?: string) => {
+    if (!update) return 'Just now';
+    try {
+      const date = new Date(update);
+      if (isNaN(date.getTime())) return 'Just now';
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      return 'Just now';
+    }
+  };
 
   return (
     <div className="mb-6 px-2">
@@ -61,7 +76,7 @@ const RideStoryTimeline: React.FC<RideStoryTimelineProps> = ({ milestone, lastUp
             {steps[currentStepIndex]?.microcopy}
           </h4>
           <p className="text-[10px] text-slate-500 mt-0.5 uppercase font-bold tracking-wider">
-            Updated: {new Date(lastUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            Updated: {formatLastUpdate(lastUpdate)}
           </p>
         </div>
       </div>

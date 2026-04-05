@@ -18,7 +18,7 @@ interface UseOwnerRealtimeOptions {
   onDriverDeclined: (payload: { message?: string }) => void;
   onTripCompleted: (payload: { fareBreakdown?: any }) => void;
   onPaymentUpdated: (payload: { tripId: string; paymentStatus: string; paidAt: string | null; transactionReference: string | null; message: string }) => void;
-  onRideProgress?: (payload: { tripId: string; milestone: 'assigned' | 'arrived' | 'in_progress' | 'completed'; timestamp?: string; status?: any }) => void;
+  onRideProgress?: (payload: { tripId: string; milestone: 'assigned' | 'arrived' | 'inprogress' | 'in_progress' | 'completed'; timestamp?: string; status?: any }) => void;
   onLocationUpdated: (lat: number, lng: number) => void;
 }
 
@@ -129,7 +129,9 @@ export const useOwnerRealtime = ({
       onPaymentUpdatedRef.current(data);
     });
     
+// Owner realtime hook for ride progress and tracking signals
     ownerSocketRef.current.on('ride:progress', (data: any) => {
+      // payload: { tripId, milestone, timestamp, status }
       onRideProgressRef.current?.(data);
     });
 
