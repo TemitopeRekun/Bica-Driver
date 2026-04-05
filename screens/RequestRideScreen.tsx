@@ -34,6 +34,72 @@ interface RequestRideScreenProps {
 
 type RideState = 'IDLE' | 'SEARCHING' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'SCHEDULED';
 
+
+  const RideStoryTimeline: React.FC<{ milestone: string; lastUpdate: string }> = ({ milestone, lastUpdate }) => {
+    const steps = [
+      { id: 'requested', label: 'Requested', icon: 'hail', microcopy: 'Waiting for a driver to confirm' },
+      { id: 'assigned', label: 'Driver Assigned', icon: 'person_pin_circle', microcopy: 'Driver is heading to your pickup' },
+      { id: 'arrived', label: 'Driver Arrived', icon: 'local_taxi', microcopy: 'Your driver has arrived – head to your car' },
+      { id: 'in_progress', label: 'In Progress', icon: 'distance', microcopy: 'Enjoy your ride' },
+      { id: 'completed', label: 'Completed', icon: 'check_circle', microcopy: 'Trip completed – proceed to payment' },
+    ];
+
+    const currentStepIndex = steps.findIndex(s => s.id === milestone);
+    const progressPercent = (currentStepIndex / (steps.length - 1)) * 100;
+
+    return (
+      <div className="mb-6 px-2">
+        <div className="flex justify-between relative mb-8">
+          <div className="absolute top-5 left-0 right-0 h-0.5 bg-slate-200 dark:bg-slate-800 z-0 mx-6"></div>
+          <div 
+            className="absolute top-5 left-0 h-0.5 bg-primary transition-all duration-700 z-0 mx-6" 
+            style={{ width: progressPercent + "%" }}
+          ></div>
+          
+          {steps.map((step, index) => {
+            const isCompleted = index < currentStepIndex;
+            const isCurrent = index === currentStepIndex;
+            
+            return (
+              <div key={step.id} className="flex flex-col items-center z-10 w-1/5">
+                <div className={"w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 " + (
+                  isCurrent ? 'bg-primary text-white scale-110 shadow-lg shadow-primary/30' : 
+                  isCompleted ? 'bg-primary/20 text-primary' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                )}>
+                  <span className="material-symbols-outlined text-lg">
+                    {isCompleted ? 'check' : step.icon}
+                  </span>
+                </div>
+                <span className={"text-[10px] mt-2 font-bold text-center " + (
+                  isCurrent ? 'text-primary' : 'text-slate-400'
+                )}>
+                  {step.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        
+        <div className="bg-primary/5 dark:bg-primary/10 rounded-2xl p-4 border border-primary/10 flex items-center gap-4 animate-fade-in">
+          <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center text-primary shadow-sm">
+            <span className="material-symbols-outlined filled animate-pulse">
+              {steps[currentStepIndex]?.icon || 'info'}
+            </span>
+          </div>
+          <div className="flex-1">
+            <h4 className="text-sm font-black text-slate-900 dark:text-white">
+              {steps[currentStepIndex]?.microcopy}
+            </h4>
+            <p className="text-[10px] text-slate-500 mt-0.5 uppercase font-bold tracking-wider">
+              Updated: {new Date(lastUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+
 const DISCOVERY_CATEGORIES = [
   { label: 'Airports', icon: 'flight_takeoff', type: 'Airport' },
   { label: 'Hotels', icon: 'hotel', type: 'Hotel' },
@@ -100,6 +166,11 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
   const [driverInfo, setDriverInfo] = useState<any>(null);
   const [trackedDriverPos, setTrackedDriverPos] = useState<[number, number] | null>(null);
   const [noDriversFound, setNoDriversFound] = useState(false);
+
+  // OWNER RIDE STORY STATE
+  const [rideMilestone, setRideMilestone] = useState<'requested' | 'assigned' | 'arrived' | 'in_progress' | 'completed'>('requested');
+  const [lastMilestoneUpdate, setLastMilestoneUpdate] = useState<string>(new Date().toISOString());
+
   const timerRefs = useRef<any[]>([]);
   const {
     pickup,
@@ -245,18 +316,23 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     switch (trip.status) {
       case 'PENDING_ACCEPTANCE':
         setRideState('SEARCHING');
+        setRideMilestone('requested');
         break;
       case 'ASSIGNED':
         setRideState('ASSIGNED');
+        setRideMilestone('assigned');
         break;
       case 'IN_PROGRESS':
         setRideState('IN_PROGRESS');
+        setRideMilestone('in_progress');
         break;
       case 'COMPLETED':
         setRideState('COMPLETED');
+        setRideMilestone('completed');
         break;
       default:
         setRideState('IDLE');
+        setRideMilestone('requested');
         break;
     }
   };
@@ -369,6 +445,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         timeAway: estimatedArrivalMins || 5,
       }));
       setRideState('ASSIGNED');
+      setRideMilestone('assigned');
     },
     onDriverDeclined: (data) => {
       alert(data.message || 'Driver declined. Please choose another driver.');
@@ -387,6 +464,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       setCurrentPaymentStatus('UNPAID');
       setPaymentStatusMessage('Please complete payment below.');
       setRideState('COMPLETED');
+      setRideMilestone('completed');
     },
     onPaymentUpdated: (data) => {
       if (data.tripId !== currentTripId) return;
@@ -395,6 +473,18 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     },
     onLocationUpdated: (lat, lng) => {
       setTrackedDriverPos([lat, lng]);
+    },
+    onRideProgress: (payload) => {
+      if (payload.milestone === 'assigned') setRideMilestone('assigned');
+      else if (payload.milestone === 'arrived') setRideMilestone('arrived');
+      else if (payload.milestone === 'in_progress') setRideMilestone('in_progress');
+      else if (payload.milestone === 'completed') setRideMilestone('completed');
+
+      if (payload.timestamp) {
+        setLastMilestoneUpdate(payload.timestamp);
+      } else {
+        setLastMilestoneUpdate(new Date().toISOString());
+      }
     },
   });
 
@@ -1050,6 +1140,8 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
 
         {(rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS') && driverInfo && (
           <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-slide-up">
+            
+            <RideStoryTimeline milestone={rideMilestone} lastUpdate={lastMilestoneUpdate} />
             <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-3 w-3">
@@ -1057,11 +1149,11 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                 </span>
                 <span className="text-sm font-bold text-slate-900 dark:text-white">
-                  {rideState === 'ASSIGNED' ? 'Driver Found!' : 'Trip in progress'}
+                  {rideMilestone === 'assigned' ? 'Driver on the way' : rideMilestone === 'arrived' ? 'Your driver is waiting' : rideMilestone === 'in_progress' ? 'Trip in progress' : rideMilestone === 'completed' ? 'Trip completed' : 'Ride status'}
                 </span>
               </div>
               <span className="text-xs font-bold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-500">
-                {rideState === 'ASSIGNED' ? `${driverInfo.timeAway} mins away` : `Heading to Destination`}
+                {rideMilestone === 'assigned' ? driverInfo.timeAway + ' mins away' : rideMilestone === 'arrived' ? 'At pickup location' : rideMilestone === 'in_progress' ? 'Heading to Destination' : rideMilestone === 'completed' ? 'Arrived at destination' : ''}
               </span>
             </div>
 
@@ -1156,41 +1248,34 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
             {currentTripFareBreakdown && (
               <div className="bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Final Fare Breakdown</p>
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Trip Summary</p>
                 </div>
 
                 <div className="px-4 py-3 space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500 text-sm">Base fare</span>
-                    <span className="font-bold text-sm">
-                      NGN {(currentTripFareBreakdown.baseFare ?? settings.baseFare).toLocaleString()}
-                    </span>
-                  </div>
+                  
+
+                  
+
+                  
 
                   <div className="flex justify-between">
-                    <span className="text-slate-500 text-sm">Distance charge</span>
+                    <span className="text-slate-500 text-sm">Distance</span>
                     <span className="font-bold text-sm">
-                      NGN {(currentTripFareBreakdown.distanceComponent ?? 0).toLocaleString()}
+                      {currentTripFareBreakdown.distanceKm ?? 0} km
                     </span>
                   </div>
-
                   <div className="flex justify-between">
-                    <span className="text-slate-500 text-sm">Time charge</span>
+                    <span className="text-slate-500 text-sm">Total Time</span>
                     <span className="font-bold text-sm">
-                      NGN {(currentTripFareBreakdown.timeComponent ?? 0).toLocaleString()}
+                      {currentTripFareBreakdown.actualMins ?? currentTripFareBreakdown.totalMins ?? 0} mins
                     </span>
-                  </div>
-
-                  <div className="flex justify-between text-xs text-slate-400">
-                    <span>Actual trip time: {currentTripFareBreakdown.actualMins ?? currentTripFareBreakdown.totalMins ?? 0} mins</span>
-                    <span>Estimated route time: {currentTripFareBreakdown.estimatedMins ?? 0} mins</span>
                   </div>
                 </div>
 
                 <div className="mx-4 border-t border-slate-200 dark:border-slate-700"></div>
 
                 <div className="px-4 py-3 flex justify-between items-center">
-                  <span className="font-black text-slate-900 dark:text-white">Total</span>
+                  <span className="font-black text-slate-900 dark:text-white">Total Paid/Due</span>
                   <span className="text-2xl font-black text-primary">
                     NGN {currentTripFareBreakdown.finalFare.toLocaleString()}
                   </span>

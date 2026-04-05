@@ -203,11 +203,13 @@ export interface PaymentStatusResponse {
 
 export interface PendingPaymentTrip extends Trip {
   owner: {
+    id: string;
     name: string;
     email: string;
     phone: string;
   };
   driver: {
+    id: string;
     name: string;
   } | null;
 }
