@@ -20,8 +20,10 @@ import { mapUser } from './mappers/appMappers';
 import { useAdminDashboard } from './hooks/useAdminDashboard';
 import { useAdminRealtime } from './hooks/useAdminRealtime';
 import { useOwnerVisibleDrivers } from './hooks/useOwnerVisibleDrivers';
+import { useToast } from './hooks/useToast';
 
 const App: React.FC = () => {
+  const { toast } = useToast();
   const [isInitializing, setIsInitializing] = useState(true);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentScreen, setCurrentScreen] = useState<AppScreen>(AppScreen.LOADING);
@@ -191,17 +193,17 @@ const App: React.FC = () => {
         }
       } else {
         // Driver registration pending approval (no token)
-        alert(response.message || 'Registration submitted. Your driver account is pending admin approval.');
+        toast.info(response.message || 'Registration submitted. Your driver account is pending admin approval.');
         navigateTo(AppScreen.LOGIN);
       }
     } catch (error: any) {
-      alert(error.message || 'Registration failed. Please try again.');
+      toast.error(error.message || 'Registration failed. Please try again.');
     }
   };
 
   const handleLogin = async (email?: string, password?: string) => {
     if (!email || !password) {
-      alert('Please enter both email and password.');
+      toast.warning('Please enter both email and password.');
       return;
     }
 
@@ -213,7 +215,7 @@ const App: React.FC = () => {
       );
 
       if (!response.token) {
-        alert(response.message || 'Login failed. Please contact support.');
+        toast.error(response.message || 'Login failed. Please contact support.');
         clearToken();
         return;
       }
@@ -223,7 +225,7 @@ const App: React.FC = () => {
       
       // Defense-in-depth: if backend somehow returns a token for an unapproved driver
       if (mapped.role === UserRole.DRIVER && mapped.approvalStatus !== 'APPROVED') {
-        alert('Access Denied: Your driver account is not yet approved.');
+        toast.error('Access Denied: Your driver account is not yet approved.');
         clearToken();
         return;
       }
@@ -241,7 +243,7 @@ const App: React.FC = () => {
     } catch (error: any) {
       // Clear token just in case
       clearToken();
-      alert(error.message || 'Invalid credentials. Please try again.');
+      toast.error(error.message || 'Invalid credentials. Please try again.');
     }
   };
 
@@ -253,7 +255,7 @@ const App: React.FC = () => {
   };
 
   const handleForcedLogout = async (message?: string) => {
-    alert(message || 'Your session is no longer valid. Please log in again.');
+    toast.info(message || 'Your session is no longer valid. Please log in again.');
     await handleLogout();
   };
 
@@ -293,7 +295,7 @@ const App: React.FC = () => {
         await loadAdminDashboard();
       }
     } catch (error: any) {
-      alert(error.message);
+      toast.error(error.message);
     }
   };
 
@@ -301,7 +303,7 @@ const App: React.FC = () => {
     try {
       await api.patch(`/users/${userId}/block`, { isBlocked: blocked });
     } catch (error: any) {
-      alert(error.message);
+      toast.error(error.message);
     }
     if (currentUser?.role === UserRole.ADMIN) {
       await loadAdminDashboard();
@@ -311,12 +313,12 @@ const App: React.FC = () => {
   const handleRetryDriverSubAccount = async (driverId: string) => {
     try {
       const response = await api.post<any>(`/payments/sub-account/retry/${driverId}`);
-      alert(response.message || 'Sub-account setup updated successfully.');
+      toast.success(response.message || 'Sub-account setup updated successfully.');
       if (currentUser?.role === UserRole.ADMIN) {
         await loadAdminDashboard();
       }
     } catch (error: any) {
-      alert(error.message || 'Failed to retry sub-account setup.');
+      toast.error(error.message || 'Failed to retry sub-account setup.');
     }
   };
 
@@ -328,7 +330,7 @@ const App: React.FC = () => {
         await loadAdminDashboard();
       }
     } catch (error: any) {
-      alert(error.message);
+      toast.error(error.message);
     }
   };
 

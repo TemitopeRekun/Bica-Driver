@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserRole, UserProfile } from '../types';
 import { CapacitorService } from '../services/CapacitorService';
+import { useToast } from '../hooks/useToast';
 import { CameraSource } from '@capacitor/camera';
 import { api } from '../services/api.service';
 
@@ -13,6 +14,7 @@ interface SignUpScreenProps {
 }
 
 const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onGoToLogin }) => {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -74,23 +76,22 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ role, onSignUp, onBack, onG
 
     // Validation
     if (!formData.fullName || !formData.email || !formData.phone || !formData.password) {
-      alert("Please fill in all required fields.");
+      toast.warning("Please fill in all required fields.");
       return;
     }
     if (isDriver) {
       if (!formData.licenseImage || !formData.selfieImage || !formData.ninImage || !formData.backgroundCheckAccepted) {
-        alert("Please complete all driver requirements including Driver License, Selfie, NIN image, and background check consent.");
+        toast.warning("Please complete all driver requirements including Driver License, Selfie, NIN image, and background check consent.");
         return;
       }
       if (!formData.nin || !formData.address || !formData.age) {
-        alert("Please fill in all personal details including Address, Age and NIN.");
+        toast.warning("Please fill in all personal details including Address, Age and NIN.");
         return;
       }
       if (!bankFormData.bankCode || !bankFormData.accountNumber || !bankFormData.accountName) {
-        alert("Please provide your bank details.");
+        toast.warning("Please provide your bank details.");
         return;
       }
-    } else {
       if (!formData.carType || !formData.carModel || !formData.carYear || !formData.address || !formData.nationality || !formData.age || !formData.gender) {
         alert("Please complete all profile details including Address, Nationality, Age, Gender, Car Type, Car Model and Car Year.");
         return;
