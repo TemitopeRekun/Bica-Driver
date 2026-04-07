@@ -268,9 +268,22 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
     setSelfieImage(null);
   };
 
-  const handleArrival = () => {
+  const handleArrival = async () => {
     CapacitorService.triggerHaptic();
-    setRidePhase('arrived');
+    if (!activeRide) return;
+
+    try {
+      await api.patch(`/rides/${activeRide.id}/status`, {
+        status: 'ARRIVED',
+      });
+      setRidePhase('arrived');
+    } catch (error: any) {
+      if (error.message?.includes('401') || error.message?.includes('403')) {
+        onForcedLogout(error.message);
+      } else {
+        toast.error(error.message || 'Failed to update arrival status. Please try again.');
+      }
+    }
   };
 
   const handleStartTrip = async () => {

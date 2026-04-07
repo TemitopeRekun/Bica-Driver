@@ -248,6 +248,11 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
         setRideMilestone('assigned');
         setLastMilestoneUpdate(trip.updatedAt || new Date().toISOString());
         break;
+      case 'ARRIVED':
+        setRideState('ASSIGNED');
+        setRideMilestone('arrived');
+        setLastMilestoneUpdate(trip.updatedAt || new Date().toISOString());
+        break;
       case 'IN_PROGRESS':
         setRideState('IN_PROGRESS');
         setRideMilestone('in_progress');
@@ -407,10 +412,19 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
     },
     onRideProgress: (payload) => {
       // Map backend milestones to owner-facing steps
-      if (payload.milestone === 'assigned') setRideMilestone('assigned');
-      else if (payload.milestone === 'arrived') setRideMilestone('arrived');
-      else if (payload.milestone === 'inprogress') setRideMilestone('in_progress');
-      else if (payload.milestone === 'completed') setRideMilestone('completed');
+      if (payload.milestone === 'assigned') {
+        setRideMilestone('assigned');
+        setRideState('ASSIGNED');
+      } else if (payload.milestone === 'arrived') {
+        setRideMilestone('arrived');
+        setRideState('ASSIGNED');
+      } else if (payload.milestone === 'inprogress' || payload.milestone === 'in_progress') {
+        setRideMilestone('in_progress');
+        setRideState('IN_PROGRESS');
+      } else if (payload.milestone === 'completed') {
+        setRideMilestone('completed');
+        setRideState('COMPLETED');
+      }
 
       if (payload.timestamp) {
         setLastMilestoneUpdate(payload.timestamp);
@@ -1054,15 +1068,6 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
               </button>
             )}
 
-            {rideState === 'IN_PROGRESS' && (
-              <button
-                onClick={handleArrivedAtDestination}
-                className="mt-4 w-full py-3 rounded-xl bg-primary text-white font-bold text-sm shadow-lg shadow-primary/25 hover:bg-green-700 transition-colors active:scale-95 flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined">flag</span>
-                I have arrived
-              </button>
-            )}
           </div>
         )}
         {rideState === 'COMPLETED' && (
