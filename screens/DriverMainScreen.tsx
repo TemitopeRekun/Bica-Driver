@@ -136,6 +136,11 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
 
         setActiveRide(restoredRide);
 
+        if (currentRide.status === 'ARRIVED') {
+          setRidePhase('arrived');
+          return;
+        }
+
         if (currentRide.status === 'IN_PROGRESS') {
           setRidePhase('trip');
           setFareBreakdown(currentRide.fareBreakdown || null);

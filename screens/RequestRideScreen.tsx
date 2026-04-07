@@ -418,7 +418,7 @@ const RequestRideScreen: React.FC<RequestRideScreenProps> = ({
       } else if (payload.milestone === 'arrived') {
         setRideMilestone('arrived');
         setRideState('ASSIGNED');
-      } else if (payload.milestone === 'inprogress' || payload.milestone === 'in_progress') {
+      } else if (payload.milestone === 'inprogress') {
         setRideMilestone('in_progress');
         setRideState('IN_PROGRESS');
       } else if (payload.milestone === 'completed') {
