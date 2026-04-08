@@ -1,3 +1,5 @@
+export const APP_VERSION = '1.0.0';
+
 export const Config = {
   apiUrl: (function () {
     const explicitApiUrl = sanitizeApiUrl(import.meta.env.VITE_API_URL);

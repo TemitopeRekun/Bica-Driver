@@ -108,6 +108,7 @@ async function request<T>(
     }
 
     const rawBody = await response.text();
+    const reqId = response.headers.get('x-request-id') || response.headers.get('X-Request-ID');
     let data: any = null;
 
     if (rawBody) {
@@ -141,11 +142,24 @@ async function request<T>(
         errorMessage = data;
       }
 
-      throw new Error(errorMessage);
+      const error = new Error(errorMessage) as any;
+      error.reqId = reqId;
+      error.status = response.status;
+      throw error;
     }
 
     return data as T;
   } catch (error: any) {
+    if (retryCount === 0 && error.status !== 401) {
+       // Auto-log to telemetry for observability
+       import('./TelemetryService').then(({ telemetry }) => {
+          telemetry.error(`API Error: ${method} ${path}`, error, { 
+            reqId: error.reqId,
+            status: error.status 
+          });
+       });
+    }
+
     // Retry on network errors (lost connection)
     if (method === 'GET' && error.message.includes('Failed to fetch') && retryCount < 3) {
       const backoffMs = Math.pow(2, retryCount) * 1000;

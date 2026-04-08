@@ -223,6 +223,8 @@ export interface SystemSettings {
   timeRate: number;   // per-minute time rate used in the fare formula
   commission: number;
   autoApprove: boolean;
+  minAppVersion?: string;
+  latestAppVersion?: string;
   id?: number;
   updatedAt?: string;
   updatedById?: string | null;

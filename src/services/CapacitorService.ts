@@ -1,4 +1,5 @@
-
+import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { Geolocation } from '@capacitor/geolocation';
 import { Camera, CameraResultType, CameraSource, CameraDirection } from '@capacitor/camera';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -234,6 +235,24 @@ export const CapacitorService = {
         await StatusBar.setStyle({ style: Style.Dark });
         await StatusBar.setBackgroundColor({ color: '#032e02' });
       }
+    } catch (e) {}
+  },
+
+  async initBackButton(onBack?: () => void) {
+    if (Capacitor.getPlatform() === 'web') return;
+    
+    try {
+      const { App } = await import('@capacitor/app');
+      App.addListener('backButton', ({ canGoBack }) => {
+        if (!canGoBack) {
+          // If at the root of the app, we can exit or show a toast
+          App.exitApp();
+        } else if (onBack) {
+          onBack();
+        } else {
+          window.history.back();
+        }
+      });
     } catch (e) {}
   }
 };

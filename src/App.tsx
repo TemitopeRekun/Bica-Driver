@@ -15,6 +15,9 @@ import { UserRole } from '@/types';
 // Components
 import SupportChatbot from '@/components/SupportChatbot';
 import { ToastProvider as ToastContainer } from '@/components/Toast/ToastProvider';
+import ErrorBoundary from '@/components/Common/ErrorBoundary';
+import VersionEnforcer from '@/components/Common/VersionEnforcer';
+import { telemetry } from '@/services/TelemetryService';
 
 const App: React.FC = () => {
   const { currentUser, setCurrentUser, logout, isAuthenticated, setInitializing, isInitializing } = useAuthStore();
@@ -24,6 +27,13 @@ const App: React.FC = () => {
 
   useEffect(() => {
     initStatusBar();
+    CapacitorService.initBackButton();
+    
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      telemetry.error('Unhandled Promise Rejection', event.reason);
+    };
+
+    window.addEventListener('unhandledrejection', handleRejection);
     
     // Initialize notifications if already authenticated
     if (isAuthenticated) {
@@ -41,7 +51,7 @@ const App: React.FC = () => {
 
     const initializeApp = async () => {
       try {
-        // 1. Load system settings
+        // 1. Load system settings (includes version info)
         await loadSettings();
 
         // 2. Check for saved session
@@ -52,36 +62,44 @@ const App: React.FC = () => {
             const mapped = mapUser(freshUser);
             setCurrentUser(mapped);
             await localforage.setItem('bicadriver_current_user', mapped);
+            telemetry.info('Session restored successfully', { userId: mapped.id });
           } catch (e) {
             console.warn('Session restoration failed:', e);
             await logout();
           }
         }
       } catch (e) {
-        console.error('Core init failed', e);
+        telemetry.error('Core init failed', e);
       } finally {
         setInitializing(false);
       }
     };
 
     initializeApp();
+
+    return () => {
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
   }, []);
 
   return (
-    <div className="flex justify-center items-start min-h-screen bg-slate-950">
-      <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative">
-        
-        {/* The Main Router - Logic moved to screens and Router hooks */}
-        <RouterProvider router={router} />
+    <ErrorBoundary>
+      <div className="flex justify-center items-start min-h-screen bg-slate-950">
+        <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative">
+          
+          <VersionEnforcer>
+            {/* The Main Router */}
+            <RouterProvider router={router} />
+          </VersionEnforcer>
 
-        {/* Global Overlays */}
-        {currentUser && (
-          <SupportChatbot user={currentUser} />
-        )}
-        
-        {/* Toast rendering is now handled by UIStore + ToastContainer */}
+          {/* Global Overlays */}
+          {currentUser && (
+            <SupportChatbot user={currentUser} />
+          )}
+          
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 };
 
