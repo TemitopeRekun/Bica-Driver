@@ -1,6 +1,7 @@
-import React from 'react';
-// @ts-ignore
-import { FixedSizeList as List } from 'react-window';
+import * as ReactWindow from 'react-window';
+
+// Handle CommonJS/ESM interop for react-window in Vite
+const List = ((ReactWindow as any).default?.FixedSizeList || (ReactWindow as any).FixedSizeList) as any;
 
 interface VirtualListProps<T> {
   items: T[];
