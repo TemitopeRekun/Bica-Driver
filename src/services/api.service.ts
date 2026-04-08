@@ -6,7 +6,7 @@ interface RequestOptions {
 }
 
 // Robust UUID v4 generator with fallback for older environments
-const generateUUID = () => {
+export const generateUUID = () => {
   try {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
       return crypto.randomUUID();
@@ -71,9 +71,16 @@ async function request<T>(
   body?: any,
   requiresAuth = true,
   options?: RequestOptions,
-  retryCount = 0
+  retryCount = 0,
+  stableIdempotencyKey?: string
 ): Promise<T> {
   const baseUrl = requireApiUrl();
+
+  // Use provided key, or previous stable key from retry, or generate new one for mutations
+  let currentIdempotencyKey = stableIdempotencyKey || options?.idempotencyKey;
+  if (!currentIdempotencyKey && (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE')) {
+    currentIdempotencyKey = generateUUID();
+  }
 
   // Check for active throttle cooldown
   if (Date.now() < throttleCoolDownUntil) {
@@ -86,8 +93,8 @@ async function request<T>(
   };
 
   // Automated Idempotency-Key for all mutation requests
-  if (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') {
-    headers['x-idempotency-key'] = options?.idempotencyKey || generateUUID();
+  if (currentIdempotencyKey) {
+    headers['x-idempotency-key'] = currentIdempotencyKey;
   }
 
   // Only declare JSON content-type when sending a body
@@ -137,7 +144,7 @@ async function request<T>(
         const backoffMs = Math.pow(2, retryCount) * 1000;
         console.warn(`[API] Retrying GET ${path} after ${backoffMs}ms... (Attempt ${retryCount + 1})`);
         await sleep(backoffMs);
-        return request<T>(method, path, body, requiresAuth, options, retryCount + 1);
+        return request<T>(method, path, body, requiresAuth, options, retryCount + 1, currentIdempotencyKey);
       }
 
       // Handle the new standardized error format (supporting message arrays)
@@ -178,11 +185,15 @@ async function request<T>(
     }
 
     // Retry on network errors (lost connection)
-    if (method === 'GET' && error.message.includes('Failed to fetch') && retryCount < 3) {
+    // Safe to retry mutations IF an idempotency key is present (the Golden Rule)
+    const canRetryMutation = (method !== 'GET') && !!currentIdempotencyKey;
+    const shouldRetry = (method === 'GET' || canRetryMutation);
+
+    if (shouldRetry && error.message.includes('Failed to fetch') && retryCount < 3) {
       const backoffMs = Math.pow(2, retryCount) * 1000;
-      console.warn(`[API] Connection lost. Retrying GET ${path} after ${backoffMs}ms...`);
+      console.warn(`[API] Connection lost during ${method} ${path}. Retrying with same key after ${backoffMs}ms...`);
       await sleep(backoffMs);
-      return request<T>(method, path, body, requiresAuth, options, retryCount + 1);
+      return request<T>(method, path, body, requiresAuth, options, retryCount + 1, currentIdempotencyKey);
     }
     throw error;
   }

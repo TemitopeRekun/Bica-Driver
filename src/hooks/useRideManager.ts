@@ -41,7 +41,8 @@ export const useRideManager = () => {
     destination: LocationData, 
     driver: any, 
     vehicleData: any,
-    scheduledAt?: string | null
+    scheduledAt?: string | null,
+    idempotencyKey?: string
   ) => {
     setRideState(scheduledAt ? 'SCHEDULED' : 'SEARCHING');
     setRideMilestone(scheduledAt ? 'scheduled' : 'requested');
@@ -58,7 +59,7 @@ export const useRideManager = () => {
         driverId: driver.id,
         transmission: vehicleData.transmission,
         scheduledAt: scheduledAt || null,
-      });
+      }, true, { idempotencyKey });
 
       if (!scheduledAt) {
         setCurrentTripId(trip.id);
@@ -94,6 +95,27 @@ export const useRideManager = () => {
       addToast(error.message || 'Failed to cancel ride.', 'error');
     }
   }, [resetRide, addToast]);
+  
+  const syncCurrentRide = useCallback(async () => {
+    try {
+      const trip = await api.get<any>('/rides/current');
+      if (trip) {
+        setCurrentTripId(trip.id);
+        setDriverInfo({
+          ...trip.driver,
+          avatar: trip.driver?.avatarUrl || IMAGES.DRIVER_CARD,
+          timeAway: trip.estimatedArrivalMins || 5,
+          tripId: trip.id,
+        });
+        if (trip.status === 'SEARCHING') setRideState('SEARCHING');
+        else if (trip.status === 'ASSIGNED') setRideState('ASSIGNED');
+        else if (trip.status === 'IN_PROGRESS') setRideState('IN_PROGRESS');
+      }
+      return trip;
+    } catch (e) {
+      return null;
+    }
+  }, [setCurrentTripId, setDriverInfo, setRideState]);
 
   return {
     fetchAvailableDrivers,
@@ -101,5 +123,6 @@ export const useRideManager = () => {
     handleRideCompletion,
     cancelRide,
     resetRide,
+    syncCurrentRide,
   };
 };

@@ -9,6 +9,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useRideManager } from '@/hooks/useRideManager';
 import { useOwnerLocationSearch } from '@/hooks/useOwnerLocationSearch';
 import { useOwnerRealtime } from '@/hooks/useOwnerRealtime';
+import { generateUUID } from '@/services/api.service';
 
 // Components
 import InteractiveMap from '@/components/InteractiveMap';
@@ -37,7 +38,8 @@ const RequestRideScreen: React.FC = () => {
     availableDrivers, setAvailableDrivers 
   } = useRideStore();
   
-  const { fetchAvailableDrivers, initiateRideRequest, resetRide } = useRideManager();
+  
+  const { fetchAvailableDrivers, initiateRideRequest, resetRide, syncCurrentRide } = useRideManager();
 
   // Reference-based tracking for the custom location search hook
   const trackedDriverIdRef = useRef<string | null>(null);
@@ -135,17 +137,29 @@ const RequestRideScreen: React.FC = () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     
+    // The "Golden Rule": Generate a NEW key per unique action/intent
+    const rideIntentId = generateUUID();
+
     try {
       await initiateRideRequest(
         pickup!, 
         destination!, 
         driver, 
         vehicleData, 
-        bookingType === 'schedule' ? new Date(scheduledAt).toISOString() : null
+        bookingType === 'schedule' ? new Date(scheduledAt).toISOString() : null,
+        rideIntentId
       );
       setShowDriverPicker(false);
-    } catch (error) {
-       // Error is already toasted by useRideManager
+    } catch (error: any) {
+       // Handle 409 Conflict: Already being processed by backend
+       if (error.status === 409) {
+          addToast('Resolving previous request...', 'info');
+          const syncedTrip = await syncCurrentRide();
+          if (syncedTrip) {
+             setShowDriverPicker(false);
+             addToast('Request successfully recovered!', 'success');
+          }
+       }
     } finally {
       setIsSubmitting(false);
     }
