@@ -58,7 +58,13 @@ const LoginScreen: React.FC = () => {
         navigate('/owner');
       }
     } catch (error: any) {
-      addToast(error.message || 'Invalid credentials. Please try again.', 'error');
+      if (error.message?.includes('404')) {
+        addToast('No account found with this email. Would you like to create one?', 'warning');
+      } else if (error.message?.includes('401')) {
+        addToast('The password you entered is incorrect. Please try again.', 'error');
+      } else {
+        addToast(error.message || "We're having trouble logging you in. Please check your connection.", 'error');
+      }
     } finally {
       setIsLoading(false);
     }

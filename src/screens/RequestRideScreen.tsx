@@ -64,7 +64,7 @@ const RequestRideScreen: React.FC = () => {
   const {
     pickup, destination, mapCenter, estimatedPrice, estimatedDistance,
     isSearchingPickup, isSearchingDest, searchQuery, isFetchingRoute,
-    searchResults, isSearching, isLocating, searchError,
+    searchResults, isSearching, isLocating, searchError, estimatedMins,
     setSearchQuery, setIsSearchingPickup, setIsSearchingDest,
     handleUseMyLocation, handleMarkerDragEnd, handleSelectLocation,
     handleCategoryTap, clearSearchState, refreshRoute, resetLocationSearch
@@ -342,23 +342,41 @@ const RequestRideScreen: React.FC = () => {
                   )}
                </div>
 
-               {pickup && destination && (
-                <div className="mt-6 p-4 bg-primary/5 rounded-2xl border border-primary/10">
-                   <div className="flex justify-between items-center">
-                      <div className="flex-1">
-                        <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Estimated Fare</p>
-                        <p className="text-2xl font-black">₦{estimatedPrice}</p>
-                        <p className="text-[10px] text-slate-400 font-medium">Approx. {estimatedDistance} km</p>
-                      </div>
-                      <button 
-                        onClick={() => setShowVehicleForm(true)} 
-                        className="bg-primary hover:bg-primary-dark transition-colors text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg shadow-primary/20"
-                      >
-                        {bookingType === 'schedule' ? 'Schedule Ride' : 'Request Now'}
-                      </button>
-                   </div>
-                </div>
-              )}
+                {pickup && destination && (
+                 <div className="mt-6 p-4 bg-primary/5 rounded-2xl border border-primary/10 transition-all">
+                    <div className="flex justify-between items-center">
+                       <div className="flex-1">
+                         <div className="flex items-center gap-2 mb-1">
+                           <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Estimated Fare</p>
+                           {isFetchingRoute && <div className="size-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
+                         </div>
+                         
+                         {isFetchingRoute ? (
+                           <div className="space-y-2">
+                             <div className="h-8 w-32 bg-primary/20 animate-pulse rounded-lg" />
+                             <div className="h-3 w-24 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-full" />
+                           </div>
+                         ) : (
+                           <>
+                             <p className="text-2xl font-black">₦{estimatedPrice}</p>
+                             <div className="flex items-center gap-2 mt-0.5">
+                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{estimatedDistance} km</p>
+                               <span className="text-[10px] text-slate-300">•</span>
+                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{estimatedMins} mins</p>
+                             </div>
+                           </>
+                         )}
+                       </div>
+                       <button 
+                         onClick={() => setShowVehicleForm(true)} 
+                         disabled={isFetchingRoute}
+                         className="bg-primary hover:bg-primary-dark disabled:opacity-50 transition-colors text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg shadow-primary/20"
+                       >
+                         {bookingType === 'schedule' ? 'Schedule' : 'Request Now'}
+                       </button>
+                    </div>
+                 </div>
+               )}
            </div>
         )}
 
@@ -378,6 +396,9 @@ const RequestRideScreen: React.FC = () => {
 
         {rideState === 'COMPLETED' && (
           <TripPaymentSummary
+            role="OWNER"
+            pickup={pickup ? getLocationShortText(pickup) : undefined}
+            destination={destination ? getLocationShortText(destination) : undefined}
             onClose={() => resetRide()}
             fareBreakdown={null}
             paymentStatus="UNPAID"

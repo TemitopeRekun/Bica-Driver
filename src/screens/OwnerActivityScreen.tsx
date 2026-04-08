@@ -379,8 +379,8 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
               </h2>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
                 {activeTab === 'trips'
-                  ? 'Trips are now separated from the booking flow so this screen can stay clean and easy to browse.'
-                  : 'Payments now have their own space, with brighter amount styling and easier reference scanning.'}
+                  ? 'Manage your travel history and review your ride details in one place.'
+                  : 'Track your confirmed payments and maintain total budget transparency.'}
               </p>
             </div>
           </div>

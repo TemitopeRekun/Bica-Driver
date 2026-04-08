@@ -412,8 +412,8 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
               </h2>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
                 {activeTab === 'trips'
-                  ? 'Your driver home now stays focused on incoming owner requests while completed ride history lives here.'
-                  : 'Settlements are now easier to browse without cluttering the live requests screen.'}
+                  ? 'Review your past performance and verify every trip milestone you have completed.'
+                  : 'Track your settled earnings and monitor your account balance in real-time.'}
               </p>
             </div>
           </div>

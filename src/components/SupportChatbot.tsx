@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, GenerateContentResponse } from '@google/genai';
 import { UserProfile } from '@/types';
+import { useUIStore } from '@/stores/uiStore';
 import { Config } from '@/services/Config';
 
 interface SupportChatbotProps {
@@ -15,6 +16,7 @@ interface Message {
 
 const SupportChatbot: React.FC<SupportChatbotProps> = ({ user }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const { addToast } = useUIStore();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
@@ -90,6 +92,7 @@ const SupportChatbot: React.FC<SupportChatbotProps> = ({ user }) => {
       }
     } catch (error) {
       console.error("Chat error:", error);
+      addToast("We're having a little trouble connecting to support. Please check your internet.", 'warning');
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'model',

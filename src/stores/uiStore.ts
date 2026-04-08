@@ -1,42 +1,37 @@
 import { create } from 'zustand';
-
-export type ToastType = 'info' | 'success' | 'warning' | 'error';
-
-interface Toast {
-  id: string;
-  message: string;
-  type: ToastType;
-}
+import { ToastItem, ToastVariant } from '@/types/toast';
 
 interface UIState {
-  toasts: Toast[];
+  toasts: ToastItem[];
   isGlobalLoading: boolean;
-  addToast: (message: string, type?: ToastType) => void;
+  addToast: (message: string, variant?: ToastVariant, options?: Partial<Omit<ToastItem, 'id' | 'message' | 'variant'>>) => string;
   removeToast: (id: string) => void;
   setGlobalLoading: (isLoading: boolean) => void;
-  playNotificationSound: () => void;
 }
-
-// Low-latency base64 notification chime (short premium "ping")
-const NOTIFICATION_CHIME = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPA...'; // Placeholder, will replace with a real short one or use HTML5 Audio if asset is missing
 
 export const useUIStore = create<UIState>((set, get) => ({
   toasts: [],
   isGlobalLoading: false,
 
-  addToast: (message, type = 'info') => {
+  addToast: (message, variant = 'info', options = {}) => {
     const id = Math.random().toString(36).substring(2, 9);
+    
     set((state) => ({
-      toasts: [...state.toasts, { id, message, type }],
+      toasts: [...state.toasts, { 
+        id, 
+        message, 
+        variant,
+        ...options 
+      }],
     }));
 
-    // Auto-play sound for toasts as requested
-    get().playNotificationSound();
-
-    // Auto-remove after 4 seconds
+    // Auto-remove after 4-6 seconds based on variant
+    const duration = options.duration || (variant === 'error' ? 6000 : 4000);
     setTimeout(() => {
       get().removeToast(id);
-    }, 4000);
+    }, duration + 500); // Buffer for animation
+
+    return id;
   },
 
   removeToast: (id) => set((state) => ({
@@ -44,17 +39,4 @@ export const useUIStore = create<UIState>((set, get) => ({
   })),
 
   setGlobalLoading: (isLoading) => set({ isGlobalLoading: isLoading }),
-
-  playNotificationSound: () => {
-    try {
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // Professional notification sound
-      audio.volume = 0.5;
-      audio.play().catch(() => {
-        // Handle cases where audio play is blocked by browser policy without user gesture
-        console.warn('Playback blocked or failed');
-      });
-    } catch (e) {
-      console.error('Sound playback error:', e);
-    }
-  },
 }));

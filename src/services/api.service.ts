@@ -147,26 +147,49 @@ async function request<T>(
         return request<T>(method, path, body, requiresAuth, options, retryCount + 1, currentIdempotencyKey);
       }
 
+  // Human-friendly error normalization
+  const normalizeErrorMessage = (status: number, originalMessage: string) => {
+    switch (status) {
+      case 401: return 'Your session has expired. Please log in again to continue.';
+      case 403: return 'You don\'t have permission to perform this action. If you believe this is an error, please contact support.';
+      case 404: return 'We couldn\'t find what you were looking for. It might have been moved or deleted.';
+      case 409: 
+        if (originalMessage.includes('idempotency')) return 'This request is already being processed. Please wait a moment.';
+        return 'There is a conflict with your request. This might happen if someone else made a change at the same time.';
+      case 422: return 'Some of the information you provided seems incorrect. Please check your details and try again.';
+      case 429: return 'We\'re receiving a lot of requests right now. Please take a 5-second breather and try again.';
+      case 500: return 'Our servers are having a momentary hiccup. We\'ve been notified and are working on it!';
+      case 502:
+      case 503:
+      case 504: return 'We\'re having trouble reaching our servers. Please check your internet connection or try again shortly.';
+      default: 
+        if (originalMessage.includes('Failed to fetch')) return 'We can\'t reach the internet right now. Please check your connection.';
+        return originalMessage || 'Something unexpected happened on our end. Please try again.';
+    }
+  };
+
       // Handle the new standardized error format (supporting message arrays)
-      let errorMessage = `Request failed with status ${response.status}`;
+      let rawErrorMessage = `Request failed with status ${response.status}`;
       
       if (typeof data === 'object' && data && 'message' in data) {
         if (Array.isArray(data.message)) {
-          errorMessage = data.message.join('; ');
+          rawErrorMessage = data.message.join('; ');
         } else {
-          errorMessage = String(data.message);
+          rawErrorMessage = String(data.message);
         }
       } else if (typeof data === 'string' && data.trim()) {
-        errorMessage = data;
+        rawErrorMessage = data;
       }
+
+      const errorMessage = normalizeErrorMessage(response.status, rawErrorMessage);
 
       // Handle 429 Rate Limiting
       if (response.status === 429) {
         throttleCoolDownUntil = Date.now() + THROTTLE_DURATION_MS;
-        console.error('[API] 429 Too Many Requests. Throttling all requests for 5s.');
       }
 
       const error = new Error(errorMessage) as any;
+      error.rawMessage = rawErrorMessage;
       error.reqId = reqId;
       error.status = response.status;
       throw error;

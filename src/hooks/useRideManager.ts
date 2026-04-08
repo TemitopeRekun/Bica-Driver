@@ -76,10 +76,10 @@ export const useRideManager = () => {
         });
       }
       
-      addToast(scheduledAt ? 'Ride successfully scheduled!' : 'Ride request sent! Waiting for driver to accept.', 'info');
+      addToast(scheduledAt ? 'Great! Your ride has been scheduled successfully.' : 'Your request has been sent! We\'re just waiting for the chauffeur to confirm.', 'info');
       return trip;
     } catch (error: any) {
-      addToast(error.message || 'Could not book ride. Please try again.', 'error');
+      addToast(error.message || 'We couldn\'t process your request right now. Please try again or check your connection.', 'error');
       setRideState('IDLE');
       throw error;
     }
@@ -95,9 +95,9 @@ export const useRideManager = () => {
     try {
       await api.post(`/rides/${tripId}/cancel`);
       resetRide();
-      addToast('Ride cancelled.', 'info');
+      addToast('Your ride has been cancelled as requested.', 'info');
     } catch (error: any) {
-      addToast(error.message || 'Failed to cancel ride.', 'error');
+      addToast(error.message || 'We had trouble cancelling the trip. Please try again or contact support if the issue persists.', 'error');
     }
   }, [resetRide, addToast]);
   

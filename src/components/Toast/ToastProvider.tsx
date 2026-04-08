@@ -1,6 +1,7 @@
-import React, { useState, useCallback, ReactNode, useMemo } from 'react';
+import React, { useCallback, ReactNode, useMemo } from 'react';
 import { ToastContext } from '../../hooks/useToast';
 import { ToastItem, ToastVariant } from '../../types/toast';
+import { useUIStore } from '../../stores/uiStore';
 import ToastItemComponent from './ToastItem';
 
 interface ToastProviderProps {
@@ -8,26 +9,15 @@ interface ToastProviderProps {
 }
 
 export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+  const { toasts, addToast: storeAddToast, removeToast } = useUIStore();
 
   const addToast = useCallback((toast: Omit<ToastItem, 'id'>) => {
-    const id = Math.random().toString(36).substr(2, 9);
-    
-    // Simple deduplication: don't add the same message/variant if it's already there
-    setToasts((prev) => {
-      const isDuplicate = prev.some(
-        (t) => t.message === toast.message && t.variant === toast.variant
-      );
-      if (isDuplicate) return prev;
-      return [...prev, { ...toast, id }];
+    return storeAddToast(toast.message, toast.variant, {
+      title: toast.title,
+      duration: toast.duration,
+      action: toast.action
     });
-
-    return id;
-  }, []);
+  }, [storeAddToast]);
 
   const toastApi = useMemo(() => ({
     success: (message: string, options?: any) => addToast({ ...options, message, variant: 'success' }),
@@ -48,8 +38,8 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       {children}
       
       {/* Toast Viewport/Container */}
-      <div className="fixed inset-x-0 bottom-0 z-[100] p-4 flex flex-col items-center gap-3 pointer-events-none sm:bottom-4 md:bottom-8">
-        <div className="flex flex-col-reverse items-center gap-2 w-full">
+      <div className="fixed inset-x-0 bottom-0 z-[100] p-4 pb-8 flex flex-col items-center gap-3 pointer-events-none sm:bottom-4 md:bottom-8">
+        <div className="flex flex-col-reverse items-center gap-2 w-full max-w-md mx-auto">
           {toasts.map((toast) => (
             <ToastItemComponent
               key={toast.id}

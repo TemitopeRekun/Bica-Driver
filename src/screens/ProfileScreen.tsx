@@ -30,7 +30,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
 
   const handleFeatureAlert = (feature: string) => {
     CapacitorService.triggerHaptic();
-    toast.info(`${feature} is not available in the demo.`);
+    toast.info(`Great news! ${feature} is coming very soon to your BICA experience.`);
   };
 
   const handleCameraUpdate = async () => {
@@ -40,8 +40,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
       setIsUpdatingAvatar(true);
       try {
         await onUpdateAvatar(photo);
+        toast.success("Looking good! Your profile photo has been updated.");
       } catch (error: any) {
-        toast.error(error.message || 'Could not update your avatar. Please try again.');
+        toast.error(error.message || "We couldn't update your photo right now. Please check your connection and try again.");
       } finally {
         setIsUpdatingAvatar(false);
       }

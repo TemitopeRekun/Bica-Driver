@@ -73,7 +73,11 @@ const SignUpScreen: React.FC = () => {
         navigate('/login');
       }
     } catch (error: any) {
-      addToast(error.message || 'Registration failed.', 'error');
+      if (error.message?.includes('409')) {
+        addToast('This email is already registered. Try logging in instead!', 'warning');
+      } else {
+        addToast(error.message || 'We couldn\'t create your account right now. Please try again.', 'error');
+      }
     } finally {
       setIsLoading(false);
     }

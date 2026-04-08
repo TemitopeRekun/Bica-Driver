@@ -1,11 +1,15 @@
 import React from 'react';
 
 interface TripPaymentSummaryProps {
+  role?: 'OWNER' | 'DRIVER';
+  pickup?: string;
+  destination?: string;
   fareBreakdown: {
     distanceKm?: number;
     actualMins?: number;
     totalMins?: number;
     finalFare: number;
+    driverEarnings?: number;
   } | null;
   paymentStatus?: 'UNPAID' | 'SUCCESS' | 'FAILED' | 'PENDING';
   paymentMessage?: string | null;
@@ -15,6 +19,9 @@ interface TripPaymentSummaryProps {
 }
 
 const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({ 
+  role = 'OWNER',
+  pickup,
+  destination,
   fareBreakdown,
   paymentStatus = 'UNPAID',
   paymentMessage,
@@ -22,14 +29,20 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
   onClose,
   isInitiatingPayment = false
 }) => {
+  const isDriver = role === 'DRIVER';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
       <div className="w-full max-w-sm bg-white dark:bg-surface-dark rounded-[2.5rem] shadow-2xl overflow-hidden animate-slide-up">
         {/* Header */}
         <div className="px-6 py-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
           <div>
-            <h3 className="text-xl font-black text-slate-900 dark:text-white">Trip Result</h3>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Final Settlement</p>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white">
+              {isDriver ? 'Trip Earnings' : 'Trip Result'}
+            </h3>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              {isDriver ? 'Performance Summary' : 'Final Settlement'}
+            </p>
           </div>
           <button 
             onClick={onClose}
@@ -40,8 +53,24 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
         </div>
 
         <div className="p-8 space-y-6">
+          {/* Route Summary (Optional for Owner) */}
+          {!isDriver && pickup && destination && (
+            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-2xl">
+              <div className="flex flex-col items-center gap-1">
+                <div className="size-2 rounded-full bg-primary" />
+                <div className="w-0.5 h-4 bg-slate-200 dark:bg-slate-700" />
+                <div className="size-2 rounded-full bg-accent" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-slate-400 uppercase truncate">{pickup}</p>
+                <div className="h-2" />
+                <p className="text-[10px] font-bold text-slate-400 uppercase truncate">{destination}</p>
+              </div>
+            </div>
+          )}
+
           {/* Detailed Breakdown */}
-          <div className="space-y-3">
+          <div className="space-y-4">
              <div className="flex justify-between items-center">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Distance traveled</span>
                 <span className="text-sm font-black text-slate-900 dark:text-white">{fareBreakdown?.distanceKm || 0} km</span>
@@ -50,14 +79,28 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Elapsed Time</span>
                 <span className="text-sm font-black text-slate-900 dark:text-white">{fareBreakdown?.actualMins || fareBreakdown?.totalMins || 0} mins</span>
              </div>
-             <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                <span className="text-sm font-black text-slate-900 dark:text-white">Amount Due</span>
-                <span className="text-2xl font-black text-primary">₦{(fareBreakdown?.finalFare || 0).toLocaleString()}</span>
-             </div>
+
+             {isDriver ? (
+               <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex justify-between items-center opacity-70">
+                    <span className="text-xs font-bold text-slate-500 uppercase">Customer Paid</span>
+                    <span className="text-sm font-black text-slate-900 dark:text-white">₦{(fareBreakdown?.finalFare || 0).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">Your Earnings</span>
+                    <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">₦{(fareBreakdown?.driverEarnings || Math.round((fareBreakdown?.finalFare || 0) * 0.8)).toLocaleString()}</span>
+                  </div>
+               </div>
+             ) : (
+               <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                  <span className="text-sm font-black text-slate-900 dark:text-white">Total Amount</span>
+                  <span className="text-3xl font-black text-primary">₦{(fareBreakdown?.finalFare || 0).toLocaleString()}</span>
+               </div>
+             )}
           </div>
 
-          {/* Payment Status Alert */}
-          {paymentMessage && (
+          {/* Payment Status Alert for Owner */}
+          {!isDriver && paymentMessage && (
             <div className={`p-4 rounded-2xl flex gap-3 items-start border-2 ${
               paymentStatus === 'SUCCESS' ? 'bg-green-500/5 border-green-500/20 text-green-600' : 'bg-red-500/5 border-red-500/20 text-red-600'
             }`}>
@@ -70,7 +113,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-3">
-            {paymentStatus !== 'SUCCESS' && onPayNow && (
+            {!isDriver && paymentStatus !== 'SUCCESS' && onPayNow && (
               <button 
                 onClick={onPayNow}
                 disabled={isInitiatingPayment}
@@ -86,9 +129,9 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
             )}
             <button 
               onClick={onClose}
-              className="w-full bg-slate-100 dark:bg-slate-800 text-slate-500 font-black py-4 rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+              className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black py-4 rounded-2xl hover:opacity-90 transition-all uppercase tracking-widest text-xs"
             >
-              DISMISS
+              {isDriver ? 'Complete and Go Online' : 'Dismiss'}
             </button>
           </div>
         </div>

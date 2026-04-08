@@ -84,7 +84,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
         if (!cancelled) setSelectedUserDetails(mapUser(user));
       })
       .catch((err: any) => {
-        console.error('Failed to refresh profile:', err);
+        toast.error("We couldn't refresh this user's latest details. Some information might be slightly out of date.");
       })
       .finally(() => {
         if (!cancelled) setSelectedUserDetailsLoading(false);

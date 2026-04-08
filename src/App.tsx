@@ -84,21 +84,23 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-      <div className="flex justify-center items-start min-h-screen bg-slate-950">
-        <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative">
-          
-          <VersionEnforcer>
-            {/* The Main Router */}
-            <RouterProvider router={router} />
-          </VersionEnforcer>
+      <ToastContainer>
+        <div className="flex justify-center items-start min-h-screen bg-slate-950">
+          <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative">
+            
+            <VersionEnforcer>
+              {/* The Main Router */}
+              <RouterProvider router={router} />
+            </VersionEnforcer>
 
-          {/* Global Overlays */}
-          {currentUser && (
-            <SupportChatbot user={currentUser} />
-          )}
-          
+            {/* Global Overlays */}
+            {currentUser && (
+              <SupportChatbot user={currentUser} />
+            )}
+            
+          </div>
         </div>
-      </div>
+      </ToastContainer>
     </ErrorBoundary>
   );
 };

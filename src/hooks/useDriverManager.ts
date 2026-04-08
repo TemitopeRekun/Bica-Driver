@@ -33,16 +33,16 @@ export const useDriverManager = () => {
         setRideMilestone('arrived');
       } else if (status === 'IN_PROGRESS') {
         setRideMilestone('in_progress');
-      } else if (status === 'COMPLETED') {
+      }      if (status === 'COMPLETED') {
         setRideState('COMPLETED');
         setRideMilestone('completed');
-        addToast('Trip completed successfully!', 'success');
+        addToast('Great job! Trip completed successfully.', 'success');
         await loadWalletSummary();
       }
       
       return result;
     } catch (error: any) {
-      addToast(error.message || `Failed to update status to ${status}`, 'error');
+      addToast(error.message || `We couldn't update the status to ${status.toLowerCase()}. Please check your connection.`, 'error');
       throw error;
     } finally {
       setIsUpdatingStatus(false);
@@ -54,9 +54,9 @@ export const useDriverManager = () => {
       await api.post(`/rides/${tripId}/accept`);
       setRideState('ASSIGNED');
       setRideMilestone('assigned');
-      addToast('Ride accepted! Proceed to pickup.', 'success');
+      addToast('Ride accepted! You can now proceed to the pickup location.', 'success');
     } catch (error: any) {
-      addToast(error.message || 'Failed to accept ride.', 'error');
+      addToast(error.message || 'We had trouble accepting this ride. It might have been taken or cancelled.', 'error');
       throw error;
     }
   }, [addToast, setRideState, setRideMilestone]);
@@ -64,9 +64,9 @@ export const useDriverManager = () => {
   const declineRide = useCallback(async (tripId: string) => {
     try {
       await api.post(`/rides/${tripId}/decline`);
-      addToast('Ride declined.', 'info');
+      addToast('Ride declined. We\'ll look for more requests for you.', 'info');
     } catch (error: any) {
-      addToast(error.message || 'Failed to decline ride.', 'error');
+      addToast(error.message || 'We couldn\'t decline the ride right now. Please try again.', 'error');
     }
   }, [addToast]);
 

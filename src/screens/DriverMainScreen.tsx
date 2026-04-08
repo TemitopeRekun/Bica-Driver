@@ -11,6 +11,7 @@ import { useDriverRealtime, DriverRideRequest } from '@/hooks/useDriverRealtime'
 // Components
 import InteractiveMap from '@/components/InteractiveMap';
 import TripProgressTimeline from '@/components/Driver/TripProgressTimeline';
+import TripPaymentSummary from '@/components/RequestRide/TripPaymentSummary';
 import { CapacitorService } from '@/services/CapacitorService';
 import { IMAGES } from '@/constants';
 import { CameraSource, CameraDirection } from '@capacitor/camera';
@@ -28,6 +29,7 @@ const DriverMainScreen: React.FC = () => {
   const [showSelfieModal, setShowSelfieModal] = useState(false);
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
   const [pendingRide, setPendingRide] = useState<DriverRideRequest | null>(null);
+  const [completedTripSummary, setCompletedTripSummary] = useState<any | null>(null);
 
   const handleOnlineStatusChange = React.useCallback((nextIsOnline: boolean) => {
     // Optional: Log status change or update local UI state if needed
@@ -99,8 +101,13 @@ const DriverMainScreen: React.FC = () => {
     if (!activeRide) return;
     try {
       CapacitorService.triggerHaptic();
-      await updateRideStatus(activeRide.id, status);
+      const result = await updateRideStatus(activeRide.id, status);
       if (status === 'COMPLETED') {
+        setCompletedTripSummary({
+          ...result,
+          pickup: activeRide.pickup,
+          destination: activeRide.destination
+        });
         setActiveRide(null);
       }
     } catch (e) {}
@@ -210,6 +217,25 @@ const DriverMainScreen: React.FC = () => {
                 )}
              </div>
           </div>
+       )}
+
+       {/* Completion Summary Modal */}
+       {completedTripSummary && (
+          <TripPaymentSummary 
+            role="DRIVER"
+            pickup={completedTripSummary.pickup}
+            destination={completedTripSummary.destination}
+            fareBreakdown={{
+              distanceKm: completedTripSummary.distanceKm || 0,
+              actualMins: completedTripSummary.actualMins || completedTripSummary.totalMins || 0,
+              finalFare: completedTripSummary.amount || 0,
+              driverEarnings: completedTripSummary.driverEarnings || 0
+            }}
+            onClose={() => {
+               setCompletedTripSummary(null);
+               setRideState('IDLE');
+            }}
+          />
        )}
     </div>
   );
