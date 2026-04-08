@@ -15,6 +15,15 @@ export const mapUser = (backendUser: any): UserProfile => ({
   monnifySubAccountCode: backendUser.monnifySubAccountCode,
   subAccountActive: backendUser.subAccountActive,
   canRetrySubAccountSetup: backendUser.canRetrySubAccountSetup,
+  carType: backendUser.carType,
+  carModel: backendUser.carModel,
+  carYear: backendUser.carYear,
+  transmission: backendUser.transmission,
+  nin: backendUser.nin,
+  age: backendUser.age,
+  gender: backendUser.gender,
+  nationality: backendUser.nationality,
+  address: backendUser.address,
   currentLocation: backendUser.locationLat
     ? { lat: backendUser.locationLat, lng: backendUser.locationLng }
     : undefined,
