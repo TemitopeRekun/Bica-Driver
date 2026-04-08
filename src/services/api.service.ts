@@ -45,13 +45,17 @@ export const clearToken = (): void => {
   localStorage.removeItem('bica_token');
 };
 
-// Core request function
+// Sleep helper for backoff
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Core request function with retry logic
 async function request<T>(
   method: string,
   path: string,
   body?: any,
   requiresAuth = true,
   options?: RequestOptions,
+  retryCount = 0
 ): Promise<T> {
   const baseUrl = requireApiUrl();
   const headers: Record<string, string> = {
@@ -63,7 +67,7 @@ async function request<T>(
     headers['X-Idempotency-Key'] = options?.idempotencyKey || generateUUID();
   }
 
-  // Only declare JSON content-type when sending a body (except for DELETE which might not have one)
+  // Only declare JSON content-type when sending a body
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
   }
@@ -75,44 +79,64 @@ async function request<T>(
     }
   }
 
-  const response = await fetch(`${baseUrl}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-    signal: options?.signal,
-  });
+  try {
+    const response = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: options?.signal,
+    });
 
-  // Handle centralized 401 Unauthorized
-  if (response.status === 401 && requiresAuth) {
-    if (unauthorizedListener) {
-      unauthorizedListener('Your session has expired. Please log in again.');
+    // Handle centralized 401 Unauthorized
+    if (response.status === 401 && requiresAuth) {
+      if (unauthorizedListener) {
+        unauthorizedListener('Your session has expired. Please log in again.');
+      }
+      throw new Error('Unauthorized');
     }
-    throw new Error('Unauthorized');
-  }
 
-  const rawBody = await response.text();
-  let data: any = null;
+    const rawBody = await response.text();
+    let data: any = null;
 
-  if (rawBody) {
-    try {
-      data = JSON.parse(rawBody);
-    } catch {
-      data = rawBody;
+    if (rawBody) {
+      try {
+        data = JSON.parse(rawBody);
+      } catch {
+        data = rawBody;
+      }
     }
+
+    if (!response.ok) {
+      // Logic for retrying failed GET requests (transient errors 500, 502, 503, 504)
+      const isTransientError = response.status >= 500 && response.status <= 504;
+      if (method === 'GET' && isTransientError && retryCount < 3) {
+        const backoffMs = Math.pow(2, retryCount) * 1000;
+        console.warn(`[API] Retrying GET ${path} after ${backoffMs}ms... (Attempt ${retryCount + 1})`);
+        await sleep(backoffMs);
+        return request<T>(method, path, body, requiresAuth, options, retryCount + 1);
+      }
+
+      const message =
+        typeof data === 'object' && data && 'message' in data
+          ? (data.message as string)
+          : typeof data === 'string' && data.trim()
+            ? data
+            : `Request failed with status ${response.status}`;
+
+      throw new Error(message);
+    }
+
+    return data as T;
+  } catch (error: any) {
+    // Retry on network errors (lost connection)
+    if (method === 'GET' && error.message.includes('Failed to fetch') && retryCount < 3) {
+      const backoffMs = Math.pow(2, retryCount) * 1000;
+      console.warn(`[API] Connection lost. Retrying GET ${path} after ${backoffMs}ms...`);
+      await sleep(backoffMs);
+      return request<T>(method, path, body, requiresAuth, options, retryCount + 1);
+    }
+    throw error;
   }
-
-  if (!response.ok) {
-    const message =
-      typeof data === 'object' && data && 'message' in data
-        ? (data.message as string)
-        : typeof data === 'string' && data.trim()
-          ? data
-          : `Request failed with status ${response.status}`;
-
-    throw new Error(message);
-  }
-
-  return data as T;
 }
 
 // Convenience methods
