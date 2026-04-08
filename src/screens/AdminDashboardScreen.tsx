@@ -26,6 +26,7 @@ interface AdminDashboardScreenProps {
   onBlockUser: (userId: string, blocked: boolean) => void;
   onRetrySubAccount: (userId: string) => Promise<void>;
   onUpdateSettings: (settings: SystemSettings) => void;
+  onForcedLogout: () => void;
   onRetry: () => Promise<void> | void;
   onBack: () => void;
   onSimulate: (role: UserRole) => void;
@@ -35,7 +36,7 @@ type AdminSection = 'overview' | 'drivers' | 'owners' | 'trips' | 'finance' | 's
 
 const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({ 
   users, trips, pendingPayments, paymentHistory, settings, isLoading, error, lastUpdated,
-  onUpdateStatus, onBlockUser, onRetrySubAccount, onUpdateSettings, 
+  onUpdateStatus, onBlockUser, onRetrySubAccount, onUpdateSettings, onForcedLogout,
   onRetry, onBack, onSimulate 
 }) => {
   const { toast } = useToast();

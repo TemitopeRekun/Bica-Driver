@@ -94,7 +94,7 @@ export const router = createHashRouter([
           error={null} 
           onUpdateStatus={() => {}} 
           onBlockUser={() => {}} 
-          onRetrySubAccount={() => {}} 
+          onRetrySubAccount={async () => {}} 
           onUpdateSettings={() => {}} 
           onRetry={() => {}} 
           onBack={() => {}} 
@@ -109,7 +109,7 @@ export const router = createHashRouter([
     path: '/profile',
     element: (
       <ProtectedRoute>
-        <ProfileScreen user={null as any} initialRole={UserRole.UNSET} onBack={() => {}} onLogout={() => {}} onUpdateAvatar={() => {}} />
+        <ProfileScreen user={null as any} initialRole={UserRole.UNSET} onBack={() => {}} onLogout={() => {}} onUpdateAvatar={async () => {}} />
       </ProtectedRoute>
     ),
   },
