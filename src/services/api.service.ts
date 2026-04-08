@@ -5,12 +5,20 @@ interface RequestOptions {
   idempotencyKey?: string;
 }
 
-// Simple UUID generator fallback for older environments
+// Robust UUID v4 generator with fallback for older environments
 const generateUUID = () => {
   try {
-    return crypto.randomUUID();
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback v4 implementation
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
   } catch (e) {
-    return Math.random().toString(36).substring(2) + Date.now().toString(36);
+    return Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
   }
 };
 
@@ -51,11 +59,11 @@ async function request<T>(
   };
 
   // Automated Idempotency-Key for all mutation requests
-  if (method === 'POST' || method === 'PATCH' || method === 'PUT') {
+  if (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') {
     headers['X-Idempotency-Key'] = options?.idempotencyKey || generateUUID();
   }
 
-  // Only declare JSON content-type when sending a body
+  // Only declare JSON content-type when sending a body (except for DELETE which might not have one)
   if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
   }

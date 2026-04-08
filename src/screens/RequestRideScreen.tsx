@@ -47,8 +47,10 @@ const RequestRideScreen: React.FC = () => {
   const refreshAvailableDriversRef = useRef<() => Promise<void>>(async () => {});
 
   const [bookingType, setBookingType] = useState<'now' | 'schedule'>('now');
+  const [scheduledAt, setScheduledAt] = useState<string>('');
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [showDriverPicker, setShowDriverPicker] = useState(false);
+  
   const [vehicleData, setVehicleData] = useState({
     make: currentUser?.carType || '',
     model: currentUser?.carModel || '',
@@ -101,7 +103,7 @@ const RequestRideScreen: React.FC = () => {
     },
     onLocationUpdated: (lat, lng) => setTrackedDriverPos([lat, lng]),
     onRideProgress: (payload) => {
-       if (payload.milestone === 'inprogress') setRideMilestone('in_progress');
+       if (payload.milestone === 'inprogress' || payload.milestone === 'in_progress') setRideMilestone('in_progress');
        else if (payload.milestone === 'arrived') setRideMilestone('arrived');
     },
     onPaymentUpdated: (data) => {
@@ -112,8 +114,15 @@ const RequestRideScreen: React.FC = () => {
   const handleConfirmRequest = async () => {
     setShowVehicleForm(false);
     if (bookingType === 'schedule') {
-      addToast('Ride successfully scheduled!', 'success');
-      setRideState('SCHEDULED');
+      if (!scheduledAt) {
+        addToast('Please select a time for your scheduled ride.', 'warning');
+        return;
+      }
+      // For scheduled rides, we can either assign a driver now or let the backend do it.
+      // Given the current flow, we'll fetch drivers first to show the picker, 
+      // or we could just send the request.
+      setShowDriverPicker(true);
+      await fetchAvailableDrivers(pickup!, vehicleData.transmission);
     } else {
       setShowDriverPicker(true);
       await fetchAvailableDrivers(pickup!, vehicleData.transmission);
@@ -122,7 +131,13 @@ const RequestRideScreen: React.FC = () => {
 
   const handleSelectDriver = async (driver: any) => {
     setShowDriverPicker(false);
-    await initiateRideRequest(pickup!, destination!, driver, vehicleData);
+    await initiateRideRequest(
+      pickup!, 
+      destination!, 
+      driver, 
+      vehicleData, 
+      bookingType === 'schedule' ? new Date(scheduledAt).toISOString() : null
+    );
   };
 
   const markers: any[] = [];
@@ -210,29 +225,71 @@ const RequestRideScreen: React.FC = () => {
       <div className="relative z-20 px-4 pb-8">
         {rideState === 'IDLE' && (
            <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-slide-up">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold">Plan your ride</h2>
-              </div>
-              
-              <div className="flex flex-col gap-4">
-                 <button onClick={() => setIsSearchingPickup(true)} className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl text-left">
-                    <span className="material-symbols-outlined text-primary">my_location</span>
-                    <span className="text-sm font-medium truncate">{pickup ? getLocationShortText(pickup) : 'Where to pick you up?'}</span>
-                 </button>
-                 <button onClick={() => setIsSearchingDest(true)} className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl text-left">
-                    <span className="material-symbols-outlined text-accent">location_on</span>
-                    <span className="text-sm font-medium truncate">{destination ? getLocationShortText(destination) : 'Where are you going?'}</span>
-                 </button>
-              </div>
+               <div className="mb-4 flex items-center justify-between">
+                 <h2 className="text-lg font-bold">Plan your ride</h2>
+                 <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/5">
+                   <button 
+                     onClick={() => setBookingType('now')}
+                     className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${bookingType === 'now' ? 'bg-white dark:bg-slate-800 text-primary shadow-sm shadow-black/5' : 'text-slate-500'}`}
+                   >
+                     Now
+                   </button>
+                   <button 
+                     onClick={() => setBookingType('schedule')}
+                     className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all ${bookingType === 'schedule' ? 'bg-white dark:bg-slate-800 text-primary shadow-sm shadow-black/5' : 'text-slate-500'}`}
+                   >
+                     Schedule
+                   </button>
+                 </div>
+               </div>
+               
+               <div className="flex flex-col gap-4">
+                  <button onClick={() => setIsSearchingPickup(true)} className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl text-left border border-transparent hover:border-slate-200 dark:hover:border-white/10 transition-colors">
+                     <span className="material-symbols-outlined text-primary">my_location</span>
+                     <div className="flex-1 min-w-0">
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pickup</p>
+                       <p className="text-sm font-black truncate">{pickup ? getLocationShortText(pickup) : 'Where to pick you up?'}</p>
+                     </div>
+                  </button>
+                  <button onClick={() => setIsSearchingDest(true)} className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl text-left border border-transparent hover:border-slate-200 dark:hover:border-white/10 transition-colors">
+                     <span className="material-symbols-outlined text-accent">location_on</span>
+                     <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Destination</p>
+                        <p className="text-sm font-black truncate">{destination ? getLocationShortText(destination) : 'Where are you going?'}</p>
+                     </div>
+                  </button>
 
-              {pickup && destination && (
+                  {bookingType === 'schedule' && (
+                    <div className="flex flex-col gap-2 p-4 bg-primary/5 rounded-2xl border border-primary/20 animate-in fade-in slide-in-from-top-2">
+                       <p className="text-[10px] font-bold text-primary uppercase tracking-widest flex items-center gap-2">
+                         <span className="material-symbols-outlined text-sm">calendar_month</span>
+                         Scheduled Time
+                       </p>
+                       <input 
+                         type="datetime-local" 
+                         value={scheduledAt}
+                         onChange={(e) => setScheduledAt(e.target.value)}
+                         className="bg-transparent border-none text-sm font-black text-slate-900 dark:text-white focus:ring-0 w-full"
+                         min={new Date().toISOString().slice(0, 16)}
+                       />
+                    </div>
+                  )}
+               </div>
+
+               {pickup && destination && (
                 <div className="mt-6 p-4 bg-primary/5 rounded-2xl border border-primary/10">
                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-[10px] font-bold text-primary uppercase">Estimated Fare</p>
+                      <div className="flex-1">
+                        <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Estimated Fare</p>
                         <p className="text-2xl font-black">₦{estimatedPrice}</p>
+                        <p className="text-[10px] text-slate-400 font-medium">Approx. {estimatedDistance} km</p>
                       </div>
-                      <button onClick={() => setShowVehicleForm(true)} className="bg-primary text-white px-6 py-3 rounded-xl font-bold">Request Now</button>
+                      <button 
+                        onClick={() => setShowVehicleForm(true)} 
+                        className="bg-primary hover:bg-primary-dark transition-colors text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg shadow-primary/20"
+                      >
+                        {bookingType === 'schedule' ? 'Schedule Ride' : 'Request Now'}
+                      </button>
                    </div>
                 </div>
               )}

@@ -178,6 +178,13 @@ export const useDriverRealtime = ({
       });
     });
 
+    socketRef.current.on('trip:status', (data: any) => {
+      // payload: { tripId, status, milestone }
+      if (data.status === 'CANCELLED' || data.status === 'COMPLETED') {
+        removeRideRequest(data.tripId);
+      }
+    });
+
     return () => {
       socketRef.current?.disconnect();
       socketRef.current = null;

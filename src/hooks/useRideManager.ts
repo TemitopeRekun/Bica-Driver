@@ -36,9 +36,15 @@ export const useRideManager = () => {
     }
   }, [setAvailableDrivers]);
 
-  const initiateRideRequest = useCallback(async (pickup: LocationData, destination: LocationData, driver: any, vehicleData: any) => {
-    setRideState('SEARCHING');
-    setRideMilestone('requested');
+  const initiateRideRequest = useCallback(async (
+    pickup: LocationData, 
+    destination: LocationData, 
+    driver: any, 
+    vehicleData: any,
+    scheduledAt?: string | null
+  ) => {
+    setRideState(scheduledAt ? 'SCHEDULED' : 'SEARCHING');
+    setRideMilestone(scheduledAt ? 'scheduled' : 'requested');
     
     try {
       const trip = await api.post<any>('/rides', {
@@ -48,20 +54,23 @@ export const useRideManager = () => {
         destAddress: getLocationAddress(destination),
         destLat: destination.lat,
         destLng: destination.lon,
-        distanceKm: 0, // Will be calculated by backend or passed from location search
+        distanceKm: 0, 
         driverId: driver.id,
         transmission: vehicleData.transmission,
+        scheduledAt: scheduledAt || null,
       });
 
-      setCurrentTripId(trip.id);
-      setDriverInfo({
-        ...trip.driver,
-        avatar: trip.driver?.avatarUrl || IMAGES.DRIVER_CARD,
-        timeAway: driver.estimatedArrivalMins || 5,
-        tripId: trip.id,
-      });
+      if (!scheduledAt) {
+        setCurrentTripId(trip.id);
+        setDriverInfo({
+          ...trip.driver,
+          avatar: trip.driver?.avatarUrl || IMAGES.DRIVER_CARD,
+          timeAway: driver.estimatedArrivalMins || 5,
+          tripId: trip.id,
+        });
+      }
       
-      addToast('Ride request sent! Waiting for driver to accept.', 'info');
+      addToast(scheduledAt ? 'Ride successfully scheduled!' : 'Ride request sent! Waiting for driver to accept.', 'info');
       return trip;
     } catch (error: any) {
       addToast(error.message || 'Could not book ride. Please try again.', 'error');

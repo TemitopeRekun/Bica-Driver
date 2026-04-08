@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Trip, LocationData, UserProfile } from '../types';
 
 export type RideState = 'IDLE' | 'SEARCHING' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'SCHEDULED';
-export type RideMilestone = 'requested' | 'assigned' | 'arrived' | 'in_progress' | 'completed';
+export type RideMilestone = 'requested' | 'scheduled' | 'assigned' | 'arrived' | 'in_progress' | 'completed';
 
 interface RideStateData {
   rideState: RideState;

@@ -17,12 +17,21 @@ import SupportChatbot from '@/components/SupportChatbot';
 import { ToastProvider as ToastContainer } from '@/components/Toast/ToastProvider';
 
 const App: React.FC = () => {
-  const { currentUser, setCurrentUser, logout, setInitializing, isInitializing } = useAuthStore();
+  const { currentUser, setCurrentUser, logout, isAuthenticated, setInitializing, isInitializing } = useAuthStore();
   const { loadSettings } = useSettingsStore();
   const { addToast } = useUIStore();
+  const { initStatusBar } = CapacitorService;
 
   useEffect(() => {
-    CapacitorService.initStatusBar();
+    initStatusBar();
+    
+    // Initialize notifications if already authenticated
+    if (isAuthenticated) {
+      import('@/services/NotificationService').then(({ notificationService }) => {
+        notificationService.init();
+        notificationService.syncTokenWithBackend();
+      });
+    }
     
     // Centralized 401 listener
     setOnUnauthorizedListener((message) => {

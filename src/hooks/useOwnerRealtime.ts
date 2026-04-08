@@ -128,6 +128,14 @@ export const useOwnerRealtime = ({
     ownerSocketRef.current.on('payment:updated', (data: any) => {
       onPaymentUpdatedRef.current(data);
     });
+
+    ownerSocketRef.current.on('trip:status', (data: any) => {
+      // Reconcile broad status changes from the backend
+      // payload: { tripId, status, milestone }
+      if (data.milestone) {
+        onRideProgressRef.current?.(data);
+      }
+    });
     
 // Owner realtime hook for ride progress and tracking signals
     ownerSocketRef.current.on('ride:progress', (data: any) => {

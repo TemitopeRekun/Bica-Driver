@@ -32,6 +32,11 @@ export const useAuthStore = create<AuthState>()(
         saveToken(token);
         await localforage.setItem('bicadriver_current_user', user);
         set({ currentUser: user, isAuthenticated: true });
+        
+        // Initialize notifications and sync token upon login
+        const { notificationService } = await import('@/services/NotificationService');
+        await notificationService.init();
+        await notificationService.syncTokenWithBackend();
       },
 
       logout: async () => {
