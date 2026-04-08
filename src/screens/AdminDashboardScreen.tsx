@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { UserProfile, UserRole, ApprovalStatus, Trip, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord } from '@/types';
 import { mapUser } from '@/mappers/appMappers';
-import { api } from '@/services/api.service';
 import { useToast } from '@/hooks/useToast';
 
 // Sub-components
@@ -13,11 +12,17 @@ import FinanceSection from '@/components/Admin/FinanceSection';
 import SettingsSection from '@/components/Admin/SettingsSection';
 import UserDossierModal from '@/components/Admin/UserDossierModal';
 
+import { api, PaginationMeta } from '@/services/api.service';
+
 interface AdminDashboardScreenProps {
   users: UserProfile[];
+  usersMeta: PaginationMeta | null;
   trips: Trip[];
+  tripsMeta: PaginationMeta | null;
   pendingPayments: PendingPaymentTrip[];
+  pendingPaymentsMeta: PaginationMeta | null;
   paymentHistory: PaymentHistoryRecord[];
+  paymentHistoryMeta: PaginationMeta | null;
   settings: SystemSettings;
   isLoading?: boolean;
   error?: string | null;
@@ -30,14 +35,16 @@ interface AdminDashboardScreenProps {
   onRetry: () => Promise<void> | void;
   onBack: () => void;
   onSimulate: (role: UserRole) => void;
+  onPageChange: (section: 'users' | 'trips' | 'pending' | 'history', page: number) => void;
 }
 
 type AdminSection = 'overview' | 'drivers' | 'owners' | 'trips' | 'finance' | 'settings';
 
 const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({ 
-  users, trips, pendingPayments, paymentHistory, settings, isLoading, error, lastUpdated,
+  users, usersMeta, trips, tripsMeta, pendingPayments, pendingPaymentsMeta, paymentHistory, paymentHistoryMeta,
+  settings, isLoading, error, lastUpdated,
   onUpdateStatus, onBlockUser, onRetrySubAccount, onUpdateSettings, onForcedLogout,
-  onRetry, onBack, onSimulate 
+  onRetry, onBack, onSimulate, onPageChange
 }) => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<AdminSection>('overview');
@@ -205,23 +212,32 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
             {activeSection === 'drivers' && (
               <DriversSection 
                 drivers={drivers} driverFilter={driverFilter} searchTerm={searchTerm}
+                meta={usersMeta} onPageChange={(p) => onPageChange('users', p)}
                 setDriverFilter={setDriverFilter} setSelectedUser={setSelectedUser}
                 retryingSubAccountIds={retryingSubAccountIds} onRetrySubAccount={handleRetrySubAccountWrap}
               />
             )}
 
             {activeSection === 'owners' && (
-              <OwnersSection owners={owners} searchTerm={searchTerm} onBlockUser={onBlockUser} />
+              <OwnersSection 
+                owners={owners} searchTerm={searchTerm} onBlockUser={onBlockUser} 
+                meta={usersMeta} onPageChange={(p) => onPageChange('users', p)}
+              />
             )}
 
             {activeSection === 'trips' && (
-              <TripsSection trips={trips} formatCurrency={formatCurrency} getTripStatusClass={getTripStatusClass} />
+              <TripsSection 
+                trips={trips} meta={tripsMeta} onPageChange={(p) => onPageChange('trips', p)}
+                formatCurrency={formatCurrency} getTripStatusClass={getTripStatusClass} 
+              />
             )}
 
             {activeSection === 'finance' && (
               <FinanceSection 
                 platformFees={platformFees} totalRevenue={totalRevenue} settings={settings}
-                pendingPayments={pendingPayments} paymentHistory={paymentHistory}
+                pendingPayments={pendingPayments} pendingPaymentsMeta={pendingPaymentsMeta}
+                paymentHistory={paymentHistory} paymentHistoryMeta={paymentHistoryMeta}
+                onPageChange={onPageChange}
                 formatCurrency={formatCurrency} formatShortDate={formatShortDate}
               />
             )}

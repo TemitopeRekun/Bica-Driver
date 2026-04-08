@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { mapTrip } from '@/mappers/appMappers';
-import { api } from '@/services/api.service';
+import { api, PaginatedResponse, PaginationMeta } from '@/services/api.service';
 import { DriverActivityTab, PaymentHistoryRecord, Trip, WalletSummary } from '@/types';
 
 interface DriverActivityScreenProps {
@@ -53,7 +53,9 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<DriverActivityTab>(initialTab);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [tripsMeta, setTripsMeta] = useState<PaginationMeta | null>(null);
   const [settlements, setSettlements] = useState<PaymentHistoryRecord[]>([]);
+  const [settlementsMeta, setSettlementsMeta] = useState<PaginationMeta | null>(null);
   const [walletSummary, setWalletSummary] = useState<WalletSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -66,49 +68,82 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
     setIsLoading(true);
     setError('');
 
-    const [tripsResult, settlementsResult, walletResult] = await Promise.allSettled([
-      api.get<any[]>('/rides/history'),
-      api.get<PaymentHistoryRecord[]>('/payments/history'),
-      api.get<WalletSummary>('/payments/wallet'),
-    ]);
+    try {
+      const [tripsResult, settlementsResult, walletResult] = await Promise.allSettled([
+        api.get<PaginatedResponse<any>>('/rides/history?limit=20'),
+        api.get<PaginatedResponse<PaymentHistoryRecord>>('/payments/history?limit=20'),
+        api.get<WalletSummary>('/payments/wallet'),
+      ]);
 
-    if (tripsResult.status === 'fulfilled') {
-      setTrips(tripsResult.value.map(mapTrip));
-    } else {
-      setTrips([]);
-    }
-
-    if (settlementsResult.status === 'fulfilled') {
-      setSettlements(settlementsResult.value);
-    } else {
-      setSettlements([]);
-    }
-
-    if (walletResult.status === 'fulfilled') {
-      setWalletSummary(walletResult.value);
-    } else {
-      setWalletSummary(null);
-    }
-
-    const failedSections = [
-      tripsResult.status === 'rejected' ? 'trips' : null,
-      settlementsResult.status === 'rejected' ? 'settlements' : null,
-      walletResult.status === 'rejected' ? 'wallet summary' : null,
-    ].filter(Boolean);
-
-    if (failedSections.length > 0) {
-      setError(`Could not load ${failedSections.join(' and ')} right now.`);
-      
-      // Check if any of the rejections were 401/403
-      const authError = [tripsResult, settlementsResult, walletResult].find(
-        (res) => res.status === 'rejected' && (res.reason.message?.includes('401') || res.reason.message?.includes('403'))
-      );
-      if (authError && authError.status === 'rejected') {
-        onForcedLogout(authError.reason.message);
+      if (tripsResult.status === 'fulfilled') {
+        setTrips(tripsResult.value.items.map(mapTrip));
+        setTripsMeta(tripsResult.value.meta);
+      } else {
+        setTrips([]);
+        setTripsMeta(null);
       }
-    }
 
-    setIsLoading(false);
+      if (settlementsResult.status === 'fulfilled') {
+        setSettlements(settlementsResult.value.items);
+        setSettlementsMeta(settlementsResult.value.meta);
+      } else {
+        setSettlements([]);
+        setSettlementsMeta(null);
+      }
+
+      if (walletResult.status === 'fulfilled') {
+        setWalletSummary(walletResult.value);
+      } else {
+        setWalletSummary(null);
+      }
+
+      const failedSections = [
+        tripsResult.status === 'rejected' ? 'trips' : null,
+        settlementsResult.status === 'rejected' ? 'settlements' : null,
+        walletResult.status === 'rejected' ? 'wallet summary' : null,
+      ].filter(Boolean);
+
+      if (failedSections.length > 0) {
+        setError(`Could not load ${failedSections.join(' and ')} right now.`);
+        
+        const authError = [tripsResult, settlementsResult, walletResult].find(
+          (res) => res.status === 'rejected' && (res.reason.message?.includes('401') || res.reason.message?.includes('403'))
+        );
+        if (authError && authError.status === 'rejected') {
+          onForcedLogout(authError.reason.message);
+        }
+      }
+    } catch (e) {
+      setError('An unexpected error occurred while loading activity.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadTripsPage = async (page: number) => {
+    setIsLoading(true);
+    try {
+      const result = await api.get<PaginatedResponse<any>>(`/rides/history?page=${page}&limit=20`);
+      setTrips(result.items.map(mapTrip));
+      setTripsMeta(result.meta);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load page');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadSettlementsPage = async (page: number) => {
+    setIsLoading(true);
+    try {
+      const result = await api.get<PaginatedResponse<any>>(`/payments/history?page=${page}&limit=20`);
+      setSettlements(result.items);
+      setSettlementsMeta(result.meta);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load page');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -191,6 +226,29 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
 
     return (
       <div className="space-y-4">
+        {/* Pagination Controls */}
+        {tripsMeta && tripsMeta.totalPages > 1 && (
+          <div className="flex items-center justify-between mb-4 bg-white/40 dark:bg-white/5 p-2 rounded-2xl border border-sky-100 dark:border-sky-500/20">
+            <button 
+              disabled={tripsMeta.page === 0}
+              onClick={() => loadTripsPage(tripsMeta.page - 1)}
+              className="size-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-slate-600 disabled:opacity-30 shadow-sm"
+            >
+              <span className="material-symbols-outlined">chevron_left</span>
+            </button>
+            <span className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest">
+              Page {tripsMeta.page + 1} of {tripsMeta.totalPages}
+            </span>
+            <button 
+              disabled={tripsMeta.page >= tripsMeta.totalPages - 1}
+              onClick={() => loadTripsPage(tripsMeta.page + 1)}
+              className="size-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-slate-600 disabled:opacity-30 shadow-sm"
+            >
+              <span className="material-symbols-outlined">chevron_right</span>
+            </button>
+          </div>
+        )}
+
         {trips.map((trip) => (
           <div
             key={trip.id}
@@ -237,6 +295,29 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
 
     return (
       <div className="space-y-4">
+        {/* Pagination Controls */}
+        {settlementsMeta && settlementsMeta.totalPages > 1 && (
+          <div className="flex items-center justify-between mb-4 bg-white/40 dark:bg-white/5 p-2 rounded-2xl border border-emerald-100 dark:border-emerald-500/20">
+            <button 
+              disabled={settlementsMeta.page === 0}
+              onClick={() => loadSettlementsPage(settlementsMeta.page - 1)}
+              className="size-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-slate-600 disabled:opacity-30 shadow-sm"
+            >
+              <span className="material-symbols-outlined">chevron_left</span>
+            </button>
+            <span className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest">
+              Page {settlementsMeta.page + 1} of {settlementsMeta.totalPages}
+            </span>
+            <button 
+              disabled={settlementsMeta.page >= settlementsMeta.totalPages - 1}
+              onClick={() => loadSettlementsPage(settlementsMeta.page + 1)}
+              className="size-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-slate-600 disabled:opacity-30 shadow-sm"
+            >
+              <span className="material-symbols-outlined">chevron_right</span>
+            </button>
+          </div>
+        )}
+
         {settlements.map((settlement) => (
           <div
             key={settlement.id}

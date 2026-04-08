@@ -1,14 +1,18 @@
 import React from 'react';
-import { PendingPaymentTrip, PaymentHistoryRecord, SystemSettings } from '@/types';
+import { SystemSettings, PendingPaymentTrip, PaymentHistoryRecord } from '@/types';
+import { PaginationMeta } from '@/services/api.service';
 
 interface FinanceSectionProps {
   platformFees: number;
   totalRevenue: number;
   settings: SystemSettings;
   pendingPayments: PendingPaymentTrip[];
+  pendingPaymentsMeta: PaginationMeta | null;
   paymentHistory: PaymentHistoryRecord[];
+  paymentHistoryMeta: PaginationMeta | null;
   formatCurrency: (amount: number) => string;
   formatShortDate: (value?: string | null) => string;
+  onPageChange: (section: 'pending' | 'history', page: number) => void;
 }
 
 const FinanceSection: React.FC<FinanceSectionProps> = ({
@@ -16,9 +20,12 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
   totalRevenue,
   settings,
   pendingPayments,
+  pendingPaymentsMeta,
   paymentHistory,
+  paymentHistoryMeta,
   formatCurrency,
-  formatShortDate
+  formatShortDate,
+  onPageChange
 }) => {
   return (
     <div className="space-y-8 animate-slide-up">
@@ -66,7 +73,29 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
               <span className="size-2 rounded-full bg-orange-500 animate-pulse"></span>
               <h3 className="font-black text-sm uppercase tracking-[0.2em] text-slate-500">Monitoring Queue</h3>
             </div>
-            <span className="text-[10px] font-black bg-orange-500/10 text-orange-600 px-3 py-1 rounded-full">{pendingPayments.length} Active Issues</span>
+            
+            {/* Pagination Controls */}
+            {pendingPaymentsMeta && pendingPaymentsMeta.totalPages > 1 && (
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+                <button 
+                  disabled={pendingPaymentsMeta.page === 0}
+                  onClick={() => onPageChange('pending', pendingPaymentsMeta.page - 1)}
+                  className="size-7 flex items-center justify-center rounded-lg text-slate-600 disabled:opacity-30 hover:bg-slate-200 transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">chevron_left</span>
+                </button>
+                <span className="text-[9px] font-black text-slate-900 dark:text-white px-1 uppercase tracking-tighter">
+                  {pendingPaymentsMeta.page + 1} / {pendingPaymentsMeta.totalPages}
+                </span>
+                <button 
+                  disabled={pendingPaymentsMeta.page >= pendingPaymentsMeta.totalPages - 1}
+                  onClick={() => onPageChange('pending', pendingPaymentsMeta.page + 1)}
+                  className="size-7 flex items-center justify-center rounded-lg text-slate-600 disabled:opacity-30 hover:bg-slate-200 transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">chevron_right</span>
+                </button>
+              </div>
+            )}
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -98,10 +127,36 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
 
        {/* Archive History */}
        <section className="space-y-4">
-          <h3 className="font-black text-sm uppercase tracking-[0.2em] text-slate-500 px-2">Settlement Archive</h3>
+          <div className="flex items-center justify-between px-2">
+            <h3 className="font-black text-sm uppercase tracking-[0.2em] text-slate-500">Settlement Archive</h3>
+            
+            {/* Pagination Controls */}
+            {paymentHistoryMeta && paymentHistoryMeta.totalPages > 1 && (
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+                <button 
+                  disabled={paymentHistoryMeta.page === 0}
+                  onClick={() => onPageChange('history', paymentHistoryMeta.page - 1)}
+                  className="size-7 flex items-center justify-center rounded-lg text-slate-600 disabled:opacity-30 hover:bg-slate-200 transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">chevron_left</span>
+                </button>
+                <span className="text-[9px] font-black text-slate-900 dark:text-white px-1 uppercase tracking-tighter">
+                  {paymentHistoryMeta.page + 1} / {paymentHistoryMeta.totalPages}
+                </span>
+                <button 
+                  disabled={paymentHistoryMeta.page >= paymentHistoryMeta.totalPages - 1}
+                  onClick={() => onPageChange('history', paymentHistoryMeta.page + 1)}
+                  className="size-7 flex items-center justify-center rounded-lg text-slate-600 disabled:opacity-30 hover:bg-slate-200 transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">chevron_right</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="bg-white dark:bg-surface-dark rounded-[2.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {paymentHistory.slice(0, 10).map((record) => (
+              {paymentHistory.map((record) => (
                 <div key={record.id} className="p-5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                   <div className="flex items-center gap-4 min-w-0">
                     <div className="size-10 bg-green-500/10 rounded-xl flex items-center justify-center text-green-500">

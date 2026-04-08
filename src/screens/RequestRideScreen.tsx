@@ -75,7 +75,9 @@ const RequestRideScreen: React.FC = () => {
     pickupRef.current = pickup;
     rideStateRef.current = rideState;
     showDriverPickerRef.current = showDriverPicker;
-    refreshAvailableDriversRef.current = () => fetchAvailableDrivers(pickup!, vehicleData.transmission);
+    refreshAvailableDriversRef.current = async () => {
+      await fetchAvailableDrivers(pickup!, vehicleData.transmission);
+    };
   }, [pickup, rideState, showDriverPicker, fetchAvailableDrivers, vehicleData.transmission]);
 
   useOwnerRealtime({
@@ -181,9 +183,8 @@ const RequestRideScreen: React.FC = () => {
 
       {showDriverPicker && (
         <DriverPickerModal
-          isOpen={showDriverPicker}
           onClose={() => setShowDriverPicker(false)}
-          drivers={availableDrivers}
+          availableDrivers={availableDrivers}
           isLoading={false}
           onSelectDriver={handleSelectDriver}
         />
@@ -191,11 +192,10 @@ const RequestRideScreen: React.FC = () => {
 
       {showVehicleForm && (
         <VehicleDetailsModal
-          isOpen={showVehicleForm}
           onClose={() => setShowVehicleForm(false)}
           vehicleData={vehicleData}
           setVehicleData={setVehicleData}
-          onConfirm={handleConfirmRequest}
+          onSubmit={handleConfirmRequest}
         />
       )}
 
@@ -299,8 +299,13 @@ const RequestRideScreen: React.FC = () => {
         {(rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS' || rideState === 'SEARCHING') && (
            <DriverStatusCard
              rideState={rideState}
-             driverInfo={driverInfo}
+             driverInfo={driverInfo || { name: 'Searching', car: 'Please wait', plate: '---', rating: 5, trips: 0, avatar: '', timeAway: 0 }}
              rideMilestone={rideMilestone}
+             lastMilestoneUpdate={new Date().toISOString()}
+             onCall={() => {}}
+             onChat={() => {}}
+             onTrack={() => {}}
+             onSOS={() => {}}
              onCancel={() => resetRide()}
            />
         )}

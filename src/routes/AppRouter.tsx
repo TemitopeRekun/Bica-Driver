@@ -13,6 +13,7 @@ import DriverMainScreen from '../screens/DriverMainScreen';
 import DriverActivityScreen from '../screens/DriverActivityScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
+import AdminDashboardPage from '../screens/AdminDashboardPage';
 import OwnerActivityScreen from '../screens/OwnerActivityScreen';
 import LoadingScreen from '../screens/LoadingScreen';
 
@@ -84,23 +85,7 @@ export const router = createHashRouter([
     path: '/admin',
     element: (
       <ProtectedRoute roles={[UserRole.ADMIN]}>
-        <AdminDashboardScreen 
-          users={[]} 
-          trips={[]} 
-          pendingPayments={[]} 
-          paymentHistory={[]} 
-          settings={{} as any} 
-          isLoading={false} 
-          error={null} 
-          onUpdateStatus={() => {}} 
-          onBlockUser={() => {}} 
-          onRetrySubAccount={async () => {}} 
-          onUpdateSettings={() => {}} 
-          onRetry={() => {}} 
-          onBack={() => {}} 
-          onSimulate={() => {}} 
-          onForcedLogout={() => {}}
-        />
+        <AdminDashboardPage />
       </ProtectedRoute>
     ),
   },

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PaymentHistoryRecord, PendingPaymentTrip, SystemSettings, Trip, UserProfile } from '@/types';
-import { api } from '@/services/api.service';
+import { api, PaginatedResponse, PaginationMeta } from '@/services/api.service';
 import { mapPaymentHistory, mapPendingPaymentTrip, mapTrip, mapUser } from '@/mappers/appMappers';
 
 interface UseAdminDashboardOptions {
@@ -9,9 +9,18 @@ interface UseAdminDashboardOptions {
 
 export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
   const [adminUsers, setAdminUsers] = useState<UserProfile[]>([]);
+  const [usersMeta, setUsersMeta] = useState<PaginationMeta | null>(null);
+  
   const [adminTrips, setAdminTrips] = useState<Trip[]>([]);
+  const [tripsMeta, setTripsMeta] = useState<PaginationMeta | null>(null);
+
   const [adminPendingPayments, setAdminPendingPayments] = useState<PendingPaymentTrip[]>([]);
+  const [pendingPaymentsMeta, setPendingPaymentsMeta] = useState<PaginationMeta | null>(null);
+
   const [adminPaymentHistory, setAdminPaymentHistory] = useState<PaymentHistoryRecord[]>([]);
+  const [paymentHistoryMeta, setPaymentHistoryMeta] = useState<PaginationMeta | null>(null);
+
+  const [adminSettings, setAdminSettings] = useState<SystemSettings | null>(null);
   const [adminDashboardLoading, setAdminDashboardLoading] = useState(false);
   const [adminDashboardError, setAdminDashboardError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -21,25 +30,79 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
     onSettingsLoadedRef.current = options.onSettingsLoaded;
   }, [options.onSettingsLoaded]);
 
+  const loadUsersPage = useCallback(async (page: number, limit: number = 20) => {
+    try {
+      const response = await api.get<PaginatedResponse<any>>(`/admin/users?page=${page}&limit=${limit}`);
+      setAdminUsers(response.items.map(mapUser));
+      setUsersMeta(response.meta);
+    } catch (error: any) {
+      setAdminDashboardError(error.message);
+      throw error;
+    }
+  }, []);
+
+  const loadTripsPage = useCallback(async (page: number, limit: number = 20) => {
+    try {
+      const response = await api.get<PaginatedResponse<any>>(`/admin/trips?page=${page}&limit=${limit}`);
+      setAdminTrips(response.items.map(mapTrip));
+      setTripsMeta(response.meta);
+    } catch (error: any) {
+      setAdminDashboardError(error.message);
+      throw error;
+    }
+  }, []);
+
+  const loadPendingPaymentsPage = useCallback(async (page: number, limit: number = 20) => {
+    try {
+      const response = await api.get<PaginatedResponse<any>>(`/payments/pending?page=${page}&limit=${limit}`);
+      setAdminPendingPayments(response.items.map(mapPendingPaymentTrip));
+      setPendingPaymentsMeta(response.meta);
+    } catch (error: any) {
+      setAdminDashboardError(error.message);
+      throw error;
+    }
+  }, []);
+
+  const loadPaymentHistoryPage = useCallback(async (page: number, limit: number = 20) => {
+    try {
+      const response = await api.get<PaginatedResponse<any>>(`/payments/history?page=${page}&limit=${limit}`);
+      setAdminPaymentHistory(response.items.map(mapPaymentHistory));
+      setPaymentHistoryMeta(response.meta);
+    } catch (error: any) {
+      setAdminDashboardError(error.message);
+      throw error;
+    }
+  }, []);
+
   const loadAdminDashboard = useCallback(async () => {
     setAdminDashboardLoading(true);
     setAdminDashboardError(null);
 
     try {
+      // First load basics and initial pages
       const [dashboard, pendingPayments, paymentHistory] = await Promise.all([
         api.get<{
-          users: any[];
-          trips: any[];
+          users: PaginatedResponse<any>;
+          trips: PaginatedResponse<any>;
           settings: SystemSettings;
-        }>('/admin/dashboard'),
-        api.get<any[]>('/payments/pending'),
-        api.get<any[]>('/payments/history'),
+        }>('/admin/dashboard?limit=20'),
+        api.get<PaginatedResponse<any>>('/payments/pending?limit=20'),
+        api.get<PaginatedResponse<any>>('/payments/history?limit=20'),
       ]);
 
-      setAdminUsers(dashboard.users.map(mapUser));
-      setAdminTrips(dashboard.trips.map(mapTrip));
-      setAdminPendingPayments(pendingPayments.map(mapPendingPaymentTrip));
-      setAdminPaymentHistory(paymentHistory.map(mapPaymentHistory));
+      setAdminUsers(dashboard.users.items.map(mapUser));
+      setUsersMeta(dashboard.users.meta);
+
+      setAdminTrips(dashboard.trips.items.map(mapTrip));
+      setTripsMeta(dashboard.trips.meta);
+
+      setAdminPendingPayments(pendingPayments.items.map(mapPendingPaymentTrip));
+      setPendingPaymentsMeta(pendingPayments.meta);
+
+      setAdminPaymentHistory(paymentHistory.items.map(mapPaymentHistory));
+      setPaymentHistoryMeta(paymentHistory.meta);
+
+      setAdminSettings(dashboard.settings);
       onSettingsLoadedRef.current?.(dashboard.settings);
       setLastUpdated(new Date());
     } catch (error: any) {
@@ -52,13 +115,22 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
 
   return {
     adminUsers,
+    usersMeta,
     adminTrips,
+    tripsMeta,
     adminPendingPayments,
+    pendingPaymentsMeta,
     adminPaymentHistory,
+    paymentHistoryMeta,
+    adminSettings,
     adminDashboardLoading,
     adminDashboardError,
     lastUpdated,
     setAdminDashboardError,
     loadAdminDashboard,
+    loadUsersPage,
+    loadTripsPage,
+    loadPendingPaymentsPage,
+    loadPaymentHistoryPage,
   };
 };

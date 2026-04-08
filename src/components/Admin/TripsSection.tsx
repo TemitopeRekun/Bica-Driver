@@ -1,17 +1,22 @@
 import React from 'react';
 import { Trip } from '@/types';
 import { VirtualList } from '../Common/VirtualList';
+import { PaginationMeta } from '@/services/api.service';
 
 interface TripsSectionProps {
   trips: Trip[];
+  meta: PaginationMeta | null;
   formatCurrency: (amount: number) => string;
   getTripStatusClass: (status: Trip['status']) => string;
+  onPageChange: (page: number) => void;
 }
 
 const TripsSection: React.FC<TripsSectionProps> = ({
   trips,
+  meta,
   formatCurrency,
-  getTripStatusClass
+  getTripStatusClass,
+  onPageChange
 }) => {
   if (trips.length === 0) {
     return (

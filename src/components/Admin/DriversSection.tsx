@@ -1,24 +1,29 @@
 import React from 'react';
 import { UserProfile, UserRole } from '@/types';
 import MonnifyStatus from './MonnifyStatus';
+import { PaginationMeta } from '@/services/api.service';
 
 interface DriversSectionProps {
   drivers: UserProfile[];
+  meta: PaginationMeta | null;
   driverFilter: 'All' | 'Pending' | 'Active' | 'Blocked';
   searchTerm: string;
   setDriverFilter: (filter: any) => void;
   setSelectedUser: (user: UserProfile) => void;
   retryingSubAccountIds: Set<string>;
+  onPageChange: (page: number) => void;
   onRetrySubAccount: (userId: string) => Promise<void>;
 }
 
 const DriversSection: React.FC<DriversSectionProps> = ({
   drivers,
+  meta,
   driverFilter,
   searchTerm,
   setDriverFilter,
   setSelectedUser,
   retryingSubAccountIds,
+  onPageChange,
   onRetrySubAccount
 }) => {
   const filteredDrivers = drivers
@@ -38,21 +43,46 @@ const DriversSection: React.FC<DriversSectionProps> = ({
 
   return (
     <div className="space-y-6 animate-slide-up">
-      {/* Filter Tabs */}
-      <div className="flex gap-2 p-1 bg-slate-100 dark:bg-white/5 rounded-2xl w-fit">
-         {(['All', 'Pending', 'Active', 'Blocked'] as const).map((filter) => (
-           <button
-             key={filter}
-             onClick={() => setDriverFilter(filter)}
-             className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-               driverFilter === filter
-                 ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
-                 : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-             }`}
-           >
-             {filter}
-           </button>
-         ))}
+      <div className="flex flex-wrap items-center justify-between gap-4 px-1">
+        {/* Filter Tabs */}
+        <div className="flex gap-2 p-1 bg-slate-100 dark:bg-white/5 rounded-2xl w-fit">
+           {(['All', 'Pending', 'Active', 'Blocked'] as const).map((filter) => (
+             <button
+               key={filter}
+               onClick={() => setDriverFilter(filter)}
+               className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                 driverFilter === filter
+                   ? 'bg-white dark:bg-slate-800 text-primary shadow-sm'
+                   : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+               }`}
+             >
+               {filter}
+             </button>
+           ))}
+        </div>
+
+        {/* Pagination Controls */}
+        {meta && meta.totalPages > 1 && (
+          <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
+            <button 
+              disabled={meta.page === 0}
+              onClick={() => onPageChange(meta.page - 1)}
+              className="size-8 flex items-center justify-center rounded-lg text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-200 transition-all"
+            >
+              <span className="material-symbols-outlined text-sm">chevron_left</span>
+            </button>
+            <span className="text-[10px] font-black text-slate-900 dark:text-white px-2 uppercase tracking-widest">
+              Page {meta.page + 1} of {meta.totalPages}
+            </span>
+            <button 
+              disabled={meta.page >= meta.totalPages - 1}
+              onClick={() => onPageChange(meta.page + 1)}
+              className="size-8 flex items-center justify-center rounded-lg text-slate-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-200 transition-all"
+            >
+              <span className="material-symbols-outlined text-sm">chevron_right</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Driver List */}
@@ -112,7 +142,6 @@ const DriversSection: React.FC<DriversSectionProps> = ({
               </div>
             </div>
 
-            {/* Payout Readiness / Monnify Status integration */}
             <div className="mt-4 pt-4 border-t border-slate-50 dark:border-white/5">
               <MonnifyStatus 
                 driver={driver} 

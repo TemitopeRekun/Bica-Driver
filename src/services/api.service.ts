@@ -48,6 +48,18 @@ export const clearToken = (): void => {
 // Sleep helper for backoff
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+export interface PaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  meta: PaginationMeta;
+}
+
 // Core request function with retry logic
 async function request<T>(
   method: string,
@@ -64,7 +76,7 @@ async function request<T>(
 
   // Automated Idempotency-Key for all mutation requests
   if (method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE') {
-    headers['X-Idempotency-Key'] = options?.idempotencyKey || generateUUID();
+    headers['x-idempotency-key'] = options?.idempotencyKey || generateUUID();
   }
 
   // Only declare JSON content-type when sending a body
@@ -116,14 +128,20 @@ async function request<T>(
         return request<T>(method, path, body, requiresAuth, options, retryCount + 1);
       }
 
-      const message =
-        typeof data === 'object' && data && 'message' in data
-          ? (data.message as string)
-          : typeof data === 'string' && data.trim()
-            ? data
-            : `Request failed with status ${response.status}`;
+      // Handle the new standardized error format (supporting message arrays)
+      let errorMessage = `Request failed with status ${response.status}`;
+      
+      if (typeof data === 'object' && data && 'message' in data) {
+        if (Array.isArray(data.message)) {
+          errorMessage = data.message.join('; ');
+        } else {
+          errorMessage = String(data.message);
+        }
+      } else if (typeof data === 'string' && data.trim()) {
+        errorMessage = data;
+      }
 
-      throw new Error(message);
+      throw new Error(errorMessage);
     }
 
     return data as T;

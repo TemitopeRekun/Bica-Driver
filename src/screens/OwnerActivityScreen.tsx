@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { mapTrip } from '@/mappers/appMappers';
-import { api } from '@/services/api.service';
+import { api, PaginatedResponse, PaginationMeta } from '@/services/api.service';
 import { OwnerActivityTab, PaymentHistoryRecord, Trip } from '@/types';
 
 interface OwnerActivityScreenProps {
@@ -51,7 +51,9 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<OwnerActivityTab>(initialTab);
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [tripsMeta, setTripsMeta] = useState<PaginationMeta | null>(null);
   const [payments, setPayments] = useState<PaymentHistoryRecord[]>([]);
+  const [paymentsMeta, setPaymentsMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -63,42 +65,68 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
     setIsLoading(true);
     setError('');
 
-    const [tripsResult, paymentsResult] = await Promise.allSettled([
-      api.get<any[]>('/rides/history'),
-      api.get<PaymentHistoryRecord[]>('/payments/history'),
-    ]);
+    try {
+      const [tripsResult, paymentsResult] = await Promise.allSettled([
+        api.get<PaginatedResponse<any>>('/rides/history?limit=20'),
+        api.get<PaginatedResponse<PaymentHistoryRecord>>('/payments/history?limit=20'),
+      ]);
 
-    if (tripsResult.status === 'fulfilled') {
-      setTrips(tripsResult.value.map(mapTrip));
-    } else {
-      setTrips([]);
+      if (tripsResult.status === 'fulfilled') {
+        setTrips(tripsResult.value.items.map(mapTrip));
+        setTripsMeta(tripsResult.value.meta);
+      } else {
+        setTrips([]);
+        setTripsMeta(null);
+      }
+
+      if (paymentsResult.status === 'fulfilled') {
+        setPayments(paymentsResult.value.items);
+        setPaymentsMeta(paymentsResult.value.meta);
+      } else {
+        setPayments([]);
+        setPaymentsMeta(null);
+      }
+
+      const failedSections = [
+        tripsResult.status === 'rejected' ? 'trips' : null,
+        paymentsResult.status === 'rejected' ? 'payments' : null,
+      ].filter(Boolean);
+
+      if (failedSections.length > 0) {
+        setError(`Could not load ${failedSections.join(' and ')} right now.`);
+      }
+    } catch (e) {
+      setError('An unexpected error occurred.');
+    } finally {
+      setIsLoading(false);
     }
-
-    if (paymentsResult.status === 'fulfilled') {
-      setPayments(paymentsResult.value);
-    } else {
-      setPayments([]);
-    }
-
-    const failedSections = [
-      tripsResult.status === 'rejected' ? 'trips' : null,
-      paymentsResult.status === 'rejected' ? 'payments' : null,
-    ].filter(Boolean);
-
-    if (failedSections.length > 0) {
-      setError(`Could not load ${failedSections.join(' and ')} right now.`);
-    }
-
-    setIsLoading(false);
   };
 
-  useEffect(() => {
-    loadActivity().catch((loadError) => {
-      console.error('Failed to load owner activity:', loadError);
-      setError('Could not load activity right now.');
+  const loadTripsPage = async (page: number) => {
+    setIsLoading(true);
+    try {
+      const result = await api.get<PaginatedResponse<any>>(`/rides/history?page=${page}&limit=20`);
+      setTrips(result.items.map(mapTrip));
+      setTripsMeta(result.meta);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load page');
+    } finally {
       setIsLoading(false);
-    });
-  }, []);
+    }
+  };
+
+  const loadPaymentsPage = async (page: number) => {
+    setIsLoading(true);
+    try {
+      const result = await api.get<PaginatedResponse<any>>(`/payments/history?page=${page}&limit=20`);
+      setPayments(result.items);
+      setPaymentsMeta(result.meta);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load page');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const formatCurrency = (value: number) => `NGN ${value.toLocaleString('en-NG')}`;
 
@@ -165,6 +193,29 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
 
     return (
       <div className="space-y-4">
+        {/* Pagination Controls */}
+        {tripsMeta && tripsMeta.totalPages > 1 && (
+          <div className="flex items-center justify-between mb-4 bg-white/40 dark:bg-white/5 p-2 rounded-2xl border border-emerald-100 dark:border-emerald-500/20">
+            <button 
+              disabled={tripsMeta.page === 0}
+              onClick={() => loadTripsPage(tripsMeta.page - 1)}
+              className="size-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-slate-600 disabled:opacity-30 shadow-sm"
+            >
+              <span className="material-symbols-outlined">chevron_left</span>
+            </button>
+            <span className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest">
+              Page {tripsMeta.page + 1} of {tripsMeta.totalPages}
+            </span>
+            <button 
+              disabled={tripsMeta.page >= tripsMeta.totalPages - 1}
+              onClick={() => loadTripsPage(tripsMeta.page + 1)}
+              className="size-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-slate-600 disabled:opacity-30 shadow-sm"
+            >
+              <span className="material-symbols-outlined">chevron_right</span>
+            </button>
+          </div>
+        )}
+
         {trips.map((trip) => (
           <div
             key={trip.id}
@@ -209,6 +260,29 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
 
     return (
       <div className="space-y-4">
+        {/* Pagination Controls */}
+        {paymentsMeta && paymentsMeta.totalPages > 1 && (
+          <div className="flex items-center justify-between mb-4 bg-white/40 dark:bg-white/5 p-2 rounded-2xl border border-amber-100 dark:border-amber-500/20">
+            <button 
+              disabled={paymentsMeta.page === 0}
+              onClick={() => loadPaymentsPage(paymentsMeta.page - 1)}
+              className="size-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-slate-600 disabled:opacity-30 shadow-sm"
+            >
+              <span className="material-symbols-outlined">chevron_left</span>
+            </button>
+            <span className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest">
+              Page {paymentsMeta.page + 1} of {paymentsMeta.totalPages}
+            </span>
+            <button 
+              disabled={paymentsMeta.page >= paymentsMeta.totalPages - 1}
+              onClick={() => loadPaymentsPage(paymentsMeta.page + 1)}
+              className="size-10 flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 text-slate-600 disabled:opacity-30 shadow-sm"
+            >
+              <span className="material-symbols-outlined">chevron_right</span>
+            </button>
+          </div>
+        )}
+
         {payments.map((payment) => (
           <div
             key={payment.id}
