@@ -115,6 +115,9 @@ export interface Trip {
   commissionAmount?: number;
   monnifyTxRef?: string;
   fareBreakdown?: Record<string, unknown> | null;
+  progressMilestone?: 'assigned' | 'arrived' | 'in_progress' | 'completed';
+  coords?: [number, number];   // [lat, lng] for pickup
+  destCoords?: [number, number]; // [lat, lng] for destination
 }
 
 export interface Payout {

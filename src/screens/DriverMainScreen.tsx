@@ -21,7 +21,7 @@ const DriverMainScreen: React.FC = () => {
   const { addToast } = useUIStore();
   const { rideState, setRideState, rideMilestone, setRideMilestone } = useRideStore();
   const { 
-    walletSummary, loadWalletSummary, updateRideStatus, acceptRide, declineRide 
+    walletSummary, loadWalletSummary, updateRideStatus, acceptRide, declineRide, syncCurrentRide 
   } = useDriverManager();
 
   const [activeRide, setActiveRide] = useState<DriverRideRequest | null>(null);
@@ -50,7 +50,28 @@ const DriverMainScreen: React.FC = () => {
 
   useEffect(() => {
     loadWalletSummary();
-  }, [loadWalletSummary]);
+    const initSync = async () => {
+       try {
+          const trip = await syncCurrentRide();
+          // Only auto-activate if the trip is actually assigned to us and in progress
+          if (trip && (trip.status === 'ASSIGNED' || trip.status === 'IN_PROGRESS')) {
+             setActiveRide({
+                id: trip.id,
+                ownerName: trip.ownerName,
+                avatar: trip.owner?.avatarUrl || IMAGES.DRIVER_CARD,
+                price: trip.amount.toLocaleString(),
+                coords: [trip.pickupLat || 0, trip.pickupLng || 0],
+                destCoords: [trip.destLat || 0, trip.destLng || 0],
+                pickup: trip.pickupAddress || '',
+                destination: trip.destAddress || '',
+                distance: `${trip.distanceKm?.toFixed(1) || '0'} km`,
+                time: `${trip.estimatedArrivalMins || 5} mins`,
+             });
+          }
+       } catch (e) {}
+    };
+    initSync();
+  }, [loadWalletSummary, syncCurrentRide]);
 
   const handleToggleOnline = () => {
     CapacitorService.triggerHaptic();
@@ -66,6 +87,7 @@ const DriverMainScreen: React.FC = () => {
   const confirmSelfieAndRide = async () => {
     if (!pendingRide || !selfieImage) return;
     try {
+      CapacitorService.triggerHaptic();
       await acceptRide(pendingRide.id);
       setActiveRide(pendingRide);
       setShowSelfieModal(false);
@@ -76,6 +98,7 @@ const DriverMainScreen: React.FC = () => {
   const handleUpdateStatus = async (status: 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED') => {
     if (!activeRide) return;
     try {
+      CapacitorService.triggerHaptic();
       await updateRideStatus(activeRide.id, status);
       if (status === 'COMPLETED') {
         setActiveRide(null);
@@ -110,7 +133,7 @@ const DriverMainScreen: React.FC = () => {
           </div>
 
           <button onClick={() => navigate('/driver/activity')} className="size-11 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 text-white">
-             <span className="material-symbols-outlined">history</span>
+             <span className="material-symbols-outlined">receipt_long</span>
           </button>
        </header>
 

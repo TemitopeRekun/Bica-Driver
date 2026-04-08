@@ -9,8 +9,6 @@ interface UseOwnerLocationSearchOptions {
   onPickupChanged?: () => void;
 }
 
-const DISTANCE_RATE = 100;
-const TIME_RATE = 50;
 const FALLBACK_MINUTES_PER_KM = 3;
 const MIN_FALLBACK_MINUTES = 5;
 const DEFAULT_MAP_CENTER: [number, number] = [6.4549, 3.4246];
@@ -107,11 +105,14 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
         Math.round(dist * FALLBACK_MINUTES_PER_KM),
         MIN_FALLBACK_MINUTES,
       );
+      const pricePerKm = settings.pricePerKm || 100;
+      const timeRate = settings.timeRate || 50;
+
       const fallbackLowEstimate =
-        settings.baseFare + dist * DISTANCE_RATE + fallbackEstimatedMins * TIME_RATE;
+        settings.baseFare + dist * pricePerKm + fallbackEstimatedMins * timeRate;
       const bufferMins = Math.max(Math.ceil(fallbackEstimatedMins * 0.15), MIN_FALLBACK_MINUTES);
       const fallbackHighEstimate =
-        settings.baseFare + dist * DISTANCE_RATE + (fallbackEstimatedMins + bufferMins) * TIME_RATE;
+        settings.baseFare + dist * pricePerKm + (fallbackEstimatedMins + bufferMins) * timeRate;
       const roundedLow = Math.round(fallbackLowEstimate / 50) * 50;
       const roundedHigh = Math.max(roundedLow, Math.round(fallbackHighEstimate / 50) * 50);
 

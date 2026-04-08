@@ -73,6 +73,18 @@ const RequestRideScreen: React.FC = () => {
     onPickupChanged: () => {}
   });
 
+  // Auto-Sync on Mount to recover any active ride
+  useEffect(() => {
+    const initSync = async () => {
+      try {
+        await syncCurrentRide();
+      } catch (e) {
+        console.error('Initial ride sync failed:', e);
+      }
+    };
+    initSync();
+  }, [syncCurrentRide]);
+
   // Sync refs for the Realtime hook
   useEffect(() => {
     pickupRef.current = pickup;
@@ -118,6 +130,11 @@ const RequestRideScreen: React.FC = () => {
 
   const handleConfirmRequest = async (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (!pickup) {
+       addToast('Please select a pickup location.', 'warning');
+       setIsSearchingPickup(true);
+       return;
+    }
     setShowVehicleForm(false);
     
     if (bookingType === 'schedule') {
@@ -126,10 +143,10 @@ const RequestRideScreen: React.FC = () => {
         return;
       }
       setShowDriverPicker(true);
-      await fetchAvailableDrivers(pickup!, vehicleData.transmission);
+      await fetchAvailableDrivers(pickup, vehicleData.transmission);
     } else {
       setShowDriverPicker(true);
-      await fetchAvailableDrivers(pickup!, vehicleData.transmission);
+      await fetchAvailableDrivers(pickup, vehicleData.transmission);
     }
   };
 
@@ -141,9 +158,13 @@ const RequestRideScreen: React.FC = () => {
     const rideIntentId = generateUUID();
 
     try {
+      if (!pickup || !destination) {
+         addToast('Pickup or Destination is missing.', 'error');
+         return;
+      }
       await initiateRideRequest(
-        pickup!, 
-        destination!, 
+        pickup, 
+        destination, 
         driver, 
         vehicleData, 
         bookingType === 'schedule' ? new Date(scheduledAt).toISOString() : null,
@@ -169,7 +190,12 @@ const RequestRideScreen: React.FC = () => {
   if (pickup) markers.push({ id: 'pickup', position: [pickup.lat, pickup.lon], title: 'Pickup', icon: 'pickup', draggable: true });
   if (destination) markers.push({ id: 'dest', position: [destination.lat, destination.lon], title: 'Destination', icon: 'destination' });
   if (driverInfo && (rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS')) {
-    markers.push({ id: 'driver', position: trackedDriverPos || [pickup!.lat, pickup!.lon], title: driverInfo.name, icon: 'taxi' });
+    markers.push({ 
+      id: 'driver', 
+      position: trackedDriverPos || (pickup ? [pickup.lat, pickup.lon] : mapCenter), 
+      title: driverInfo.name, 
+      icon: 'taxi' 
+    });
   }
 
   return (
@@ -234,13 +260,30 @@ const RequestRideScreen: React.FC = () => {
         <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-background-light dark:from-background-dark via-background-light/80 dark:via-background-dark/80 to-transparent pointer-events-none"></div>
       </div>
 
-      <header className="relative z-10 px-4 py-3 flex items-center justify-end">
-        <button
-          onClick={() => navigate('/profile')}
-          className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/20 overflow-hidden"
-        >
-          {currentUser?.avatar ? <img src={currentUser.avatar} className="w-full h-full object-cover" alt="Profile" /> : <span className="material-symbols-outlined">person</span>}
-        </button>
+      <header className="relative z-10 px-4 py-8 flex items-center justify-between pointer-events-none">
+        <div className="flex-1 pointer-events-auto">
+           {/* Placeholder for left-side items if needed */}
+        </div>
+
+        <div className="flex flex-col items-center pointer-events-none">
+           <span className="text-lg font-bold text-white tracking-tight italic drop-shadow-lg">BICA<span className="text-primary NOT-italic">DRIVE</span></span>
+           <p className="text-[8px] font-black text-white/60 uppercase tracking-[0.3em] leading-none">Premium Owner Console</p>
+        </div>
+
+        <div className="flex-1 flex justify-end gap-3 pointer-events-auto">
+          <button
+            onClick={() => navigate('/owner/activity')}
+            className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/20 shadow-xl"
+          >
+            <span className="material-symbols-outlined text-xl">receipt_long</span>
+          </button>
+          <button
+            onClick={() => navigate('/profile')}
+            className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white border border-white/20 overflow-hidden shadow-xl"
+          >
+            {currentUser?.avatar ? <img src={currentUser.avatar} className="w-full h-full object-cover" alt="Profile" /> : <span className="material-symbols-outlined">person</span>}
+          </button>
+        </div>
       </header>
 
       <div className="flex-1"></div>

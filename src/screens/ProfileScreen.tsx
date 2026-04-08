@@ -15,6 +15,15 @@ interface ProfileScreenProps {
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack, onLogout, onUpdateAvatar }) => {
   const { toast } = useToast();
+  
+  if (!user) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background-light dark:bg-background-dark">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
   // The role is locked based on the initial selection for both Owners and Drivers.
   const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);

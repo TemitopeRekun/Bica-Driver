@@ -77,5 +77,18 @@ export const useDriverManager = () => {
     updateRideStatus,
     acceptRide,
     declineRide,
+    syncCurrentRide: useCallback(async () => {
+      try {
+        const activeTrip = await api.get<Trip>('/rides/current');
+        if (activeTrip) {
+          setRideState(activeTrip.status as any);
+          setRideMilestone(activeTrip.progressMilestone || 'assigned');
+          return activeTrip;
+        }
+        return null;
+      } catch (error) {
+        return null;
+      }
+    }, [setRideState, setRideMilestone]),
   };
-};
+}

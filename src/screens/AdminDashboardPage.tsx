@@ -5,6 +5,7 @@ import AdminDashboardScreen from './AdminDashboardScreen';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/useToast';
 import { ApprovalStatus, SystemSettings, UserRole } from '@/types';
+import { api } from '@/services/api.service';
 
 const AdminDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -36,19 +37,33 @@ const AdminDashboardPage: React.FC = () => {
   };
 
   const handleUpdateStatus = async (userId: string, status: ApprovalStatus) => {
-    // Implement API call for status update
-    toast.success(`User status updated to ${status}`);
-    loadAdminDashboard();
+    try {
+      await api.patch(`/admin/users/${userId}/status`, { status });
+      toast.success(`User status updated to ${status}`);
+      await loadAdminDashboard();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update user status');
+    }
   };
 
   const handleBlockUser = async (userId: string, blocked: boolean) => {
-    toast.success(`User ${blocked ? 'blocked' : 'unblocked'}`);
-    loadAdminDashboard();
+    try {
+      await api.patch(`/admin/users/${userId}/block`, { blocked });
+      toast.success(`User ${blocked ? 'blocked' : 'unblocked'}`);
+      await loadAdminDashboard();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update block status');
+    }
   };
 
   const handleUpdateSettings = async (settings: SystemSettings) => {
-    toast.success("Settings saved to cluster");
-    loadAdminDashboard();
+    try {
+      await api.patch('/admin/settings', settings);
+      toast.success("Settings saved to cluster");
+      await loadAdminDashboard();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update system settings');
+    }
   };
 
   return (

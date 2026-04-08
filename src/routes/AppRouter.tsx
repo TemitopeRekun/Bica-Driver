@@ -1,7 +1,7 @@
-import React from 'react';
-import { createHashRouter, Navigate } from 'react-router-dom';
+import { createHashRouter, Navigate, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { UserRole } from '@/types';
+import GlobalRouteError from '@/components/Common/GlobalRouteError';
 
 // Screens
 import WelcomeScreen from '../screens/WelcomeScreen';
@@ -29,10 +29,60 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: UserRole[] }
   return <>{children}</>;
 };
 
+const ProfileWrapper: React.FC = () => {
+  const { currentUser, logout, updateProfile } = useAuthStore();
+  const navigate = useNavigate();
+
+  if (!currentUser) return <Navigate to="/login" replace />;
+
+  const handleUpdateAvatar = async (newAvatar: string) => {
+    // Optimistically update or wait for API - here we wait for safety
+    await import('@/services/api.service').then(async ({ api }) => {
+      await api.patch('/users/profile', { avatarUrl: newAvatar });
+    });
+    updateProfile({ avatar: newAvatar });
+  };
+
+  return (
+    <ProfileScreen
+      user={currentUser}
+      initialRole={currentUser.role}
+      onBack={() => navigate(-1)}
+      onLogout={logout}
+      onUpdateAvatar={handleUpdateAvatar}
+    />
+  );
+};
+
+const DriverActivityWrapper: React.FC = () => {
+  const { logout } = useAuthStore();
+  const navigate = useNavigate();
+
+  return (
+    <DriverActivityScreen
+      initialTab="trips"
+      onBack={() => navigate(-1)}
+      onForcedLogout={logout}
+    />
+  );
+};
+
+const OwnerActivityWrapper: React.FC = () => {
+  const navigate = useNavigate();
+
+  return (
+    <OwnerActivityScreen
+      initialTab="trips"
+      onBack={() => navigate(-1)}
+    />
+  );
+};
+
 export const router = createHashRouter([
   {
     path: '/',
     element: <WelcomeScreen />, 
+    errorElement: <GlobalRouteError />,
   },
   {
     path: '/login',
@@ -59,7 +109,7 @@ export const router = createHashRouter([
     path: '/owner/activity',
     element: (
       <ProtectedRoute roles={[UserRole.OWNER, UserRole.ADMIN]}>
-        <OwnerActivityScreen initialTab="trips" onBack={() => {}} />
+        <OwnerActivityWrapper />
       </ProtectedRoute>
     ),
   },
@@ -76,7 +126,7 @@ export const router = createHashRouter([
     path: '/driver/activity',
     element: (
       <ProtectedRoute roles={[UserRole.DRIVER, UserRole.ADMIN]}>
-        <DriverActivityScreen initialTab="trips" onBack={() => {}} onForcedLogout={() => {}} />
+        <DriverActivityWrapper />
       </ProtectedRoute>
     ),
   },
@@ -94,7 +144,7 @@ export const router = createHashRouter([
     path: '/profile',
     element: (
       <ProtectedRoute>
-        <ProfileScreen user={null as any} initialRole={UserRole.UNSET} onBack={() => {}} onLogout={() => {}} onUpdateAvatar={async () => {}} />
+        <ProfileWrapper />
       </ProtectedRoute>
     ),
   },

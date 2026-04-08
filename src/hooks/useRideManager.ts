@@ -21,7 +21,12 @@ export const useRideManager = () => {
     resetRide,
   } = useRideStore();
 
-  const fetchAvailableDrivers = useCallback(async (pickup: LocationData, transmission: string) => {
+  const fetchAvailableDrivers = useCallback(async (pickup: LocationData | null, transmission: string) => {
+    if (!pickup?.lat || !pickup?.lon) {
+       console.warn('Cannot fetch drivers: Pickup location is invalid.');
+       setAvailableDrivers([]);
+       return [];
+    }
     try {
       const transmissionParam = transmission ? `&transmission=${encodeURIComponent(transmission)}` : '';
       const drivers = await api.get<any[]>(
