@@ -64,12 +64,6 @@ const LoginScreen: React.FC = () => {
     }
   };
 
-  const fillAdminCredentials = () => {
-    setFormData({
-      email: 'admin@bicadrive.app',
-      password: 'admin'
-    });
-  };
 
   return (
     <div className="flex h-screen w-full flex-col bg-background-light dark:bg-background-dark">
@@ -161,13 +155,6 @@ const LoginScreen: React.FC = () => {
             Sign Up
           </span>
         </p>
-
-        <button 
-          onClick={fillAdminCredentials}
-          className="px-4 py-2 rounded-lg bg-white/5 border border-white/5 text-[10px] font-mono text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-        >
-          [DEV] Autofill Admin
-        </button>
       </footer>
     </div>
   );

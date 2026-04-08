@@ -1,5 +1,6 @@
 import React from 'react';
 import RideStoryTimeline from './RideStoryTimeline';
+import { IMAGES } from '../../constants';
 
 interface DriverStatusCardProps {
   rideState: string;
@@ -60,7 +61,7 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
       </div>
 
       <div className="flex items-center gap-4 mb-6">
-        <img src={driverInfo.avatar} className="w-16 h-16 rounded-2xl object-cover ring-2 ring-primary/20" alt="Driver" />
+        <img src={driverInfo.avatar || IMAGES.DRIVER_CARD} className="w-16 h-16 rounded-2xl object-cover ring-2 ring-primary/20" alt="Driver" />
         <div className="flex-1">
           <h3 className="text-lg font-bold leading-tight">{driverInfo.name}</h3>
           <p className="text-sm text-slate-500">{driverInfo.car} • {driverInfo.plate}</p>

@@ -30,6 +30,10 @@ export const setOnUnauthorizedListener = (listener: UnauthorizedListener) => {
   unauthorizedListener = listener;
 };
 
+// Rate limiting state
+let throttleCoolDownUntil = 0;
+const THROTTLE_DURATION_MS = 5000;
+
 // Get token from localStorage
 const getToken = (): string | null => {
   return localStorage.getItem('bica_token');
@@ -70,6 +74,13 @@ async function request<T>(
   retryCount = 0
 ): Promise<T> {
   const baseUrl = requireApiUrl();
+
+  // Check for active throttle cooldown
+  if (Date.now() < throttleCoolDownUntil) {
+     const remaining = Math.ceil((throttleCoolDownUntil - Date.now()) / 1000);
+     throw new Error(`Client is throttled. Retrying in ${remaining}s...`);
+  }
+
   const headers: Record<string, string> = {
     'ngrok-skip-browser-warning': 'true',
   };
@@ -140,6 +151,12 @@ async function request<T>(
         }
       } else if (typeof data === 'string' && data.trim()) {
         errorMessage = data;
+      }
+
+      // Handle 429 Rate Limiting
+      if (response.status === 429) {
+        throttleCoolDownUntil = Date.now() + THROTTLE_DURATION_MS;
+        console.error('[API] 429 Too Many Requests. Throttling all requests for 5s.');
       }
 
       const error = new Error(errorMessage) as any;

@@ -61,6 +61,7 @@ export const useDriverRealtime = ({
 
   const socketRef = useRef<Socket | null>(null);
   const trackingInterval = useRef<any>(null);
+  const isInitializing = useRef(false);
   const updateOnlineState = useCallback(
     (nextIsOnline: boolean) => {
       setIsOnline(nextIsOnline);
@@ -203,6 +204,9 @@ export const useDriverRealtime = ({
     }
 
     const initLocation = async () => {
+      if (isInitializing.current) return;
+      isInitializing.current = true;
+      
       setIsLocationRefreshing(true);
       setAvailabilityIssue(null);
       try {
@@ -266,6 +270,7 @@ export const useDriverRealtime = ({
         }
       } finally {
         setIsLocationRefreshing(false);
+        isInitializing.current = false;
       }
     };
 
@@ -288,7 +293,7 @@ export const useDriverRealtime = ({
     return () => {
       clearInterval(trackingInterval.current);
     };
-  }, [isOnline, approvalStatus, user?.id, registerDriverSocket, pushDriverLocation]);
+  }, [isOnline, approvalStatus, user?.id]);
 
   return {
     isOnline,

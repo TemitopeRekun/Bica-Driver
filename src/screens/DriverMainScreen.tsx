@@ -29,17 +29,23 @@ const DriverMainScreen: React.FC = () => {
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
   const [pendingRide, setPendingRide] = useState<DriverRideRequest | null>(null);
 
+  const handleOnlineStatusChange = React.useCallback((nextIsOnline: boolean) => {
+    // Optional: Log status change or update local UI state if needed
+  }, []);
+
+  const handleForcedLogout = React.useCallback((message?: string) => {
+     addToast(message || 'Session expired.', 'error');
+     logout();
+  }, [addToast, logout]);
+
   const {
     isOnline, isLocationRefreshing, availabilityIssue, driverPos,
     liveRideRequests, enableOnline, disableOnline, removeRideRequest
   } = useDriverRealtime({
     user: currentUser,
     approvalStatus: currentUser?.approvalStatus || 'PENDING',
-    onOnlineStatusChange: () => {},
-    onForcedLogout: () => {
-       addToast('Session expired.', 'error');
-       logout();
-    },
+    onOnlineStatusChange: handleOnlineStatusChange,
+    onForcedLogout: handleForcedLogout,
   });
 
   useEffect(() => {

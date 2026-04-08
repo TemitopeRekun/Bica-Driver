@@ -23,8 +23,10 @@ const DriverPickerModal: React.FC<DriverPickerModalProps> = ({
             <p className="text-sm text-slate-500">Select your preferred driver to start the ride</p>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            disabled={isLoading}
+            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
@@ -49,8 +51,10 @@ const DriverPickerModal: React.FC<DriverPickerModalProps> = ({
               {availableDrivers.map(driver => (
                 <button
                   key={driver.id}
+                  type="button"
+                  disabled={isLoading}
                   onClick={() => onSelectDriver(driver)}
-                  className="w-full flex items-center gap-4 p-4 bg-surface-light dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-primary transition-all active:scale-[0.98] text-left"
+                  className="w-full flex items-center gap-4 p-4 bg-surface-light dark:bg-surface-dark rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-primary transition-all active:scale-[0.98] text-left disabled:opacity-75 disabled:cursor-not-allowed group"
                 >
                   <div className="relative shrink-0">
                     <img
@@ -89,7 +93,11 @@ const DriverPickerModal: React.FC<DriverPickerModalProps> = ({
                         ~{driver.estimatedArrivalMins} mins
                       </span>
                     )}
-                    <span className="material-symbols-outlined text-slate-300">chevron_right</span>
+                    {isLoading ? (
+                      <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <span className="material-symbols-outlined text-slate-300 group-hover:text-primary transition-colors">chevron_right</span>
+                    )}
                   </div>
                 </button>
               ))}

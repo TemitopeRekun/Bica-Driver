@@ -50,6 +50,7 @@ const RequestRideScreen: React.FC = () => {
   const [scheduledAt, setScheduledAt] = useState<string>('');
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [showDriverPicker, setShowDriverPicker] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [vehicleData, setVehicleData] = useState({
     make: currentUser?.carType || '',
@@ -113,16 +114,15 @@ const RequestRideScreen: React.FC = () => {
     }
   });
 
-  const handleConfirmRequest = async () => {
+  const handleConfirmRequest = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     setShowVehicleForm(false);
+    
     if (bookingType === 'schedule') {
       if (!scheduledAt) {
         addToast('Please select a time for your scheduled ride.', 'warning');
         return;
       }
-      // For scheduled rides, we can either assign a driver now or let the backend do it.
-      // Given the current flow, we'll fetch drivers first to show the picker, 
-      // or we could just send the request.
       setShowDriverPicker(true);
       await fetchAvailableDrivers(pickup!, vehicleData.transmission);
     } else {
@@ -132,14 +132,23 @@ const RequestRideScreen: React.FC = () => {
   };
 
   const handleSelectDriver = async (driver: any) => {
-    setShowDriverPicker(false);
-    await initiateRideRequest(
-      pickup!, 
-      destination!, 
-      driver, 
-      vehicleData, 
-      bookingType === 'schedule' ? new Date(scheduledAt).toISOString() : null
-    );
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    
+    try {
+      await initiateRideRequest(
+        pickup!, 
+        destination!, 
+        driver, 
+        vehicleData, 
+        bookingType === 'schedule' ? new Date(scheduledAt).toISOString() : null
+      );
+      setShowDriverPicker(false);
+    } catch (error) {
+       // Error is already toasted by useRideManager
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const markers: any[] = [];
@@ -183,9 +192,9 @@ const RequestRideScreen: React.FC = () => {
 
       {showDriverPicker && (
         <DriverPickerModal
-          onClose={() => setShowDriverPicker(false)}
+          onClose={() => !isSubmitting && setShowDriverPicker(false)}
           availableDrivers={availableDrivers}
-          isLoading={false}
+          isLoading={isSubmitting}
           onSelectDriver={handleSelectDriver}
         />
       )}
@@ -299,7 +308,7 @@ const RequestRideScreen: React.FC = () => {
         {(rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS' || rideState === 'SEARCHING') && (
            <DriverStatusCard
              rideState={rideState}
-             driverInfo={driverInfo || { name: 'Searching', car: 'Please wait', plate: '---', rating: 5, trips: 0, avatar: '', timeAway: 0 }}
+             driverInfo={driverInfo || { name: 'Searching', car: 'Please wait', plate: '---', rating: 5, trips: 0, avatar: IMAGES.DRIVER_CARD, timeAway: 0 }}
              rideMilestone={rideMilestone}
              lastMilestoneUpdate={new Date().toISOString()}
              onCall={() => {}}
