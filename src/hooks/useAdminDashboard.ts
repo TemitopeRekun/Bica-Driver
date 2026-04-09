@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PaymentHistoryRecord, PendingPaymentTrip, SystemSettings, Trip, UserProfile } from '@/types';
+import { AdminDashboardStats, PaymentHistoryRecord, PendingPaymentTrip, SystemSettings, Trip, UserProfile } from '@/types';
 import { api, PaginatedResponse, PaginationMeta } from '@/services/api.service';
 import { mapPaymentHistory, mapPendingPaymentTrip, mapTrip, mapUser } from '@/mappers/appMappers';
 
@@ -13,6 +13,9 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
   
   const [adminTrips, setAdminTrips] = useState<Trip[]>([]);
   const [tripsMeta, setTripsMeta] = useState<PaginationMeta | null>(null);
+
+  const [adminPendingDrivers, setAdminPendingDrivers] = useState<UserProfile[]>([]);
+  const [adminStats, setAdminStats] = useState<AdminDashboardStats | null>(null);
 
   const [adminPendingPayments, setAdminPendingPayments] = useState<PendingPaymentTrip[]>([]);
   const [pendingPaymentsMeta, setPendingPaymentsMeta] = useState<PaginationMeta | null>(null);
@@ -52,6 +55,15 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
     }
   }, []);
 
+  const loadPendingDrivers = useCallback(async () => {
+    try {
+      const response = await api.get<any[]>('/admin/drivers/pending');
+      setAdminPendingDrivers(response.map(mapUser));
+    } catch (error: any) {
+      setAdminDashboardError(error.message);
+    }
+  }, []);
+
   const loadPendingPaymentsPage = useCallback(async (page: number, limit: number = 20) => {
     try {
       const response = await api.get<PaginatedResponse<any>>(`/payments/pending?page=${page}&limit=${limit}`);
@@ -85,7 +97,10 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
           users: PaginatedResponse<any>;
           trips: PaginatedResponse<any>;
           settings: SystemSettings;
-        }>('/admin/dashboard?limit=20'),
+          stats: AdminDashboardStats;
+          pendingDrivers?: any[];
+          pending?: any[];
+        }>('/admin/dashboard?limit=10'),
         api.get<PaginatedResponse<any>>('/payments/pending?limit=20'),
         api.get<PaginatedResponse<any>>('/payments/history?limit=20'),
       ]);
@@ -101,6 +116,11 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
 
       setAdminPaymentHistory(paymentHistory?.items?.map(mapPaymentHistory) || []);
       setPaymentHistoryMeta(paymentHistory?.meta || null);
+
+      setAdminStats(dashboard.stats || null);
+      
+      const pDrivers = dashboard.pendingDrivers || dashboard.pending || [];
+      setAdminPendingDrivers(pDrivers.map(mapUser));
 
       setAdminSettings(dashboard.settings);
       onSettingsLoadedRef.current?.(dashboard.settings);
@@ -118,6 +138,8 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
     usersMeta,
     adminTrips,
     tripsMeta,
+    adminPendingDrivers,
+    adminStats,
     adminPendingPayments,
     pendingPaymentsMeta,
     adminPaymentHistory,
@@ -130,6 +152,7 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
     loadAdminDashboard,
     loadUsersPage,
     loadTripsPage,
+    loadPendingDrivers,
     loadPendingPaymentsPage,
     loadPaymentHistoryPage,
   };

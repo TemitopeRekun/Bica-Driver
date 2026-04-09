@@ -275,3 +275,10 @@ export interface RouteData {
     high: number;
   };
 }
+export interface AdminDashboardStats {
+  totalDrivers: number;
+  totalOwners: number;
+  totalTrips: number;
+  pendingDriversCount: number;
+  totalEarnings: number;
+}

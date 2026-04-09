@@ -12,7 +12,7 @@ const AdminDashboardPage: React.FC = () => {
   const { toast } = useToast();
   const { logout } = useAuthStore();
   const {
-    adminUsers, usersMeta, adminTrips, tripsMeta,
+    adminUsers, usersMeta, adminTrips, tripsMeta, adminPendingDrivers, adminStats,
     adminPendingPayments, pendingPaymentsMeta, 
     adminPaymentHistory, paymentHistoryMeta,
     adminSettings, adminDashboardLoading, adminDashboardError, lastUpdated,
@@ -38,7 +38,7 @@ const AdminDashboardPage: React.FC = () => {
 
   const handleUpdateStatus = async (userId: string, status: ApprovalStatus) => {
     try {
-      await api.patch(`/admin/users/${userId}/status`, { status });
+      await api.patch(`/users/${userId}/approval`, { status });
       toast.success(`User status updated to ${status}`);
       await loadAdminDashboard();
     } catch (e: any) {
@@ -48,11 +48,21 @@ const AdminDashboardPage: React.FC = () => {
 
   const handleBlockUser = async (userId: string, blocked: boolean) => {
     try {
-      await api.patch(`/admin/users/${userId}/block`, { blocked });
+      await api.patch(`/users/${userId}/block`, { isBlocked: blocked });
       toast.success(`User ${blocked ? 'blocked' : 'unblocked'}`);
       await loadAdminDashboard();
     } catch (e: any) {
       toast.error(e.message || 'Failed to update block status');
+    }
+  };
+
+  const handleRetrySubAccount = async (userId: string) => {
+    try {
+      await api.post(`/admin/users/${userId}/retry-subaccount`);
+      toast.success("Sub-account creation re-triggered successfully!");
+      await loadAdminDashboard();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to retry sub-account setup');
     }
   };
 
@@ -72,6 +82,8 @@ const AdminDashboardPage: React.FC = () => {
       usersMeta={usersMeta}
       trips={adminTrips || []}
       tripsMeta={tripsMeta}
+      pendingDrivers={adminPendingDrivers || []}
+      stats={adminStats}
       pendingPayments={adminPendingPayments || []}
       pendingPaymentsMeta={pendingPaymentsMeta}
       paymentHistory={adminPaymentHistory || []}
@@ -82,7 +94,7 @@ const AdminDashboardPage: React.FC = () => {
       lastUpdated={lastUpdated}
       onUpdateStatus={handleUpdateStatus}
       onBlockUser={handleBlockUser}
-      onRetrySubAccount={async () => {}}
+      onRetrySubAccount={handleRetrySubAccount}
       onUpdateSettings={handleUpdateSettings}
       onForcedLogout={() => logout()}
       onRetry={() => loadAdminDashboard()}

@@ -1,9 +1,9 @@
-import React from 'react';
-import { Trip, PendingPaymentTrip, UserProfile, UserRole } from '@/types';
+import { Trip, PendingPaymentTrip, UserProfile, UserRole, AdminDashboardStats } from '@/types';
 
 interface OverviewSectionProps {
   lastUpdated: Date | null;
   pendingDrivers: UserProfile[];
+  stats: AdminDashboardStats | null;
   pendingPayments: PendingPaymentTrip[];
   platformFees: number;
   completedTripsCount: number;
@@ -19,6 +19,7 @@ interface OverviewSectionProps {
 const OverviewSection: React.FC<OverviewSectionProps> = ({
   lastUpdated,
   pendingDrivers,
+  stats,
   pendingPayments,
   platformFees,
   completedTripsCount,
@@ -30,6 +31,13 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
   setActiveSection,
   onSimulate
 }) => {
+  // Use server side stats if available
+  const displayPendingDriversCount = stats?.pendingDriversCount ?? pendingDrivers.length;
+  const displayTotalRevenue = stats?.totalEarnings ? (stats.totalEarnings * 0.15) : platformFees; // Assume 15% fee for display if using total earnings
+  const displayCompletedTrips = stats?.totalTrips ?? completedTripsCount;
+  const displayTotalDrivers = stats?.totalDrivers ?? onlineDriversCount;
+  const displayTotalOwners = stats?.totalOwners ?? totalOwnersCount;
+
   return (
     <div className="space-y-6 animate-slide-up">
       {/* Platform Status Header */}
@@ -50,14 +58,14 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
       </div>
 
       {/* Immediate Attention Area */}
-      {(pendingDrivers.length > 0 || pendingPayments.length > 0) && (
+      {(displayPendingDriversCount > 0 || pendingPayments.length > 0) && (
         <div className="bg-red-500/5 border-2 border-red-500/20 rounded-[2rem] p-5 shadow-inner">
           <div className="flex items-center gap-2 mb-4">
             <span className="material-symbols-outlined text-red-500 filled">priority_high</span>
             <h3 className="text-sm font-black text-red-600 dark:text-red-400 uppercase tracking-widest">Immediate Attention</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {pendingDrivers.length > 0 && (
+            {displayPendingDriversCount > 0 && (
               <button 
                 onClick={() => setActiveSection('drivers')}
                 className="bg-white dark:bg-red-950/20 border border-red-500/20 p-4 rounded-2xl flex items-center justify-between group hover:border-red-500 transition-all active:scale-[0.98]"
@@ -68,7 +76,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
                   </div>
                   <div className="text-left">
                     <p className="text-[10px] font-black text-slate-500 uppercase">Pending Drivers</p>
-                    <p className="text-xl font-black text-slate-900 dark:text-white">{pendingDrivers.length}</p>
+                    <p className="text-xl font-black text-slate-900 dark:text-white">{displayPendingDriversCount}</p>
                   </div>
                 </div>
                 <div className="size-8 rounded-full border border-red-500/20 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-all">
@@ -110,7 +118,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
             <span className="text-[9px] font-black text-green-500 px-2 py-0.5 bg-green-500/10 rounded-full italic">+12%</span>
           </div>
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Revenue</p>
-          <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{formatCurrency(platformFees)}</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{formatCurrency(displayTotalRevenue)}</p>
         </div>
 
         {/* Trips Volume */}
@@ -122,7 +130,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
             <span className="text-[9px] font-black text-primary px-2 py-0.5 bg-primary/10 rounded-full italic">Volume</span>
           </div>
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Completed Trips</p>
-          <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{completedTripsCount}</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{displayCompletedTrips}</p>
         </div>
 
         {/* Active Drivers */}
@@ -131,10 +139,10 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
             <span className="size-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500 transition-transform group-hover:scale-110">
               <span className="material-symbols-outlined">sports_motorsports</span>
             </span>
-            <span className="text-[9px] font-black text-blue-500 px-2 py-0.5 bg-blue-500/10 rounded-full italic">Online</span>
+            <span className="text-[9px] font-black text-blue-500 px-2 py-0.5 bg-blue-500/10 rounded-full italic">Total</span>
           </div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Active Drivers</p>
-          <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{onlineDriversCount}</p>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Registered Drivers</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{displayTotalDrivers}</p>
         </div>
 
         {/* Registered Owners */}
@@ -146,7 +154,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
             <span className="text-[9px] font-black text-purple-500 px-2 py-0.5 bg-purple-500/10 rounded-full italic">Users</span>
           </div>
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Owners</p>
-          <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{totalOwnersCount}</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{displayTotalOwners}</p>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UserProfile, UserRole, ApprovalStatus, Trip, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord } from '@/types';
+import { UserProfile, UserRole, ApprovalStatus, Trip, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminDashboardStats } from '@/types';
 import { mapUser } from '@/mappers/appMappers';
 import { useToast } from '@/hooks/useToast';
 
@@ -19,6 +19,8 @@ interface AdminDashboardScreenProps {
   usersMeta: PaginationMeta | null;
   trips: Trip[];
   tripsMeta: PaginationMeta | null;
+  pendingDrivers: UserProfile[];
+  stats: AdminDashboardStats | null;
   pendingPayments: PendingPaymentTrip[];
   pendingPaymentsMeta: PaginationMeta | null;
   paymentHistory: PaymentHistoryRecord[];
@@ -41,7 +43,8 @@ interface AdminDashboardScreenProps {
 type AdminSection = 'overview' | 'drivers' | 'owners' | 'trips' | 'finance' | 'settings';
 
 const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({ 
-  users, usersMeta, trips, tripsMeta, pendingPayments, pendingPaymentsMeta, paymentHistory, paymentHistoryMeta,
+  users, usersMeta, trips, tripsMeta, pendingDrivers, stats,
+  pendingPayments, pendingPaymentsMeta, paymentHistory, paymentHistoryMeta,
   settings, isLoading, error, lastUpdated,
   onUpdateStatus, onBlockUser, onRetrySubAccount, onUpdateSettings, onForcedLogout,
   onRetry, onBack, onSimulate, onPageChange
@@ -63,8 +66,9 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   // Statistics & Derived Data
   const drivers = users.filter(u => u.role === UserRole.DRIVER);
   const owners = users.filter(u => u.role === UserRole.OWNER);
-  const pendingDrivers = drivers.filter(u => u.approvalStatus === 'PENDING');
-  const totalRevenue = trips.reduce((acc, t) => t.status === 'COMPLETED' ? acc + t.amount : acc, 0);
+  
+  // Use server stats if available, fallback to local (though discouraged by contract)
+  const totalRevenue = stats?.totalEarnings || trips.reduce((acc, t) => t.status === 'COMPLETED' ? acc + t.amount : acc, 0);
   const platformFees = totalRevenue * (settings.commission / 100);
 
   // Profile Detail Sync
@@ -201,11 +205,19 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
 
             {activeSection === 'overview' && (
               <OverviewSection 
-                lastUpdated={lastUpdated} pendingDrivers={pendingDrivers} pendingPayments={pendingPayments}
-                platformFees={platformFees} completedTripsCount={trips.filter(t => t.status === 'COMPLETED').length}
-                onlineDriversCount={drivers.filter(d => d.isOnline).length} totalOwnersCount={owners.length}
-                trips={trips} formatCurrency={formatCurrency} formatShortDate={formatShortDate}
-                setActiveSection={setActiveSection} onSimulate={onSimulate}
+                lastUpdated={lastUpdated} 
+                pendingDrivers={pendingDrivers} 
+                stats={stats}
+                pendingPayments={pendingPayments}
+                platformFees={platformFees} 
+                completedTripsCount={trips.filter(t => t.status === 'COMPLETED').length}
+                onlineDriversCount={drivers.filter(d => d.isOnline).length} 
+                totalOwnersCount={owners.length}
+                trips={trips} 
+                formatCurrency={formatCurrency} 
+                formatShortDate={formatShortDate}
+                setActiveSection={setActiveSection} 
+                onSimulate={onSimulate}
               />
             )}
 
