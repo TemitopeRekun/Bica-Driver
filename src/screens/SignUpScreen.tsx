@@ -403,6 +403,7 @@ const SignUpScreen: React.FC = () => {
                         {errors.age && touched.age && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.age}</p>}
                     </div>
                     <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Gender</label>
                         <div className={`flex items-center bg-white dark:bg-surface-dark border rounded-2xl px-4 h-14 transition-all ${errors.gender && touched.gender ? 'border-red-500 bg-red-500/5' : 'border-slate-100 dark:border-white/5'}`}>
                             <select 
                                 className="bg-transparent border-none text-slate-900 dark:text-white text-sm font-bold w-full focus:ring-0 p-0"
