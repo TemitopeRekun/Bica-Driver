@@ -147,7 +147,10 @@ const RequestRideScreen: React.FC = () => {
        else if (m === 'assigned') setRideMilestone('assigned');
        else if (m === 'completed') {
           setRideMilestone('completed');
-          syncCurrentRide();
+          // Only sync if we haven't already transitioned to COMPLETED to avoid state flickering
+          if (rideStateRef.current !== 'COMPLETED') {
+            syncCurrentRide();
+          }
        }
     },
     onPaymentUpdated: (data) => {

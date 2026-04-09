@@ -39,18 +39,26 @@ export const useRideManager = () => {
           timeAway: trip.estimatedArrivalMins || 5,
           tripId: trip.id,
         });
+        
         if (trip.status === 'SEARCHING') setRideState('SEARCHING');
         else if (trip.status === 'ASSIGNED') setRideState('ASSIGNED');
         else if (trip.status === 'IN_PROGRESS') setRideState('IN_PROGRESS');
+        else if (trip.status === 'COMPLETED') {
+          setCompletedTripData(trip);
+          setRideState('COMPLETED');
+        }
       } else {
-        // Force reset if backend says no ride active
-        resetRide();
+        // IMPORTANT: Only reset if we aren't currently showing a completion/payment summary.
+        // Completed trips are no longer "current" in the backend, so we must protect our local IDLE transition.
+        if (rideState !== 'COMPLETED') {
+          resetRide();
+        }
       }
       return trip;
     } catch (e) {
       return null;
     }
-  }, [setCurrentTripId, setDriverInfo, setRideState, resetRide]);
+  }, [setCurrentTripId, setDriverInfo, setRideState, setCompletedTripData, rideState, resetRide]);
 
   const fetchAvailableDrivers = useCallback(async (pickup: LocationData | null, transmission: string) => {
     if (!pickup?.lat || !pickup?.lon) {
