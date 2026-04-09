@@ -1,73 +1,55 @@
 import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Config } from '@/services/Config';
+import { sounds } from '@/services/SoundService';
+import { useUIStore } from '@/stores/uiStore';
 
 const API_URL = Config.apiUrl;
 
 interface UseAdminRealtimeOptions {
-  enabled: boolean;
   adminId?: string;
-  onRefresh: () => Promise<void>;
+  onNewDriver?: (data: any) => void;
+  onTripCompleted?: (data: any) => void;
 }
 
-export const useAdminRealtime = ({ enabled, adminId, onRefresh }: UseAdminRealtimeOptions) => {
-  const adminSocketRef = useRef<Socket | null>(null);
-  const adminRefreshTimer = useRef<any>(null);
-  const onRefreshRef = useRef(onRefresh);
+export const useAdminRealtime = ({ adminId, onNewDriver, onTripCompleted }: UseAdminRealtimeOptions) => {
+  const socketRef = useRef<Socket | null>(null);
+  const { addToast } = useUIStore();
 
   useEffect(() => {
-    onRefreshRef.current = onRefresh;
-  }, [onRefresh]);
+    if (!adminId || !API_URL) return;
 
-  useEffect(() => {
-    if (!enabled || !adminId || !API_URL) {
-      adminSocketRef.current?.disconnect();
-      adminSocketRef.current = null;
-      if (adminRefreshTimer.current) {
-        clearTimeout(adminRefreshTimer.current);
-        adminRefreshTimer.current = null;
-      }
-      return;
-    }
-
-    const scheduleAdminRefresh = () => {
-      if (adminRefreshTimer.current) {
-        clearTimeout(adminRefreshTimer.current);
-      }
-
-      adminRefreshTimer.current = setTimeout(() => {
-        onRefreshRef.current().catch((error: any) => {
-          console.error('Failed to refresh admin dashboard:', error);
-        });
-      }, 250);
-    };
-
-    adminSocketRef.current = io(`${API_URL}/admin`, {
+    // Connect to the admin namespace
+    socketRef.current = io(`${API_URL}/admin`, {
       transports: ['websocket'],
+      autoConnect: true,
     });
 
-    adminSocketRef.current.on('connect', () => {
-      adminSocketRef.current?.emit('admin:register', { adminId });
+    socketRef.current.on('connect', () => {
+      console.log('📡 [AdminWS] Connected to monitoring cluster');
+      socketRef.current?.emit('admin:register', { adminId });
     });
 
-    [
-      'admin:dashboard:update',
-      'admin:driver:pending_approval',
-      'admin:user:updated',
-      'admin:trip:updated',
-      'admin:settings:updated',
-      'admin:payment:updated',
-    ].forEach((eventName) => {
-      adminSocketRef.current?.on(eventName, scheduleAdminRefresh);
+    // Listen for new driver registrations
+    socketRef.current.on('admin:new-driver', (data: any) => {
+      console.log('📡 [AdminWS] New driver registered:', data);
+      sounds.playNotification();
+      addToast(`New chauffeur registered: ${data.name || 'Anonymous'}`, 'info');
+      onNewDriver?.(data);
+    });
+
+    // Listen for system-wide trip completions (to update stats)
+    socketRef.current.on('admin:trip-completed', (data: any) => {
+      onTripCompleted?.(data);
     });
 
     return () => {
-      adminSocketRef.current?.disconnect();
-      adminSocketRef.current = null;
-      if (adminRefreshTimer.current) {
-        clearTimeout(adminRefreshTimer.current);
-        adminRefreshTimer.current = null;
-      }
+      socketRef.current?.disconnect();
+      socketRef.current = null;
     };
-  }, [enabled, adminId]);
+  }, [adminId, onNewDriver, onTripCompleted, addToast]);
+
+  return {
+    socket: socketRef.current,
+  };
 };

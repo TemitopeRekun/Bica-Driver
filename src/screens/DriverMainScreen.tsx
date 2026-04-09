@@ -107,7 +107,8 @@ const DriverMainScreen: React.FC = () => {
                 pickup: trip.pickupAddress || '',
                 destination: trip.destAddress || '',
                 distance: `${trip.distanceKm?.toFixed(1) || '0'} km`,
-                time: `${trip.estimatedArrivalMins || 5} mins`,
+                timeToPickup: `${trip.estimatedArrivalMins || 5}m to pickup`,
+                tripDuration: `${trip.estimatedMins || 10}m trip`,
              });
           }
        } catch (e) {}
@@ -124,6 +125,14 @@ const DriverMainScreen: React.FC = () => {
   const handleAcceptRide = (ride: DriverRideRequest) => {
     setPendingRide(ride);
     setShowSelfieModal(true);
+  };
+
+  const handleDeclineRide = async (ride: DriverRideRequest) => {
+    try {
+      CapacitorService.triggerHaptic();
+      await declineRide(ride.id);
+      removeRideRequest(ride.id);
+    } catch (e) {}
   };
 
   const confirmSelfieAndRide = async () => {
@@ -210,6 +219,7 @@ const DriverMainScreen: React.FC = () => {
                          key={req.id} 
                          request={req} 
                          onAccept={handleAcceptRide} 
+                         onDecline={handleDeclineRide}
                       />
                    ))
                 ) : (

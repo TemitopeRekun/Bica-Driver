@@ -95,14 +95,28 @@ const RequestRideScreen: React.FC = () => {
   // Auto-Sync on Mount to recover any active ride
   useEffect(() => {
     const initSync = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isReturningFromPayment = urlParams.has('paymentReference') || urlParams.has('transactionReference');
+      
+      if (isReturningFromPayment) {
+        setIsInitiatingPayment(true);
+      }
+
       try {
         await syncCurrentRide();
       } catch (e) {
         console.error('Initial ride sync failed:', e);
+      } finally {
+        setIsInitiatingPayment(false);
+        // Clear the query params to prevent re-triggering on refresh
+        if (isReturningFromPayment) {
+           window.history.replaceState({}, document.title, window.location.pathname);
+        }
       }
     };
     initSync();
-  }, [syncCurrentRide]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only sync on mount
 
   // Sync refs for the Realtime hook
   useEffect(() => {
@@ -129,9 +143,11 @@ const RequestRideScreen: React.FC = () => {
       setRideMilestone('assigned');
     },
     onDriverDeclined: () => {
-      addToast('Driver declined. Searching for others.', 'warning');
+      addToast('The chauffeur declined the request. Feel free to search for another driver!', 'info');
       setRideState('IDLE');
-      fetchAvailableDrivers(pickup!, vehicleData.transmission);
+      if (pickup) {
+        fetchAvailableDrivers(pickup, vehicleData.transmission);
+      }
     },
     onTripCompleted: (data) => {
       setCompletedTripData(data);
@@ -449,6 +465,7 @@ const RequestRideScreen: React.FC = () => {
               distanceKm: completedTripData?.fareBreakdown?.distanceKm ?? completedTripData?.distanceKm ?? 0,
               actualMins: completedTripData?.fareBreakdown?.actualMins ?? completedTripData?.actualMins ?? completedTripData?.fareBreakdown?.totalMins ?? completedTripData?.totalMins ?? 0,
               finalFare: completedTripData?.fareBreakdown?.finalFare ?? completedTripData?.finalFare ?? completedTripData?.amount ?? 0,
+              totalAmount: completedTripData?.fareBreakdown?.totalAmount,
             }}
             paymentStatus={completedTripData?.paymentStatus || 'UNPAID'}
             paymentMessage={completedTripData?.paymentStatus === 'PAID' ? 'Payment confirmed! Thank you.' : ''}

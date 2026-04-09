@@ -9,6 +9,7 @@ interface TripPaymentSummaryProps {
     actualMins?: number;
     totalMins?: number;
     finalFare: number;
+    totalAmount?: number;
     driverEarnings?: number;
   } | null;
   paymentStatus?: 'UNPAID' | 'SUCCESS' | 'FAILED' | 'PENDING';
@@ -38,18 +39,21 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
         <div className="px-6 py-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
           <div>
             <h3 className="text-xl font-black text-slate-900 dark:text-white">
-              {isDriver ? 'Trip Earnings' : 'Trip Result'}
+              {isDriver ? 'Trip Earnings' : (paymentStatus === 'SUCCESS' ? 'Trip Paid!' : 'Trip Result')}
             </h3>
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-              {isDriver ? 'Performance Summary' : 'Final Settlement'}
+              {isDriver ? 'Performance Summary' : (paymentStatus === 'SUCCESS' ? 'Thank you for riding' : 'Final Settlement')}
             </p>
           </div>
-          <button 
-            onClick={onClose}
-            className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors"
-          >
-            <span className="material-symbols-outlined text-lg">close</span>
-          </button>
+          {/* Only allow closing if driver OR if owner has paid. Prevents "mistaken dismiss" before payment. */}
+          {(isDriver || paymentStatus === 'SUCCESS') && (
+            <button 
+              onClick={onClose}
+              className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors animate-in fade-in"
+            >
+              <span className="material-symbols-outlined text-lg">close</span>
+            </button>
+          )}
         </div>
 
         <div className="p-8 space-y-6">
@@ -84,7 +88,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex justify-between items-center opacity-70">
                     <span className="text-xs font-bold text-slate-500 uppercase">Customer Paid</span>
-                    <span className="text-sm font-black text-slate-900 dark:text-white">₦{(fareBreakdown?.finalFare || 0).toLocaleString()}</span>
+                    <span className="text-sm font-black text-slate-900 dark:text-white">₦{(fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">Your Earnings</span>
@@ -92,22 +96,24 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                   </div>
                </div>
              ) : (
-               <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                  <span className="text-sm font-black text-slate-900 dark:text-white">Total Amount</span>
-                  <span className="text-3xl font-black text-primary">₦{(fareBreakdown?.finalFare || 0).toLocaleString()}</span>
-               </div>
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                   <span className="text-sm font-black text-slate-900 dark:text-white">Total Amount</span>
+                   <span className="text-3xl font-black text-primary">₦{(fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0).toLocaleString()}</span>
+                </div>
              )}
           </div>
 
           {/* Payment Status Alert for Owner */}
-          {!isDriver && paymentMessage && (
-            <div className={`p-4 rounded-2xl flex gap-3 items-start border-2 ${
+          {!isDriver && (paymentMessage || paymentStatus === 'SUCCESS') && (
+            <div className={`p-4 rounded-2xl flex gap-3 items-start border-2 animate-in slide-in-from-top-4 duration-500 ${
               paymentStatus === 'SUCCESS' ? 'bg-green-500/5 border-green-500/20 text-green-600' : 'bg-red-500/5 border-red-500/20 text-red-600'
             }`}>
               <span className="material-symbols-outlined text-base">
-                {paymentStatus === 'SUCCESS' ? 'check_circle' : 'error'}
+                {paymentStatus === 'SUCCESS' ? 'verified' : 'error'}
               </span>
-              <p className="text-[10px] font-black uppercase leading-relaxed">{paymentMessage}</p>
+              <p className="text-[10px] font-black uppercase leading-relaxed">
+                {paymentStatus === 'SUCCESS' ? 'Trip settlement confirmed successfully!' : paymentMessage}
+              </p>
             </div>
           )}
 
@@ -124,15 +130,28 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                 ) : (
                   <span className="material-symbols-outlined">payments</span>
                 )}
-                {isInitiatingPayment ? 'SECURE CONNECTION...' : 'PAY NGN ' + (fareBreakdown?.finalFare || 0).toLocaleString()}
+                {isInitiatingPayment ? 'SECURE CONNECTION...' : 'PAY NGN ' + (fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0).toLocaleString()}
               </button>
             )}
-            <button 
-              onClick={onClose}
-              className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black py-4 rounded-2xl hover:opacity-90 transition-all uppercase tracking-widest text-xs"
-            >
-              {isDriver ? 'Complete and Go Online' : 'Dismiss'}
-            </button>
+
+            {(isDriver || paymentStatus === 'SUCCESS') && (
+              <button 
+                onClick={onClose}
+                className={`w-full font-black py-4 rounded-2xl hover:opacity-90 transition-all uppercase tracking-widest text-xs animate-in zoom-in duration-300 ${
+                  paymentStatus === 'SUCCESS' 
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                    : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
+                }`}
+              >
+                {isDriver ? 'Complete and Go Online' : 'Finish & Return Home'}
+              </button>
+            )}
+            
+            {!isDriver && paymentStatus !== 'SUCCESS' && (
+              <p className="text-center text-[8px] font-black text-slate-400 uppercase tracking-widest opacity-60">
+                Payment is required to complete engagement
+              </p>
+            )}
           </div>
         </div>
       </div>

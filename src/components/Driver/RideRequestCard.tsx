@@ -4,9 +4,10 @@ import { DriverRideRequest } from '@/hooks/useDriverRealtime';
 interface RideRequestCardProps {
   request: DriverRideRequest;
   onAccept: (request: DriverRideRequest) => void;
+  onDecline: (request: DriverRideRequest) => void;
 }
 
-const RideRequestCard: React.FC<RideRequestCardProps> = ({ request, onAccept }) => {
+const RideRequestCard: React.FC<RideRequestCardProps> = ({ request, onAccept, onDecline }) => {
   return (
     <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/10 space-y-6 shadow-2xl animate-scale-in">
       {/* Header: Identity & Status */}
@@ -81,17 +82,25 @@ const RideRequestCard: React.FC<RideRequestCardProps> = ({ request, onAccept }) 
         </div>
       </div>
 
-      {/* Action Button */}
-      <button 
-        onClick={() => onAccept(request)}
-        className="group relative w-full overflow-hidden bg-primary py-5 rounded-3xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-primary/20"
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-        <span className="relative text-white font-black text-lg uppercase tracking-widest flex items-center justify-center gap-2">
-          Accept Request
-          <span className="material-symbols-outlined font-black">arrow_forward</span>
-        </span>
-      </button>
+      {/* Action Buttons */}
+      <div className="flex gap-3">
+        <button 
+          onClick={() => onDecline(request)}
+          className="flex-1 bg-white/5 hover:bg-white/10 text-slate-300 font-bold py-4 rounded-2xl border border-white/10 transition-all uppercase tracking-widest text-xs"
+        >
+          Decline
+        </button>
+        <button 
+          onClick={() => onAccept(request)}
+          className="flex-[2] group relative overflow-hidden bg-primary py-4 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-primary/20"
+        >
+          <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+          <span className="relative text-white font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2">
+            Accept
+            <span className="material-symbols-outlined text-sm font-black">arrow_forward</span>
+          </span>
+        </button>
+      </div>
     </div>
   );
 };

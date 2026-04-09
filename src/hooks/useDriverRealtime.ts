@@ -5,6 +5,7 @@ import { api } from '@/services/api.service';
 import { Config } from '@/services/Config';
 import { IMAGES } from '@/constants';
 import { UserProfile } from '@/types';
+import { sounds } from '@/services/SoundService';
 import { Geolocation } from '@capacitor/geolocation';
 
 const API_URL = Config.apiUrl;
@@ -180,6 +181,7 @@ export const useDriverRealtime = ({
     });
 
     const handleIncomingRequest = (trip: any) => {
+      sounds.playNotification();
       const rideRequest: DriverRideRequest = {
         id: trip.id,
         ownerName: trip.owner?.name || 'Car Owner',

@@ -170,15 +170,32 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
     <div className="flex h-screen w-full flex-col bg-background-light dark:bg-background-dark text-slate-900 dark:text-white overflow-hidden">
       {/* Header */}
       <header className="px-4 py-3 bg-surface-light dark:bg-surface-dark border-b border-slate-200 dark:border-slate-800 flex items-center gap-4 shrink-0 z-20">
-        <button onClick={onBack} className="w-10 h-10 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors">
-          <span className="material-symbols-outlined">arrow_back</span>
-        </button>
+        {activeSection !== 'overview' && (
+          <button 
+            onClick={() => setActiveSection('overview')} 
+            className="w-10 h-10 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors"
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
+        )}
         <div className="flex-1">
           <h1 className="font-black text-lg uppercase tracking-tight">Admin Console</h1>
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Bicadriver v1.1.0</p>
         </div>
-        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-          <span className="material-symbols-outlined filled">admin_panel_settings</span>
+        <div className="flex items-center gap-2">
+          {activeSection === 'overview' && (
+            <button 
+              onClick={onBack} 
+              className="px-4 py-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 flex items-center gap-2 transition-all border border-red-500/10"
+              title="Exit Admin"
+            >
+              <span className="text-[10px] font-black uppercase tracking-wider">Exit Admin</span>
+              <span className="material-symbols-outlined text-sm">exit_to_app</span>
+            </button>
+          )}
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+            <span className="material-symbols-outlined filled">admin_panel_settings</span>
+          </div>
         </div>
       </header>
 

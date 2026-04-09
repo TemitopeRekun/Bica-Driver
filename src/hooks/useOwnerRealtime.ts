@@ -2,6 +2,7 @@ import { MutableRefObject, useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { IMAGES } from '@/constants';
 import { Config } from '@/services/Config';
+import { sounds } from '@/services/SoundService';
 
 const API_URL = Config.apiUrl;
 
@@ -114,6 +115,7 @@ export const useOwnerRealtime = ({
         },
         estimatedArrivalMins: data.estimatedArrivalMins,
       });
+      sounds.playSuccess();
 
       if (data.driver?.id) {
         trackedDriverIdRef.current = data.driver.id;
@@ -129,6 +131,9 @@ export const useOwnerRealtime = ({
     });
 
     ownerSocketRef.current.on('payment:updated', (data: any) => {
+      if (data.paymentStatus === 'PAID' || data.message?.toLowerCase().includes('success')) {
+        sounds.playSuccess();
+      }
       onPaymentUpdatedRef.current(data);
     });
 
@@ -140,6 +145,9 @@ export const useOwnerRealtime = ({
           ...data,
           milestone: (m === 'inprogress' || m === 'in_progress' || m === 'trip') ? 'in_progress' : m as any
         });
+        if (m === 'arrived') {
+          sounds.playAlert();
+        }
       }
     });
 
@@ -153,6 +161,11 @@ export const useOwnerRealtime = ({
           tripId: data.tripId || data.id,
           milestone: (data.milestone || data.status.toLowerCase()) as any
         });
+        if (data.milestone === 'arrived' || data.status === 'ARRIVED') {
+          sounds.playAlert();
+        } else if (data.status === 'COMPLETED') {
+          sounds.playNotification();
+        }
       }
     });
 

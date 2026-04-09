@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAdminDashboard } from '@/hooks/useAdminDashboard';
+import { useAdminRealtime } from '@/hooks/useAdminRealtime';
 import AdminDashboardScreen from './AdminDashboardScreen';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/useToast';
@@ -19,6 +20,18 @@ const AdminDashboardPage: React.FC = () => {
     loadAdminDashboard, loadUsersPage, loadTripsPage, 
     loadPendingPaymentsPage, loadPaymentHistoryPage
   } = useAdminDashboard();
+  const { currentUser } = useAuthStore();
+
+  const handleNewRegistration = React.useCallback(() => {
+    loadAdminDashboard().catch(() => {});
+  }, [loadAdminDashboard]);
+
+  // Hook up real-time monitoring
+  useAdminRealtime({
+    adminId: currentUser?.id,
+    onNewDriver: handleNewRegistration,
+    onTripCompleted: handleNewRegistration,
+  });
 
   useEffect(() => {
     loadAdminDashboard().catch(err => {

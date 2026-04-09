@@ -23,6 +23,7 @@ export const useRideManager = () => {
     setTrackedDriverPos,
     setAvailableDrivers,
     completedTripData,
+    setCompletedTripData,
     routePreview,
     setRoutePreview,
     resetRide,
@@ -31,6 +32,9 @@ export const useRideManager = () => {
   const syncCurrentRide = useCallback(async () => {
     try {
       const trip = await api.get<any>('/rides/current');
+      // Access current state via store to avoid dependency loop
+      const currentState = useRideStore.getState().rideState;
+
       if (trip) {
         setCurrentTripId(trip.id);
         setDriverInfo({
@@ -48,9 +52,10 @@ export const useRideManager = () => {
           setRideState('COMPLETED');
         }
       } else {
-        // IMPORTANT: Only reset if we aren't currently showing a completion/payment summary.
-        // Completed trips are no longer "current" in the backend, so we must protect our local IDLE transition.
-        if (rideState !== 'COMPLETED') {
+        // IMPORTANT: Only reset if we aren't currently in a "Live" transition state.
+        // During SEARCHING or ASSIGNED, a null response might just be a backend delay (race condition).
+        const PROTECTED_STATES: string[] = ['SEARCHING', 'ASSIGNED', 'COMPLETED'];
+        if (!PROTECTED_STATES.includes(currentState)) {
           resetRide();
         }
       }
@@ -58,7 +63,7 @@ export const useRideManager = () => {
     } catch (e) {
       return null;
     }
-  }, [setCurrentTripId, setDriverInfo, setRideState, setCompletedTripData, rideState, resetRide]);
+  }, [setCurrentTripId, setDriverInfo, setRideState, setCompletedTripData, resetRide]);
 
   const fetchAvailableDrivers = useCallback(async (pickup: LocationData | null, transmission: string) => {
     if (!pickup?.lat || !pickup?.lon) {
