@@ -20,6 +20,7 @@ interface UseOwnerRealtimeOptions {
   onPaymentUpdated: (payload: { tripId: string; paymentStatus: string; paidAt: string | null; transactionReference: string | null; message: string }) => void;
   onRideProgress?: (payload: { tripId: string; milestone: 'assigned' | 'arrived' | 'inprogress' | 'in_progress' | 'completed'; timestamp?: string; status?: any }) => void;
   onLocationUpdated: (lat: number, lng: number) => void;
+  syncCurrentRide?: () => Promise<any>;
 }
 
 export const useOwnerRealtime = ({
@@ -37,6 +38,7 @@ export const useOwnerRealtime = ({
   onPaymentUpdated,
   onRideProgress,
   onLocationUpdated,
+  syncCurrentRide,
 }: UseOwnerRealtimeOptions) => {
   const ownerSocketRef = useRef<Socket | null>(null);
   const onDriverAcceptedRef = useRef(onDriverAccepted);
@@ -45,6 +47,7 @@ export const useOwnerRealtime = ({
   const onPaymentUpdatedRef = useRef(onPaymentUpdated);
   const onRideProgressRef = useRef(onRideProgress);
   const onLocationUpdatedRef = useRef(onLocationUpdated);
+  const syncCurrentRideRef = useRef(syncCurrentRide);
   const driverInfoIdRef = useRef(driverInfoId);
   const rideStateValueRef = useRef(rideState);
 
@@ -129,18 +132,28 @@ export const useOwnerRealtime = ({
       onPaymentUpdatedRef.current(data);
     });
 
-    ownerSocketRef.current.on('trip:status', (data: any) => {
-      // Reconcile broad status changes from the backend
-      // payload: { tripId, status, milestone }
-      if (data.milestone) {
-        onRideProgressRef.current?.(data);
+    ownerSocketRef.current.on('ride:progress', (data: any) => {
+      // payload: { tripId, milestone, timestamp }
+      const m = data.milestone;
+      if (m) {
+        onRideProgressRef.current?.({
+          ...data,
+          milestone: (m === 'inprogress' || m === 'in_progress' || m === 'trip') ? 'in_progress' : m as any
+        });
       }
     });
-    
-// Owner realtime hook for ride progress and tracking signals
-    ownerSocketRef.current.on('ride:progress', (data: any) => {
-      // payload: { tripId, milestone, timestamp, status }
-      onRideProgressRef.current?.(data);
+
+    ownerSocketRef.current.on('trip:status', (data: any) => {
+      // payload: { tripId, status, milestone }
+      if (data.status === 'COMPLETED') {
+        onTripCompletedRef.current({ fareBreakdown: data.fareBreakdown });
+      } else if (data.status || data.milestone) {
+        // Aligned with Guide: Fail-Forward sync logic
+        onRideProgressRef.current?.({
+          tripId: data.tripId || data.id,
+          milestone: (data.milestone || data.status.toLowerCase()) as any
+        });
+      }
     });
 
     ownerSocketRef.current.on('driver:availability', () => {

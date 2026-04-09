@@ -1,7 +1,7 @@
 
 import React from 'react';
 
-export type DriverMilestone = 'assigned' | 'pickup' | 'arrived' | 'in_progress' | 'trip' | 'completed';
+export type DriverMilestone = 'assigned' | 'pickup' | 'arrived' | 'in_progress' | 'inprogress' | 'trip' | 'completed';
 
 interface TripProgressTimelineProps {
   milestone: DriverMilestone;
@@ -21,6 +21,7 @@ const TripProgressTimeline: React.FC<TripProgressTimelineProps> = ({ milestone }
       case 'pickup': return 0;
       case 'arrived': return 1;
       case 'in_progress':
+      case 'inprogress':
       case 'trip': return 2;
       case 'completed': return 3;
       default: return 0;

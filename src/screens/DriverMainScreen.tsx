@@ -12,6 +12,7 @@ import { useDriverRealtime, DriverRideRequest } from '@/hooks/useDriverRealtime'
 import InteractiveMap from '@/components/InteractiveMap';
 import TripProgressTimeline from '@/components/Driver/TripProgressTimeline';
 import TripPaymentSummary from '@/components/RequestRide/TripPaymentSummary';
+import RideRequestCard from '@/components/Driver/RideRequestCard';
 import { CapacitorService } from '@/services/CapacitorService';
 import { IMAGES } from '@/constants';
 import { CameraSource, CameraDirection } from '@capacitor/camera';
@@ -56,6 +57,38 @@ const DriverMainScreen: React.FC = () => {
        else if (m === 'completed') setRideMilestone('completed');
     },
   });
+
+  // Boot-time Sync: Recover active trip if page refreshed
+  useEffect(() => {
+    const recoverSession = async () => {
+      try {
+        const trip = await syncCurrentRide();
+        if (trip && !['COMPLETED', 'CANCELLED', 'REJECTED'].includes(trip.status)) {
+           // If it's an active trip assigned specifically to this driver
+           if (trip.driverId === currentUser?.id && trip.status !== 'PENDING_ACCEPTANCE') {
+             setActiveRide({
+               id: trip.id,
+               ownerName: trip.owner?.name || 'Car Owner',
+               pickup: trip.pickupAddress,
+               destination: trip.destAddress,
+               distance: `${trip.distanceKm?.toFixed(1)} km`,
+               price: trip.driverEarnings?.toLocaleString() || trip.amount?.toLocaleString(),
+               timeToPickup: `${trip.estimatedArrivalMins || 5}m to pickup`,
+               tripDuration: `${trip.estimatedMins || 10}m trip`,
+               avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
+               coords: [trip.pickupLat, trip.pickupLng],
+               destCoords: [trip.destLat, trip.destLng],
+             });
+             setRideState(trip.status as any);
+             setRideMilestone(trip.status.toLowerCase() as any);
+           }
+        }
+      } catch (e) {
+        console.warn('Session recovery failed:', e);
+      }
+    };
+    recoverSession();
+  }, [syncCurrentRide, currentUser?.id, setRideState, setRideMilestone]);
 
   useEffect(() => {
     loadWalletSummary();
@@ -172,23 +205,12 @@ const DriverMainScreen: React.FC = () => {
                 </div>
 
                 {liveRideRequests.length > 0 ? (
-                   liveRideRequests.map(req => (
-                      <div key={req.id} className="bg-white/5 p-5 rounded-3xl border border-white/5 flex flex-col gap-4">
-                         <div className="flex justify-between">
-                            <div className="flex items-center gap-3">
-                               <img src={req.avatar} className="size-10 rounded-full" alt="" />
-                               <div>
-                                  <p className="font-bold text-white text-sm">{req.ownerName}</p>
-                                  <p className="text-[10px] text-slate-400">4.9 · Verified Owner</p>
-                               </div>
-                            </div>
-                            <div className="text-right">
-                               <p className="text-[10px] text-slate-500 font-bold uppercase">Reward</p>
-                               <p className="text-xl font-black text-primary italic">₦{req.price}</p>
-                            </div>
-                         </div>
-                         <button onClick={() => handleAcceptRide(req)} className="w-full bg-primary py-4 rounded-2xl text-white font-black shadow-lg">Accept Request</button>
-                      </div>
+                   liveRideRequests.map((req) => (
+                      <RideRequestCard 
+                         key={req.id} 
+                         request={req} 
+                         onAccept={handleAcceptRide} 
+                      />
                    ))
                 ) : (
                    <div className="py-12 text-center text-slate-500">
@@ -242,10 +264,10 @@ const DriverMainScreen: React.FC = () => {
             pickup={completedTripSummary.pickup}
             destination={completedTripSummary.destination}
             fareBreakdown={{
-              distanceKm: completedTripSummary.distanceKm || 0,
-              actualMins: completedTripSummary.actualMins || completedTripSummary.totalMins || 0,
-              finalFare: completedTripSummary.amount || 0,
-              driverEarnings: completedTripSummary.driverEarnings || 0
+              distanceKm: completedTripSummary.distanceKm || completedTripSummary.fareBreakdown?.distanceKm || 0,
+              actualMins: completedTripSummary.actualMins || completedTripSummary.totalMins || completedTripSummary.fareBreakdown?.actualMins || completedTripSummary.fareBreakdown?.totalMins || 0,
+              finalFare: completedTripSummary.finalFare || completedTripSummary.amount || completedTripSummary.fareBreakdown?.finalFare || 0,
+              driverEarnings: completedTripSummary.driverEarnings || completedTripSummary.fareBreakdown?.driverEarnings || 0
             }}
             onClose={() => {
                setCompletedTripSummary(null);

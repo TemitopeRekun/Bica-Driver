@@ -16,11 +16,11 @@ export interface DriverRideRequest {
   destination: string;
   distance: string;
   price: string;
-  time: string;
+  timeToPickup: string;
+  tripDuration: string;
   avatar: string;
   coords: [number, number];
   destCoords: [number, number];
-  estimatedMins?: number | null;
 }
 
 interface UseDriverRealtimeOptions {
@@ -179,7 +179,7 @@ export const useDriverRealtime = ({
       registerDriverSocket();
     });
 
-    socketRef.current.on('ride:assigned', (trip: any) => {
+    const handleIncomingRequest = (trip: any) => {
       const rideRequest: DriverRideRequest = {
         id: trip.id,
         ownerName: trip.owner?.name || 'Car Owner',
@@ -187,18 +187,46 @@ export const useDriverRealtime = ({
         destination: trip.destAddress,
         distance: `${trip.distanceKm?.toFixed(1)} km`,
         price: trip.driverEarnings?.toLocaleString() || trip.amount?.toLocaleString(),
-        time: `${trip.estimatedArrivalMins || 5} mins`,
+        timeToPickup: `${trip.estimatedArrivalMins || 5}m to pickup`,
+        tripDuration: `${trip.estimatedMins || trip.fareBreakdown?.totalMins || 10}m trip`,
         avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
         coords: [trip.pickupLat, trip.pickupLng],
         destCoords: [trip.destLat, trip.destLng],
-        estimatedMins: trip.estimatedMins ?? null,
       };
 
       setLiveRideRequests((prev) => {
         if (prev.some((ride) => ride.id === trip.id)) return prev;
         return [rideRequest, ...prev];
       });
+    };
+
+    // Aligned with Integration Guide: Supporting both legacy and new events
+    socketRef.current.on('ride:assigned', handleIncomingRequest);
+    socketRef.current.on('ride:request', handleIncomingRequest);
+
+    socketRef.current.on('ride:cancelled', (data: any) => {
+      removeRideRequest(data.tripId || data.id);
     });
+
+    // Boot-time Sync: Recover any pending or active requests after socket is ready
+    const bootSync = async () => {
+      try {
+        const trip = await api.get<any>('/rides/current');
+        if (!trip) return;
+
+        if (trip.status === 'PENDING_ACCEPTANCE' || trip.status === 'SEARCHING') {
+          // It's a pending request, add to the card queue
+          handleIncomingRequest(trip);
+        } else if (['ASSIGNED', 'IN_PROGRESS', 'ARRIVED'].includes(trip.status)) {
+          // It's an active trip, restore state
+          onRideProgress?.({ tripId: trip.id, milestone: trip.status.toLowerCase() });
+        }
+      } catch (err) {
+        console.warn('[DriverSync] Could not recover active ride:', err);
+      }
+    };
+    
+    bootSync();
 
     socketRef.current.on('trip:status', (data: any) => {
       // payload: { tripId, status, milestone }

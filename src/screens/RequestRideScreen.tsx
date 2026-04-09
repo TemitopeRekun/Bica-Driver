@@ -35,11 +35,12 @@ const RequestRideScreen: React.FC = () => {
     currentTripId, setCurrentTripId,
     driverInfo, setDriverInfo,
     trackedDriverPos, setTrackedDriverPos,
-    availableDrivers, setAvailableDrivers 
+    availableDrivers, setAvailableDrivers,
+    completedTripData, setCompletedTripData
   } = useRideStore();
   
   
-  const { fetchAvailableDrivers, initiateRideRequest, cancelRide, resetRide, syncCurrentRide } = useRideManager();
+  const { fetchAvailableDrivers, initiateRideRequest, cancelRide, resetRide, syncCurrentRide, getRoute, initiatePayment } = useRideManager();
 
   // Reference-based tracking for the custom location search hook
   const trackedDriverIdRef = useRef<string | null>(null);
@@ -53,6 +54,7 @@ const RequestRideScreen: React.FC = () => {
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [showDriverPicker, setShowDriverPicker] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isInitiatingPayment, setIsInitiatingPayment] = useState(false);
   
   const [vehicleData, setVehicleData] = useState({
     make: currentUser?.carType || '',
@@ -72,6 +74,23 @@ const RequestRideScreen: React.FC = () => {
     settings,
     onPickupChanged: () => {}
   });
+
+  // Update route distance/ETA when points change
+  useEffect(() => {
+    if (pickup && destination && rideState === 'IDLE') {
+      getRoute(pickup, destination);
+    }
+  }, [pickup, destination, rideState, getRoute]);
+
+  const handlePayNow = async () => {
+    if (!completedTripData?.id && !currentTripId) return;
+    try {
+      setIsInitiatingPayment(true);
+      await initiatePayment(completedTripData?.id || currentTripId!);
+    } catch (e) {
+      setIsInitiatingPayment(false);
+    }
+  };
 
   // Auto-Sync on Mount to recover any active ride
   useEffect(() => {
@@ -114,17 +133,22 @@ const RequestRideScreen: React.FC = () => {
       setRideState('IDLE');
       fetchAvailableDrivers(pickup!, vehicleData.transmission);
     },
-    onTripCompleted: () => {
+    onTripCompleted: (data) => {
+      setCompletedTripData(data);
       setRideState('COMPLETED');
       setRideMilestone('completed');
     },
     onLocationUpdated: (lat, lng) => setTrackedDriverPos([lat, lng]),
+    syncCurrentRide,
     onRideProgress: (payload) => {
        const m = payload.milestone?.toLowerCase();
        if (m === 'inprogress' || m === 'in_progress' || m === 'trip') setRideMilestone('in_progress');
        else if (m === 'arrived') setRideMilestone('arrived');
        else if (m === 'assigned') setRideMilestone('assigned');
-       else if (m === 'completed') setRideMilestone('completed');
+       else if (m === 'completed') {
+          setRideMilestone('completed');
+          syncCurrentRide();
+       }
     },
     onPaymentUpdated: (data) => {
       addToast(data.message || `Payment ${data.paymentStatus}`, data.paymentStatus === 'PAID' ? 'success' : 'info');
@@ -418,11 +442,15 @@ const RequestRideScreen: React.FC = () => {
             pickup={pickup ? getLocationShortText(pickup) : undefined}
             destination={destination ? getLocationShortText(destination) : undefined}
             onClose={() => resetRide()}
-            fareBreakdown={null}
-            paymentStatus="UNPAID"
-            paymentMessage=""
-            onPayNow={() => {}}
-            isInitiatingPayment={false}
+            fareBreakdown={{
+              distanceKm: completedTripData?.fareBreakdown?.distanceKm ?? completedTripData?.distanceKm ?? 0,
+              actualMins: completedTripData?.fareBreakdown?.actualMins ?? completedTripData?.actualMins ?? completedTripData?.fareBreakdown?.totalMins ?? completedTripData?.totalMins ?? 0,
+              finalFare: completedTripData?.fareBreakdown?.finalFare ?? completedTripData?.finalFare ?? completedTripData?.amount ?? 0,
+            }}
+            paymentStatus={completedTripData?.paymentStatus || 'UNPAID'}
+            paymentMessage={completedTripData?.paymentStatus === 'PAID' ? 'Payment confirmed! Thank you.' : ''}
+            onPayNow={handlePayNow}
+            isInitiatingPayment={isInitiatingPayment}
           />
         )}
       </div>

@@ -48,14 +48,14 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
           <span className="text-sm font-bold text-slate-900 dark:text-white">
             {rideMilestone === 'assigned' ? 'Driver on the way' : 
              rideMilestone === 'arrived' ? 'Your driver is waiting' : 
-             rideMilestone === 'in_progress' ? 'Trip in progress' : 
+             (rideMilestone === 'in_progress' || rideMilestone === 'inprogress' || rideMilestone === 'trip') ? 'Trip in progress' : 
              rideMilestone === 'completed' ? 'Trip completed' : 'Ride status'}
           </span>
         </div>
         <span className="text-xs font-bold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-500">
           {rideMilestone === 'assigned' ? driverInfo.timeAway + ' mins away' : 
            rideMilestone === 'arrived' ? 'At pickup location' : 
-           rideMilestone === 'in_progress' ? 'Heading to Destination' : 
+           (rideMilestone === 'in_progress' || rideMilestone === 'inprogress' || rideMilestone === 'trip') ? 'Heading to Destination' : 
            rideMilestone === 'completed' ? 'Arrived at destination' : ''}
         </span>
       </div>

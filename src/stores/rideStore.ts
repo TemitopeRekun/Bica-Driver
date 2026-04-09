@@ -34,6 +34,8 @@ interface RideStateData {
   driverInfo: any | null;
   trackedDriverPos: [number, number] | null;
   availableDrivers: any[];
+  completedTripData: any | null;
+  routePreview: { distanceKm: number; estimatedMins: number } | null;
   
   // Setters
   setRideState: (state: RideState) => void;
@@ -43,6 +45,8 @@ interface RideStateData {
   setDriverInfo: (info: any | null) => void;
   setTrackedDriverPos: (pos: [number, number] | null) => void;
   setAvailableDrivers: (drivers: any[]) => void;
+  setCompletedTripData: (data: any | null) => void;
+  setRoutePreview: (route: { distanceKm: number; estimatedMins: number } | null) => void;
   
   resetRide: () => void;
 }
@@ -57,6 +61,8 @@ export const useRideStore = create<RideStateData>()(
       driverInfo: null,
       trackedDriverPos: null,
       availableDrivers: [],
+      completedTripData: null,
+      routePreview: null,
 
       setRideState: (rideState) => set({ rideState }),
       setRideMilestone: (rideMilestone) => set({ rideMilestone }),
@@ -65,6 +71,8 @@ export const useRideStore = create<RideStateData>()(
       setDriverInfo: (driverInfo) => set({ driverInfo }),
       setTrackedDriverPos: (trackedDriverPos) => set({ trackedDriverPos }),
       setAvailableDrivers: (availableDrivers) => set({ availableDrivers }),
+      setCompletedTripData: (completedTripData) => set({ completedTripData }),
+      setRoutePreview: (routePreview) => set({ routePreview }),
 
       resetRide: () => set({
         rideState: 'IDLE',
@@ -74,6 +82,8 @@ export const useRideStore = create<RideStateData>()(
         driverInfo: null,
         trackedDriverPos: null,
         availableDrivers: [],
+        completedTripData: null,
+        routePreview: null,
       }),
     }),
     {
@@ -86,6 +96,7 @@ export const useRideStore = create<RideStateData>()(
         currentTripId: state.currentTripId,
         driverInfo: state.driverInfo,
         trackedDriverPos: state.trackedDriverPos,
+        completedTripData: state.completedTripData,
       }),
     }
   )

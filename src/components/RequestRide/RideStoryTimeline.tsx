@@ -18,7 +18,8 @@ const RideStoryTimeline: React.FC<RideStoryTimelineProps> = ({
     { id: 'completed', label: 'Completed', icon: 'check_circle', microcopy: 'Trip completed – proceed to payment' },
   ];
 
-  const currentStepIndex = Math.max(0, steps.findIndex(s => s.id === milestone));
+  const normalizedMilestone = (milestone === 'inprogress' || milestone === 'trip') ? 'in_progress' : milestone;
+  const currentStepIndex = Math.max(0, steps.findIndex(s => s.id === normalizedMilestone));
   const progressPercent = (currentStepIndex / (steps.length - 1)) * 100;
 
   const formatLastUpdate = (update?: string) => {

@@ -13,11 +13,18 @@ export const useRideManager = () => {
   const {
     rideState,
     setRideState,
+    rideMilestone,
     setRideMilestone,
+    currentTripId,
     setCurrentTripId,
+    driverInfo,
     setDriverInfo,
+    trackedDriverPos,
     setTrackedDriverPos,
     setAvailableDrivers,
+    completedTripData,
+    routePreview,
+    setRoutePreview,
     resetRide,
   } = useRideStore();
 
@@ -65,6 +72,36 @@ export const useRideManager = () => {
     }
   }, [setAvailableDrivers]);
 
+  const getRoute = useCallback(async (origin: LocationData, destination: LocationData) => {
+    try {
+      const route = await api.get<any>(
+        `/locations/route?originLat=${origin.lat}&originLng=${origin.lon}&destLat=${destination.lat}&destLng=${destination.lon}`
+      );
+      setRoutePreview({
+        distanceKm: route.distanceKm,
+        estimatedMins: route.estimatedMins
+      });
+      return route;
+    } catch (error) {
+      console.error('Failed to calculate route:', error);
+      return null;
+    }
+  }, [setRoutePreview]);
+
+  const initiatePayment = useCallback(async (tripId: string) => {
+    try {
+      const response = await api.post<any>(`/payments/initiate/${tripId}`);
+      if (response.checkoutUrl) {
+        // Redirect to Monnify Sandbox/Live checkout
+        window.location.href = response.checkoutUrl;
+      }
+      return response;
+    } catch (error: any) {
+      addToast(error.message || 'Failed to initiate payment. Please try again.', 'error');
+      throw error;
+    }
+  }, [addToast]);
+
   const initiateRideRequest = useCallback(async (
     pickup: LocationData, 
     destination: LocationData, 
@@ -84,7 +121,8 @@ export const useRideManager = () => {
         destAddress: getLocationAddress(destination),
         destLat: destination.lat,
         destLng: destination.lon,
-        distanceKm: 0, 
+        distanceKm: routePreview?.distanceKm || 0, 
+        estimatedMins: routePreview?.estimatedMins || 0,
         driverId: driver.id,
         transmission: vehicleData.transmission,
         scheduledAt: scheduledAt || null,
@@ -107,7 +145,7 @@ export const useRideManager = () => {
       setRideState('IDLE');
       throw error;
     }
-  }, [setRideState, setRideMilestone, setCurrentTripId, setDriverInfo, addToast]);
+  }, [setRideState, setRideMilestone, setCurrentTripId, setDriverInfo, addToast, routePreview]);
 
   const handleRideCompletion = useCallback((trip: Trip) => {
     addToast('Trip completed! Thank you for riding with BICA.', 'success');
@@ -137,5 +175,7 @@ export const useRideManager = () => {
     cancelRide,
     resetRide,
     syncCurrentRide,
+    getRoute,
+    initiatePayment,
   };
 };
