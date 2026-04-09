@@ -156,7 +156,7 @@ const SignUpScreen: React.FC = () => {
     // Validate current step fields
     const stepFields: Record<number, string[]> = {
       1: ['name', 'email', 'phone', 'age', 'gender', 'nationality', 'address'],
-      2: isDriver ? ['nin'] : ['carType', 'carModel', 'carYear', 'transmission'],
+      2: isDriver ? ['nin', 'transmission'] : ['carType', 'carModel', 'carYear', 'transmission'],
       3: isDriver ? ['bankCode', 'accountNumber', 'accountName'] : ['password'],
       4: ['password']
     };
@@ -264,9 +264,10 @@ const SignUpScreen: React.FC = () => {
         // Owner Specific Fields (Strictly following the contract)
         finalPayload = {
           ...basePayload,
-          carType: formData.carType.toUpperCase(), // Normalize for contract safety
+          carType: formData.carType.toUpperCase(),
           carModel: formData.carModel.trim(),
           carYear: formData.carYear,
+          transmission: formData.transmission.toUpperCase(),
           gender: formData.gender.toUpperCase(),
           address: formData.address.trim(),
           nationality: formData.nationality.trim(),
@@ -529,25 +530,52 @@ const SignUpScreen: React.FC = () => {
                          )}
                          {isCapturing === 'nin' && <div className="absolute inset-0 bg-black/20 flex items-center justify-center"><span className="material-symbols-outlined animate-spin text-white">refresh</span></div>}
                       </button>
-                   </div>
-                </div>
+                    </div>
+                 </div>
 
-                <button 
-                    onClick={handleNext}
-                    className="w-full bg-primary py-5 rounded-2xl text-white font-black text-lg shadow-xl shadow-primary/20 active:scale-[0.98] transition-all mt-auto"
-                >
-                    Continue
-                </button>
-            </div>
+                 {/* Transmission Type — required for driver filter matching */}
+                 <div className="flex flex-col gap-1.5">
+                     <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Transmission You Can Drive</label>
+                     <div className="grid grid-cols-3 gap-3">
+                         {(['Manual', 'Automatic', 'Both'] as const).map(type => (
+                             <button
+                                 key={type}
+                                 type="button"
+                                 onClick={() => {
+                                     setFormData({...formData, transmission: type});
+                                     setErrors(prev => ({...prev, transmission: ''}));
+                                 }}
+                                 className={`py-4 rounded-2xl text-sm font-bold border transition-all ${
+                                     formData.transmission === type
+                                         ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20'
+                                         : 'bg-white dark:bg-surface-dark border-slate-100 dark:border-white/5 text-slate-600 dark:text-slate-400'
+                                 }`}
+                             >
+                                 {type}
+                             </button>
+                         ))}
+                     </div>
+                     {errors.transmission && touched.transmission && (
+                         <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.transmission}</p>
+                     )}
+                 </div>
+
+                 <button 
+                     onClick={handleNext}
+                     className="w-full bg-primary py-5 rounded-2xl text-white font-black text-lg shadow-xl shadow-primary/20 active:scale-[0.98] transition-all mt-auto"
+                 >
+                     Continue
+                 </button>
+             </div>
           )}
 
           {/* STEP 2 (OWNER): VEHICLE DETAILS */}
           {step === 2 && !isDriver && (
-            <div className="flex flex-col gap-6 animate-fade-in">
-                <div className="mb-2">
-                    <h2 className="text-2xl font-bold mb-1">Vehicle Specs</h2>
-                    <p className="text-sm text-slate-500 font-medium">Tell us about the car being used.</p>
-                </div>
+             <div className="flex flex-col gap-6 animate-fade-in">
+                 <div className="mb-2">
+                     <h2 className="text-2xl font-bold mb-1">Vehicle Specs</h2>
+                     <p className="text-sm text-slate-500 font-medium">Tell us about the car being used.</p>
+                 </div>
 
                 <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Luxury Car Category</label>

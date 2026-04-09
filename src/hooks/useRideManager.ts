@@ -28,7 +28,7 @@ export const useRideManager = () => {
        return [];
     }
     try {
-      const transmissionParam = transmission ? `&transmission=${encodeURIComponent(transmission)}` : '';
+      const transmissionParam = transmission ? `&transmission=${encodeURIComponent(transmission.toUpperCase())}` : '';
       const drivers = await api.get<any[]>(
         `/users/drivers/available?pickupLat=${pickup.lat}&pickupLng=${pickup.lon}${transmissionParam}`
       );
