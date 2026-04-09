@@ -88,7 +88,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">Your Earnings</span>
-                    <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">₦{(fareBreakdown?.driverEarnings || Math.round((fareBreakdown?.finalFare || 0) * 0.8)).toLocaleString()}</span>
+                    <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">₦{(fareBreakdown?.driverEarnings || 0).toLocaleString()}</span>
                   </div>
                </div>
              ) : (

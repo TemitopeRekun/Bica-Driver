@@ -446,6 +446,16 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
                   Settled to {walletSummary.accountNumber}
                 </span>
               )}
+              <span className={`rounded-full px-2.5 py-1 font-bold flex items-center gap-1 ${
+                walletSummary?.subAccountActive 
+                  ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' 
+                  : 'bg-orange-500/10 text-orange-600 border border-orange-500/20'
+              }`}>
+                <span className="material-symbols-outlined text-[14px]">
+                  {walletSummary?.subAccountActive ? 'verified' : 'pending_actions'}
+                </span>
+                {walletSummary?.subAccountActive ? 'Payouts Active' : 'Payouts Pending'}
+              </span>
             </div>
           )}
         </div>
