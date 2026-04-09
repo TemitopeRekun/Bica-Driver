@@ -20,9 +20,14 @@ const TripsSection: React.FC<TripsSectionProps> = ({
 }) => {
   if (trips.length === 0) {
     return (
-      <div className="py-24 text-center opacity-30">
-         <span className="material-symbols-outlined text-6xl mb-4">route_off</span>
-         <p className="font-black text-sm uppercase tracking-widest">Archive Empty</p>
+      <div className="py-24 text-center flex flex-col items-center justify-center animate-fade-in opacity-50">
+         <div className="size-24 bg-slate-100 dark:bg-white/5 rounded-[2.5rem] flex items-center justify-center mb-6 border border-slate-200 dark:border-white/5">
+            <span className="material-symbols-outlined text-5xl text-slate-400">history</span>
+         </div>
+         <h4 className="text-lg font-black text-slate-900 dark:text-white mb-2 uppercase tracking-[0.2em]">Archive Empty</h4>
+         <p className="text-sm text-slate-500 max-w-[280px] leading-relaxed mx-auto font-medium">
+           Every trip managed by the platform will be logged here for permanent record keeping.
+         </p>
       </div>
     );
   }

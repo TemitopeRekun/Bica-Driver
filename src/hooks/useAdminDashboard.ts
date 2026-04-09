@@ -90,17 +90,17 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
         api.get<PaginatedResponse<any>>('/payments/history?limit=20'),
       ]);
 
-      setAdminUsers(dashboard.users.items.map(mapUser));
-      setUsersMeta(dashboard.users.meta);
+      setAdminUsers(dashboard.users?.items?.map(mapUser) || []);
+      setUsersMeta(dashboard.users?.meta || null);
 
-      setAdminTrips(dashboard.trips.items.map(mapTrip));
-      setTripsMeta(dashboard.trips.meta);
+      setAdminTrips(dashboard.trips?.items?.map(mapTrip) || []);
+      setTripsMeta(dashboard.trips?.meta || null);
 
-      setAdminPendingPayments(pendingPayments.items.map(mapPendingPaymentTrip));
-      setPendingPaymentsMeta(pendingPayments.meta);
+      setAdminPendingPayments(pendingPayments?.items?.map(mapPendingPaymentTrip) || []);
+      setPendingPaymentsMeta(pendingPayments?.meta || null);
 
-      setAdminPaymentHistory(paymentHistory.items.map(mapPaymentHistory));
-      setPaymentHistoryMeta(paymentHistory.meta);
+      setAdminPaymentHistory(paymentHistory?.items?.map(mapPaymentHistory) || []);
+      setPaymentHistoryMeta(paymentHistory?.meta || null);
 
       setAdminSettings(dashboard.settings);
       onSettingsLoadedRef.current?.(dashboard.settings);

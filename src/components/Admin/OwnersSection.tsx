@@ -96,9 +96,18 @@ const OwnersSection: React.FC<OwnersSectionProps> = ({
           </div>
         ))}
         {filteredOwners.length === 0 && (
-          <div className="py-20 text-center opacity-40">
-             <span className="material-symbols-outlined text-5xl mb-4">person_off</span>
-             <p className="font-bold">No owners found matching search.</p>
+          <div className="py-24 text-center flex flex-col items-center justify-center animate-fade-in">
+             <div className="size-24 bg-purple-500/5 rounded-[2.5rem] flex items-center justify-center mb-6 border border-purple-500/10">
+                <span className="material-symbols-outlined text-5xl text-purple-500/40">groups</span>
+             </div>
+             <h4 className="text-lg font-black text-slate-900 dark:text-white mb-2">
+               {searchTerm ? 'No search results' : 'No Registered Owners'}
+             </h4>
+             <p className="text-sm text-slate-500 max-w-[280px] leading-relaxed mx-auto font-medium">
+               {searchTerm 
+                 ? `We couldn't find any owner matching "${searchTerm}". Try a different name or email.`
+                 : 'Owner accounts will be listed here as soon as they sign up for the platform.'}
+             </p>
           </div>
         )}
       </div>

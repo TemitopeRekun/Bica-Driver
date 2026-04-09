@@ -72,16 +72,17 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
       ]);
 
       if (tripsResult.status === 'fulfilled') {
-        setTrips(tripsResult.value.items.map(mapTrip));
-        setTripsMeta(tripsResult.value.meta);
+        const items = tripsResult.value?.items || [];
+        setTrips(items.map(mapTrip));
+        setTripsMeta(tripsResult.value?.meta || null);
       } else {
         setTrips([]);
         setTripsMeta(null);
       }
 
       if (paymentsResult.status === 'fulfilled') {
-        setPayments(paymentsResult.value.items);
-        setPaymentsMeta(paymentsResult.value.meta);
+        setPayments(paymentsResult.value?.items || []);
+        setPaymentsMeta(paymentsResult.value?.meta || null);
       } else {
         setPayments([]);
         setPaymentsMeta(null);
@@ -106,8 +107,8 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
     setIsLoading(true);
     try {
       const result = await api.get<PaginatedResponse<any>>(`/rides/history?page=${page}&limit=20`);
-      setTrips(result.items.map(mapTrip));
-      setTripsMeta(result.meta);
+      setTrips(result?.items?.map(mapTrip) || []);
+      setTripsMeta(result?.meta || null);
     } catch (e: any) {
       setError(e.message || 'Failed to load page');
     } finally {
@@ -119,8 +120,8 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
     setIsLoading(true);
     try {
       const result = await api.get<PaginatedResponse<any>>(`/payments/history?page=${page}&limit=20`);
-      setPayments(result.items);
-      setPaymentsMeta(result.meta);
+      setPayments(result?.items || []);
+      setPaymentsMeta(result?.meta || null);
     } catch (e: any) {
       setError(e.message || 'Failed to load page');
     } finally {

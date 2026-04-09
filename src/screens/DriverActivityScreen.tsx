@@ -76,23 +76,24 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
       ]);
 
       if (tripsResult.status === 'fulfilled') {
-        setTrips(tripsResult.value.items.map(mapTrip));
-        setTripsMeta(tripsResult.value.meta);
+        const items = tripsResult.value?.items || [];
+        setTrips(items.map(mapTrip));
+        setTripsMeta(tripsResult.value?.meta || null);
       } else {
         setTrips([]);
         setTripsMeta(null);
       }
 
       if (settlementsResult.status === 'fulfilled') {
-        setSettlements(settlementsResult.value.items);
-        setSettlementsMeta(settlementsResult.value.meta);
+        setSettlements(settlementsResult.value?.items || []);
+        setSettlementsMeta(settlementsResult.value?.meta || null);
       } else {
         setSettlements([]);
         setSettlementsMeta(null);
       }
 
       if (walletResult.status === 'fulfilled') {
-        setWalletSummary(walletResult.value);
+        setWalletSummary(walletResult.value || null);
       } else {
         setWalletSummary(null);
       }
@@ -107,10 +108,10 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
         setError(`Could not load ${failedSections.join(' and ')} right now.`);
         
         const authError = [tripsResult, settlementsResult, walletResult].find(
-          (res) => res.status === 'rejected' && (res.reason.message?.includes('401') || res.reason.message?.includes('403'))
+          (res) => res.status === 'rejected' && (res.reason?.message?.includes('401') || res.reason?.message?.includes('403'))
         );
         if (authError && authError.status === 'rejected') {
-          onForcedLogout(authError.reason.message);
+          onForcedLogout?.(authError.reason?.message);
         }
       }
     } catch (e) {
@@ -124,8 +125,8 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
     setIsLoading(true);
     try {
       const result = await api.get<PaginatedResponse<any>>(`/rides/history?page=${page}&limit=20`);
-      setTrips(result.items.map(mapTrip));
-      setTripsMeta(result.meta);
+      setTrips(result?.items?.map(mapTrip) || []);
+      setTripsMeta(result?.meta || null);
     } catch (e: any) {
       setError(e.message || 'Failed to load page');
     } finally {
@@ -137,8 +138,8 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
     setIsLoading(true);
     try {
       const result = await api.get<PaginatedResponse<any>>(`/payments/history?page=${page}&limit=20`);
-      setSettlements(result.items);
-      setSettlementsMeta(result.meta);
+      setSettlements(result?.items || []);
+      setSettlementsMeta(result?.meta || null);
     } catch (e: any) {
       setError(e.message || 'Failed to load page');
     } finally {

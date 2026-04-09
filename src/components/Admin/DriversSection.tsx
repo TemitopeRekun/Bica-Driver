@@ -154,9 +154,18 @@ const DriversSection: React.FC<DriversSectionProps> = ({
       </div>
 
       {filteredDrivers.length === 0 && (
-        <div className="py-20 text-center flex flex-col items-center gap-4 text-slate-400">
-           <span className="material-symbols-outlined text-5xl opacity-20">person_search</span>
-           <p className="font-bold text-sm">No drivers found matching "{driverFilter}"</p>
+        <div className="py-24 text-center flex flex-col items-center justify-center animate-fade-in">
+           <div className="size-24 bg-primary/5 rounded-[2.5rem] flex items-center justify-center mb-6 border border-primary/10">
+              <span className="material-symbols-outlined text-5xl text-primary/40">badge</span>
+           </div>
+           <h4 className="text-lg font-black text-slate-900 dark:text-white mb-2">
+             {searchTerm ? 'No search results' : `No ${driverFilter} Chauffeurs`}
+           </h4>
+           <p className="text-sm text-slate-500 max-w-[280px] leading-relaxed mx-auto font-medium">
+             {searchTerm 
+               ? `We couldn't find any driver matching "${searchTerm}". Try a different name or email.`
+               : `New driver registrations will appear here for your review and approval.`}
+           </p>
         </div>
       )}
     </div>

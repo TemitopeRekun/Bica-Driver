@@ -150,37 +150,6 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
         </div>
       </div>
 
-      {/* Simulator Quick Access */}
-      <div className="bg-slate-900 text-white p-6 rounded-[2.5rem] shadow-2xl relative overflow-hidden group">
-        <div className="absolute top-0 right-0 size-48 bg-primary/20 rounded-full -mr-24 -mt-24 blur-3xl pointer-events-none group-hover:bg-primary/30 transition-all"></div>
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="max-w-md">
-            <h3 className="text-xl font-black flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">terminal</span>
-              Operations Simulator
-            </h3>
-            <p className="text-slate-400 text-sm mt-1 leading-relaxed">
-              Verify the platform as a live user. Switch roles instantly to inspect the Driver or Owner dashboard functionality.
-            </p>
-          </div>
-          <div className="flex gap-3">
-             <button 
-               onClick={() => onSimulate(UserRole.DRIVER)}
-               className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-primary/20"
-             >
-               <span className="material-symbols-outlined text-sm">sports_motorsports</span>
-               As Driver
-             </button>
-             <button 
-               onClick={() => onSimulate(UserRole.OWNER)}
-               className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 border border-white/10"
-             >
-               <span className="material-symbols-outlined text-sm">directions_car</span>
-               As Owner
-             </button>
-          </div>
-        </div>
-      </div>
 
       {/* Recent Activity Mini-Feed */}
       <div className="bg-white dark:bg-surface-dark rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -213,9 +182,15 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
             </div>
           ))}
           {trips.length === 0 && (
-            <div className="p-12 text-center text-slate-400">
-              <span className="material-symbols-outlined text-4xl mb-2 opacity-20">cloud_off</span>
-              <p className="italic text-sm">No recent activity detected.</p>
+            <div className="py-20 px-8 text-center flex flex-col items-center justify-center animate-fade-in">
+              <div className="size-20 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-6 relative">
+                 <span className="material-symbols-outlined text-4xl text-slate-300 dark:text-slate-600">monitor_heart</span>
+                 <div className="absolute top-0 right-0 size-4 bg-green-500 rounded-full border-4 border-white dark:border-surface-dark animate-pulse"></div>
+              </div>
+              <h4 className="text-base font-black text-slate-900 dark:text-white mb-2">Awaiting Live Activity</h4>
+              <p className="text-sm text-slate-500 max-w-[240px] leading-relaxed mx-auto font-medium">
+                The platform is active and monitoring for ride requests. Activity will appear here in real-time.
+              </p>
             </div>
           )}
         </div>
