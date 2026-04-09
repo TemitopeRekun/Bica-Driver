@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UserProfile, UserRole, ApprovalStatus, Trip, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminDashboardStats } from '@/types';
+import { UserProfile, UserRole, ApprovalStatus, Trip, TripStatus, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminDashboardStats, AdminSection, DriverFilter } from '@/types';
 import { mapUser } from '@/mappers/appMappers';
 import { useToast } from '@/hooks/useToast';
 
@@ -29,10 +29,10 @@ interface AdminDashboardScreenProps {
   isLoading?: boolean;
   error?: string | null;
   lastUpdated?: Date | null;
-  onUpdateStatus: (userId: string, status: ApprovalStatus) => void;
-  onBlockUser: (userId: string, blocked: boolean) => void;
-  onRetrySubAccount: (userId: string) => Promise<void>;
-  onUpdateSettings: (settings: SystemSettings) => void;
+  onUpdateStatus: (userId: string, approvalStatus: ApprovalStatus) => Promise<void>;
+  onBlockUser: (userId: string, isBlocked: boolean) => Promise<void>;
+  onRetrySubAccount: (userId: string) => Promise<any>;
+  onUpdateSettings: (settings: SystemSettings) => Promise<void>;
   onForcedLogout: () => void;
   onRetry: () => Promise<void> | void;
   onBack: () => void;
@@ -40,7 +40,7 @@ interface AdminDashboardScreenProps {
   onPageChange: (section: 'users' | 'trips' | 'pending' | 'history', page: number) => void;
 }
 
-type AdminSection = 'overview' | 'drivers' | 'owners' | 'trips' | 'finance' | 'settings';
+
 
 const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({ 
   users, usersMeta, trips, tripsMeta, pendingDrivers, stats,
@@ -55,17 +55,34 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   const [selectedUserDetails, setSelectedUserDetails] = useState<UserProfile | null>(null);
   const [selectedUserDetailsLoading, setSelectedUserDetailsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [driverFilter, setDriverFilter] = useState<'All' | 'Pending' | 'Active' | 'Blocked'>('All');
+  const [driverFilter, setDriverFilter] = useState<DriverFilter>('All');
   const [retryingSubAccountIds, setRetryingSubAccountIds] = useState<Set<string>>(new Set());
   const [localSettings, setLocalSettings] = useState<SystemSettings>(settings);
+
+  // Helper to jump to a section with a specific filter
+  const jumpToSection = (section: AdminSection, filter?: any) => {
+    setActiveSection(section);
+    if (filter && section === 'drivers') setDriverFilter(filter);
+    // Scroll main area to top
+    const main = document.querySelector('main');
+    if (main) main.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   const modalUser = selectedUserDetails && selectedUserDetails.id === selectedUser?.id
       ? selectedUserDetails
       : selectedUser;
 
-  // Statistics & Derived Data
-  const drivers = users.filter(u => u.role === UserRole.DRIVER);
-  const owners = users.filter(u => u.role === UserRole.OWNER);
+  // Statistics & Derived Data - UNIFY DATA SOURCES
+  // Merge pendingDrivers (dedicated list) with paginated users to ensure 100% sync
+  const driversMap = new Map<string, UserProfile>();
+  users.filter(u => u.role === UserRole.DRIVER).forEach(u => driversMap.set(u.id, u));
+  pendingDrivers.forEach(u => driversMap.set(u.id, u));
+  
+  const allKnownDrivers = Array.from(driversMap.values());
+  const allKnownOwners = users.filter(u => u.role === UserRole.OWNER);
+
+  const drivers = allKnownDrivers;
+  const owners = allKnownOwners;
   
   // Use server stats if available, fallback to local (though discouraged by contract)
   const totalRevenue = stats?.totalEarnings || trips.reduce((acc, t) => t.status === 'COMPLETED' ? acc + t.amount : acc, 0);
@@ -102,7 +119,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
     toast.success("System Settings Updated Successfully!");
   };
 
-  const getTripStatusClass = (status: Trip['status']) => {
+  const getTripStatusClass = (status: TripStatus) => {
     switch (status) {
       case 'COMPLETED': return 'bg-green-500/10 text-green-500';
       case 'CANCELLED':
@@ -130,7 +147,16 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   const handleRetrySubAccountWrap = async (userId: string) => {
     setRetryingSubAccountIds(prev => new Set(prev).add(userId));
     try {
-      await onRetrySubAccount(userId);
+      const result: any = await onRetrySubAccount(userId);
+      // Immediately reflect successfully created sub-account in dossier without waiting for full dashboard reload
+      if (result && result.subAccountActive) {
+        setSelectedUserDetails(prev => prev ? { 
+          ...prev, 
+          subAccountActive: true, 
+          canRetrySubAccountSetup: false,
+          monnifySubAccountCode: result.monnifySubAccountCode || prev.monnifySubAccountCode
+        } : prev);
+      }
     } finally {
       setRetryingSubAccountIds(prev => {
         const next = new Set(prev);
@@ -216,7 +242,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                 trips={trips} 
                 formatCurrency={formatCurrency} 
                 formatShortDate={formatShortDate}
-                setActiveSection={setActiveSection} 
+                onJump={jumpToSection} 
                 onSimulate={onSimulate}
               />
             )}
@@ -232,7 +258,9 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
 
             {activeSection === 'owners' && (
               <OwnersSection 
-                owners={owners} searchTerm={searchTerm} onBlockUser={onBlockUser} 
+                owners={owners} searchTerm={searchTerm} 
+                onBlockUser={onBlockUser}
+                setSelectedUser={setSelectedUser}
                 meta={usersMeta} onPageChange={(p) => onPageChange('users', p)}
               />
             )}

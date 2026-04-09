@@ -36,13 +36,14 @@ const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const handleUpdateStatus = async (userId: string, status: ApprovalStatus) => {
+  const handleUpdateStatus = async (userId: string, approvalStatus: ApprovalStatus) => {
     try {
-      await api.patch(`/users/${userId}/approval`, { status });
-      toast.success(`User status updated to ${status}`);
+      // Backend requires key 'approvalStatus' not 'status'
+      await api.patch(`/users/${userId}/approval`, { approvalStatus });
+      toast.success(`Driver ${approvalStatus === 'APPROVED' ? 'approved' : 'rejected'} successfully`);
       await loadAdminDashboard();
     } catch (e: any) {
-      toast.error(e.message || 'Failed to update user status');
+      toast.error(e.message || 'Failed to update approval status');
     }
   };
 
@@ -58,11 +59,13 @@ const AdminDashboardPage: React.FC = () => {
 
   const handleRetrySubAccount = async (userId: string) => {
     try {
-      await api.post(`/admin/users/${userId}/retry-subaccount`);
+      const response = await api.post<any>(`/admin/users/${userId}/retry-subaccount`);
       toast.success("Sub-account creation re-triggered successfully!");
       await loadAdminDashboard();
+      return response;
     } catch (e: any) {
       toast.error(e.message || 'Failed to retry sub-account setup');
+      return null;
     }
   };
 

@@ -102,8 +102,27 @@ export const useDriverRealtime = ({
     }
   }, [user?.id, onForcedLogout]);
 
-  const enableOnline = useCallback(() => {
+  const enableOnline = useCallback(async () => {
     setAvailabilityIssue(null);
+    // Get GPS position immediately when driver taps "Go Online"
+    // and send it together with the online status in one request
+    try {
+      const pos = await CapacitorService.getCurrentLocation();
+      if (pos?.coords) {
+        const { latitude, longitude } = pos.coords;
+        await api.patch('/users/online', {
+          isOnline: true,
+          lat: latitude,
+          lng: longitude,
+        });
+        setDriverPos([latitude, longitude]);
+      } else {
+        await api.patch('/users/online', { isOnline: true });
+      }
+    } catch {
+      // If GPS fails, still go online — the tracking interval will fix location
+      await api.patch('/users/online', { isOnline: true }).catch(() => {});
+    }
     updateOnlineState(true);
   }, [updateOnlineState]);
 
@@ -226,8 +245,13 @@ export const useDriverRealtime = ({
         }
 
         const { latitude, longitude } = pos.coords;
-        await pushDriverLocation(latitude, longitude);
-        await api.patch('/users/online', { isOnline: true });
+        // Send isOnline + lat + lng in ONE atomic request — not two separate calls
+        await api.patch('/users/online', {
+          isOnline: true,
+          lat: latitude,
+          lng: longitude,
+        });
+        setDriverPos([latitude, longitude]);
         setAvailabilityIssue(null);
       } catch (error: any) {
         console.error('Initial location failed:', error);
@@ -263,6 +287,7 @@ export const useDriverRealtime = ({
           if (!socketRef.current?.connected) {
             socketRef.current.connect();
           }
+          // Keep driver online — next heartbeat interval will resend coords
           await api.patch('/users/online', { isOnline: true }).catch(() => {});
           setAvailabilityIssue(
             'We could not refresh live location yet. You are still online and retries will continue automatically.',
@@ -281,8 +306,13 @@ export const useDriverRealtime = ({
         const pos = await CapacitorService.getCurrentLocation();
         if (pos) {
           const { latitude, longitude } = pos.coords;
-          await pushDriverLocation(latitude, longitude);
-          await api.patch('/users/online', { isOnline: true }).catch(() => {});
+          // Heartbeat: keep online flag fresh + broadcast location in one request
+          await api.patch('/users/online', {
+            isOnline: true,
+            lat: latitude,
+            lng: longitude,
+          });
+          setDriverPos([latitude, longitude]);
           setAvailabilityIssue(null);
         }
       } catch (error) {

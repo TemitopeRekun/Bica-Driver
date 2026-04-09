@@ -128,7 +128,8 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
   const handleUseMyLocation = async () => {
     setIsLocating(true);
     try {
-      const position = await CapacitorService.getCurrentLocation();
+      // forPickup=true forces maximumAge:0 — always a fresh GPS read, never cached
+      const position = await CapacitorService.getCurrentLocation(true);
       const latitude = position?.coords?.latitude;
       const longitude = position?.coords?.longitude;
       const accuracy = position?.coords?.accuracy;
@@ -253,7 +254,24 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     let isMounted = true;
 
     const hydrateInitialLocation = async () => {
-      const pos = await CapacitorService.getCurrentLocation();
+      // On web, proactively query permission state so the browser prompt
+      // appears automatically when this screen mounts — not just on button tap
+      if ('permissions' in navigator) {
+        try {
+          const permStatus = await navigator.permissions.query({ name: 'geolocation' });
+          if (permStatus.state === 'denied') {
+            // No point trying — don't waste the GPS attempt
+            return;
+          }
+          // state === 'prompt' → getCurrentPosition will trigger the dialog
+          // state === 'granted' → will read silently
+        } catch {
+          // Browser may not support permissions.query for geolocation — continue anyway
+        }
+      }
+
+      // forPickup=true forces maximumAge:0 — always a fresh GPS read, never cached
+      const pos = await CapacitorService.getCurrentLocation(true);
       if (!pos || !isMounted) return;
 
       const nextCenter: [number, number] = [pos.coords.latitude, pos.coords.longitude];
@@ -274,7 +292,11 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     };
 
     hydrateInitialLocation().catch((error) => {
-      console.error('Failed to hydrate initial owner location:', error);
+      // Silently suppress permission errors on initial hydration — user hasn't
+      // clicked anything yet so we don't want intrusive error messages
+      if (!String(error?.message ?? error).toLowerCase().includes('permission')) {
+        console.error('Failed to hydrate initial owner location:', error);
+      }
     });
 
     return () => {

@@ -12,7 +12,7 @@ interface OverviewSectionProps {
   trips: Trip[];
   formatCurrency: (amount: number) => string;
   formatShortDate: (value?: string | null) => string;
-  setActiveSection: (section: any) => void;
+  onJump: (section: any, filter?: any) => void;
   onSimulate: (role: UserRole) => void;
 }
 
@@ -28,7 +28,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
   trips,
   formatCurrency,
   formatShortDate,
-  setActiveSection,
+  onJump,
   onSimulate
 }) => {
   // Use server side stats if available
@@ -67,7 +67,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {displayPendingDriversCount > 0 && (
               <button 
-                onClick={() => setActiveSection('drivers')}
+                onClick={() => onJump('drivers', 'Pending')}
                 className="bg-white dark:bg-red-950/20 border border-red-500/20 p-4 rounded-2xl flex items-center justify-between group hover:border-red-500 transition-all active:scale-[0.98]"
               >
                 <div className="flex items-center gap-3">
@@ -86,7 +86,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
             )}
             {pendingPayments.length > 0 && (
               <button 
-                onClick={() => setActiveSection('finance')}
+                onClick={() => onJump('finance')}
                 className="bg-white dark:bg-red-950/20 border border-red-500/20 p-4 rounded-2xl flex items-center justify-between group hover:border-red-500 transition-all active:scale-[0.98]"
               >
                 <div className="flex items-center gap-3">

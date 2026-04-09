@@ -91,39 +91,73 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
     setAdminDashboardError(null);
 
     try {
-      // First load basics and initial pages
-      const [dashboard, pendingPayments, paymentHistory] = await Promise.all([
+      // Load the consolidated dashboard + role-specific user pages in parallel
+      const [dashboard, ownersRes, pendingPayments, paymentHistory] = await Promise.all([
         api.get<{
-          users: PaginatedResponse<any>;
-          trips: PaginatedResponse<any>;
+          users: any;
+          trips: any;
           settings: SystemSettings;
           stats: AdminDashboardStats;
           pendingDrivers?: any[];
           pending?: any[];
-        }>('/admin/dashboard?limit=10'),
-        api.get<PaginatedResponse<any>>('/payments/pending?limit=20'),
-        api.get<PaginatedResponse<any>>('/payments/history?limit=20'),
+          driversPending?: any[];
+          payouts?: any[];
+        }>('/admin/dashboard'),
+        // Load all users separately so the Owners and Drivers tabs are always populated
+        // Note: backend /admin/users does NOT support ?role= filter — we filter client-side
+        api.get<any>('/admin/users?limit=50').catch(() => null),
+        api.get<any>('/payments/pending?limit=20').catch(() => ({ items: [], meta: null })),
+        api.get<any>('/payments/history?limit=20').catch(() => ({ items: [], meta: null })),
       ]);
 
-      setAdminUsers(dashboard.users?.items?.map(mapUser) || []);
-      setUsersMeta(dashboard.users?.meta || null);
+      // ── Users (from dashboard snapshot — latest 10 mixed) ──
+      const rawUsers: any[] = Array.isArray(dashboard.users)
+        ? dashboard.users
+        : (dashboard.users?.items ?? []);
+      setAdminUsers(rawUsers.map(mapUser));
+      setUsersMeta(
+        Array.isArray(dashboard.users) ? null : (dashboard.users?.meta ?? null)
+      );
 
-      setAdminTrips(dashboard.trips?.items?.map(mapTrip) || []);
-      setTripsMeta(dashboard.trips?.meta || null);
+      // ── If dedicated owner endpoint returned data, prefer that ──
+      if (ownersRes) {
+        const rawOwners: any[] = Array.isArray(ownersRes)
+          ? ownersRes
+          : (ownersRes?.items ?? []);
+        // Merge owners into adminUsers so the Owners tab is always populated
+        setAdminUsers(prev => {
+          const existing = new Map(prev.map(u => [u.id, u]));
+          rawOwners.map(mapUser).forEach(o => existing.set(o.id, o));
+          return Array.from(existing.values());
+        });
+      }
 
-      setAdminPendingPayments(pendingPayments?.items?.map(mapPendingPaymentTrip) || []);
-      setPendingPaymentsMeta(pendingPayments?.meta || null);
+      // ── Trips ──
+      const rawTrips: any[] = Array.isArray(dashboard.trips)
+        ? dashboard.trips
+        : (dashboard.trips?.items ?? []);
+      setAdminTrips(rawTrips.map(mapTrip));
+      setTripsMeta(
+        Array.isArray(dashboard.trips) ? null : (dashboard.trips?.meta ?? null)
+      );
 
-      setAdminPaymentHistory(paymentHistory?.items?.map(mapPaymentHistory) || []);
-      setPaymentHistoryMeta(paymentHistory?.meta || null);
-
-      setAdminStats(dashboard.stats || null);
-      
-      const pDrivers = dashboard.pendingDrivers || dashboard.pending || [];
+      // ── Pending drivers (dedicated server-side list) ──
+      const pDrivers = dashboard.pendingDrivers || dashboard.pending || dashboard.driversPending || [];
       setAdminPendingDrivers(pDrivers.map(mapUser));
 
+      // ── Stats ──
+      setAdminStats(dashboard.stats || null);
+
+      // ── Settings ──
       setAdminSettings(dashboard.settings);
       onSettingsLoadedRef.current?.(dashboard.settings);
+
+      // ── Payments ──
+      setAdminPendingPayments(pendingPayments?.items?.map(mapPendingPaymentTrip) ?? []);
+      setPendingPaymentsMeta(pendingPayments?.meta ?? null);
+      setAdminPaymentHistory(paymentHistory?.items?.map(mapPaymentHistory) ?? []);
+      setPaymentHistoryMeta(paymentHistory?.meta ?? null);
+
       setLastUpdated(new Date());
     } catch (error: any) {
       setAdminDashboardError(error.message || 'Could not load admin dashboard.');

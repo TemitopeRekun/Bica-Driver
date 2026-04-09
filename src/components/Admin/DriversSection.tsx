@@ -1,14 +1,13 @@
 import React from 'react';
-import { UserProfile, UserRole } from '@/types';
-import MonnifyStatus from './MonnifyStatus';
+import { UserProfile, UserRole, DriverFilter } from '@/types';
 import { PaginationMeta } from '@/services/api.service';
 
 interface DriversSectionProps {
   drivers: UserProfile[];
   meta: PaginationMeta | null;
-  driverFilter: 'All' | 'Pending' | 'Active' | 'Blocked';
+  driverFilter: DriverFilter;
   searchTerm: string;
-  setDriverFilter: (filter: any) => void;
+  setDriverFilter: (filter: DriverFilter) => void;
   setSelectedUser: (user: UserProfile) => void;
   retryingSubAccountIds: Set<string>;
   onPageChange: (page: number) => void;
@@ -86,71 +85,75 @@ const DriversSection: React.FC<DriversSectionProps> = ({
       </div>
 
       {/* Driver List */}
-      <div className="grid grid-cols-1 gap-4">
-        {filteredDrivers.map(driver => (
-          <div 
-            key={driver.id}
-            onClick={() => setSelectedUser(driver)}
-            className={`group bg-white dark:bg-surface-dark p-5 rounded-[2rem] border-2 transition-all cursor-pointer hover:shadow-xl active:scale-[0.99] ${
-              driver.approvalStatus === 'PENDING' 
-                ? 'border-orange-500/20 bg-orange-500/[0.02]' 
-                : driver.isBlocked 
-                  ? 'border-red-500/20 opacity-80' 
-                  : 'border-slate-100 dark:border-slate-800'
-            }`}
-          >
-            <div className="flex items-start gap-4">
-              <div className="relative shrink-0">
-                <img src={driver.avatar} className="size-14 rounded-2xl object-cover shadow-md" alt="" />
-                <div className={`absolute -top-1 -right-1 size-4 rounded-full border-2 border-white dark:border-surface-dark shadow-sm ${
-                  driver.approvalStatus === 'APPROVED' ? 'bg-green-500' : driver.approvalStatus === 'PENDING' ? 'bg-orange-500 animate-pulse' : 'bg-red-500'
-                }`}></div>
-              </div>
-              
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between mb-1">
-                  <h4 className="font-black text-base text-slate-900 dark:text-white truncate pr-2">
-                    {driver.name}
-                  </h4>
-                  <div className="flex gap-1.5 shrink-0">
-                    {driver.isBlocked && (
-                      <span className="text-[8px] font-black bg-red-500/10 text-red-500 px-2 py-0.5 rounded-full uppercase tracking-tighter border border-red-500/20">Blocked</span>
-                    )}
-                    {driver.isOnline && (
-                      <span className="text-[8px] font-black bg-green-500/10 text-green-500 px-2 py-0.5 rounded-full uppercase tracking-tighter border border-green-500/20">Online</span>
-                    )}
-                    {driver.approvalStatus === 'PENDING' && (
-                      <span className="text-[8px] font-black bg-orange-500 text-white px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm">Review Required</span>
-                    )}
+      <div className="grid grid-cols-1 gap-3">
+        {filteredDrivers.map(driver => {
+          const isPending = driver.approvalStatus === 'PENDING';
+          const isBlocked = !!driver.isBlocked;
+          const isApproved = driver.approvalStatus === 'APPROVED';
+
+          return (
+            <div 
+              key={driver.id}
+              onClick={() => setSelectedUser(driver)}
+              className={`group bg-white dark:bg-surface-dark rounded-2xl border-2 transition-all cursor-pointer active:scale-[0.99] hover:shadow-lg ${
+                isPending ? 'border-orange-400/30 bg-orange-500/[0.02]'
+                : isBlocked ? 'border-red-400/20 opacity-80'
+                : 'border-slate-100 dark:border-slate-800'
+              }`}
+            >
+              {/* Card body */}
+              <div className="p-4 flex items-center gap-3">
+                {/* Avatar + status dot */}
+                <div className="relative shrink-0">
+                  <img src={driver.avatar} className="size-12 rounded-xl object-cover shadow-sm" alt="" />
+                  <div className={`absolute -top-1 -right-1 size-3.5 rounded-full border-2 border-white dark:border-surface-dark ${
+                    isApproved ? 'bg-green-500' : isPending ? 'bg-orange-400 animate-pulse' : 'bg-red-500'
+                  }`} />
+                </div>
+
+                {/* Details */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h4 className="font-black text-sm text-slate-900 dark:text-white truncate">{driver.name}</h4>
+                    {isBlocked && <span className="shrink-0 text-[8px] font-black bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded-full uppercase border border-red-500/20">Blocked</span>}
+                    {driver.isOnline && !isBlocked && <span className="shrink-0 text-[8px] font-black bg-green-500/10 text-green-600 px-1.5 py-0.5 rounded-full uppercase border border-green-500/20">Online</span>}
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium truncate">{driver.email}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className="text-[9px] bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-lg text-slate-500 font-black uppercase">
+                      {driver.transmission || 'Manual'}
+                    </span>
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg uppercase ${
+                      isPending ? 'bg-orange-500/10 text-orange-600' 
+                      : isApproved ? 'bg-green-500/10 text-green-600' 
+                      : 'bg-red-500/10 text-red-500'
+                    }`}>
+                      {driver.approvalStatus || 'PENDING'}
+                    </span>
                   </div>
                 </div>
-                
-                <p className="text-xs text-slate-500 font-medium truncate mb-2">{driver.email}</p>
-                
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[9px] bg-slate-100 dark:bg-white/5 px-2 py-1 rounded-lg text-slate-500 font-black uppercase tracking-widest">
-                    {driver.transmission || 'Manual'}
-                  </span>
-                  <span className="text-[9px] bg-slate-100 dark:bg-white/5 px-2 py-1 rounded-lg text-slate-500 font-black uppercase tracking-widest">
-                    {driver.id.slice(0, 8)}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="self-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="material-symbols-outlined text-primary">arrow_forward</span>
-              </div>
-            </div>
 
-            <div className="mt-4 pt-4 border-t border-slate-50 dark:border-white/5">
-              <MonnifyStatus 
-                driver={driver} 
-                retryingSubAccountIds={retryingSubAccountIds} 
-                onRetrySubAccount={onRetrySubAccount} 
-              />
+                {/* Tap chevron */}
+                <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 group-hover:text-primary transition-colors text-lg shrink-0">
+                  chevron_right
+                </span>
+              </div>
+
+              {/* Pending CTA — full width at bottom of card */}
+              {isPending && (
+                <div className="px-4 pb-4" onClick={e => e.stopPropagation()}>
+                  <button 
+                    onClick={() => setSelectedUser(driver)}
+                    className="w-full bg-orange-500/10 hover:bg-orange-500 border border-orange-400/30 text-orange-600 hover:text-white font-black py-3 rounded-xl text-[11px] uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">folder_open</span>
+                    Open Dossier — Review Required
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {filteredDrivers.length === 0 && (

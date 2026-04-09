@@ -5,16 +5,24 @@ import { Camera, CameraResultType, CameraSource, CameraDirection } from '@capaci
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { StatusBar, Style } from '@capacitor/status-bar';
 
+// For pickup: MUST be a fresh reading — never use a cached position
+const PICKUP_GEOLOCATION_OPTIONS = {
+  enableHighAccuracy: true,
+  timeout: 15000,
+  maximumAge: 0,            // 0 = always read fresh from GPS chip
+};
+
+// For ongoing tracking heartbeats: a short cache is fine
 const HIGH_ACCURACY_GEOLOCATION_OPTIONS = {
   enableHighAccuracy: true,
   timeout: 12000,
-  maximumAge: 15000,
+  maximumAge: 5000,         // 5s — acceptable for tracking updates
 };
 
 const BALANCED_GEOLOCATION_OPTIONS = {
   enableHighAccuracy: false,
   timeout: 20000,
-  maximumAge: 120000,
+  maximumAge: 10000,        // 10s — fallback when high-accuracy fails
 };
 
 const DESIRED_ACCURACY_METERS = 100;
@@ -65,12 +73,13 @@ const logGeolocationIssue = (context: string, error: unknown) => {
 };
 
 export const CapacitorService = {
-  async getCurrentLocation(): Promise<any> {
+  async getCurrentLocation(forPickup = false): Promise<any> {
     const shouldRetryForAccuracy = (position: any) =>
       Boolean(
         position?.coords &&
         typeof position.coords.accuracy === 'number' &&
-        position.coords.accuracy > DESIRED_ACCURACY_METERS,
+        // For pickups, accept only very good accuracy; for tracking, 100m is fine
+        position.coords.accuracy > (forPickup ? 50 : DESIRED_ACCURACY_METERS),
       );
 
     const getWebLocation = (options: PositionOptions) =>
@@ -104,10 +113,50 @@ export const CapacitorService = {
         }
       });
 
+    const tryWebLocation = async () => {
+      let lastError: unknown = null;
+      // For pickup: start with maximumAge: 0 to guarantee a fresh GPS fix
+      const attemptOptions = forPickup
+        ? [PICKUP_GEOLOCATION_OPTIONS, HIGH_ACCURACY_GEOLOCATION_OPTIONS, BALANCED_GEOLOCATION_OPTIONS]
+        : [HIGH_ACCURACY_GEOLOCATION_OPTIONS, BALANCED_GEOLOCATION_OPTIONS];
+
+      for (const options of attemptOptions) {
+        const { position, error } = await getWebLocation(options);
+        if (position) {
+          if (shouldRetryForAccuracy(position)) {
+            // One retry with the next fallback option
+            const retryResult = await getWebLocation(BALANCED_GEOLOCATION_OPTIONS);
+            return {
+              position: retryResult.position || position,
+              error: retryResult.error,
+            };
+          }
+          return { position, error: null };
+        }
+        lastError = error;
+        if (isPermissionDeniedError(error)) {
+          return { position: null, error };
+        }
+      }
+      return { position: null, error: lastError };
+    };
+
     const tryCapacitorLocation = async () => {
       let lastError: unknown = null;
+      // For pickup: start with maximumAge: 0 to guarantee a fresh GPS fix
+      const attemptOptions = forPickup
+        ? [PICKUP_GEOLOCATION_OPTIONS, HIGH_ACCURACY_GEOLOCATION_OPTIONS, BALANCED_GEOLOCATION_OPTIONS]
+        : [HIGH_ACCURACY_GEOLOCATION_OPTIONS, BALANCED_GEOLOCATION_OPTIONS];
 
-      const attemptOptions = [HIGH_ACCURACY_GEOLOCATION_OPTIONS, BALANCED_GEOLOCATION_OPTIONS];
+      // Request permissions explicitly so the OS dialog appears on native
+      try {
+        const perm = await Geolocation.requestPermissions();
+        if (perm.location === 'denied') {
+          return { position: null, error: new Error('Location permission denied.') };
+        }
+      } catch {
+        // requestPermissions may not be supported on all platforms — continue
+      }
 
       for (const options of attemptOptions) {
         try {
@@ -133,33 +182,21 @@ export const CapacitorService = {
       return { position: null, error: lastError };
     };
 
-    const tryWebLocation = async () => {
-      let lastError: unknown = null;
-      const attemptOptions = [HIGH_ACCURACY_GEOLOCATION_OPTIONS, BALANCED_GEOLOCATION_OPTIONS];
+    // On plain web (not native Capacitor), skip the Capacitor plugin entirely
+    // so the browser's native permission prompt appears immediately
+    const isNative = Capacitor.isNativePlatform();
 
-      for (const options of attemptOptions) {
-        const { position, error } = await getWebLocation(options);
-        if (position) {
-          if (shouldRetryForAccuracy(position)) {
-            const retryResult = await getWebLocation(BALANCED_GEOLOCATION_OPTIONS);
-            return {
-              position: retryResult.position || position,
-              error: retryResult.error,
-            };
-          }
-
-          return { position, error: null };
-        }
-
-        lastError = error;
-        if (isPermissionDeniedError(error)) {
-          return { position: null, error };
-        }
+    if (!isNative) {
+      const webResult = await tryWebLocation();
+      if (webResult.position) return webResult.position;
+      if (isPermissionDeniedError(webResult.error)) {
+        throw new Error('Location permission denied.');
       }
+      if (webResult.error) logGeolocationIssue('web', webResult.error);
+      return null;
+    }
 
-      return { position: null, error: lastError };
-    };
-
+    // Native path: Capacitor first, web API as fallback
     const capacitorResult = await tryCapacitorLocation();
     if (capacitorResult.position) {
       return capacitorResult.position;

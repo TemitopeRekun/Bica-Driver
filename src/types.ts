@@ -220,6 +220,11 @@ export interface PendingPaymentTrip extends Trip {
 export type OwnerActivityTab = 'trips' | 'payments';
 export type DriverActivityTab = 'trips' | 'settlements';
 
+// Admin-specific types
+export type DriverFilter = 'All' | 'Pending' | 'Active' | 'Blocked';
+export type AdminSection = 'overview' | 'drivers' | 'owners' | 'trips' | 'finance' | 'settings';
+
+
 export interface SystemSettings {
   baseFare: number;
   pricePerKm: number; // distance rate per km used in the fare formula
