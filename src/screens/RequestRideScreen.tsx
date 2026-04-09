@@ -39,7 +39,7 @@ const RequestRideScreen: React.FC = () => {
   } = useRideStore();
   
   
-  const { fetchAvailableDrivers, initiateRideRequest, resetRide, syncCurrentRide } = useRideManager();
+  const { fetchAvailableDrivers, initiateRideRequest, cancelRide, resetRide, syncCurrentRide } = useRideManager();
 
   // Reference-based tracking for the custom location search hook
   const trackedDriverIdRef = useRef<string | null>(null);
@@ -95,7 +95,7 @@ const RequestRideScreen: React.FC = () => {
     };
   }, [pickup, rideState, showDriverPicker, fetchAvailableDrivers, vehicleData.transmission]);
 
-  useOwnerRealtime({
+  const { emitCancel } = useOwnerRealtime({
     ownerId: currentUser?.id,
     driverInfoId: driverInfo?.id,
     rideState,
@@ -120,13 +120,28 @@ const RequestRideScreen: React.FC = () => {
     },
     onLocationUpdated: (lat, lng) => setTrackedDriverPos([lat, lng]),
     onRideProgress: (payload) => {
-       if (payload.milestone === 'inprogress' || payload.milestone === 'in_progress') setRideMilestone('in_progress');
-       else if (payload.milestone === 'arrived') setRideMilestone('arrived');
+       const m = payload.milestone?.toLowerCase();
+       if (m === 'inprogress' || m === 'in_progress' || m === 'trip') setRideMilestone('in_progress');
+       else if (m === 'arrived') setRideMilestone('arrived');
+       else if (m === 'assigned') setRideMilestone('assigned');
+       else if (m === 'completed') setRideMilestone('completed');
     },
     onPaymentUpdated: (data) => {
       addToast(data.message || `Payment ${data.paymentStatus}`, data.paymentStatus === 'PAID' ? 'success' : 'info');
     }
   });
+
+  const handleCancelRide = async () => {
+    if (currentTripId) {
+      console.log(`[ACTION] Owner initiating cancellation for trip: ${currentTripId}`);
+      // Send redundant socket signal for instant UI feedback across devices
+      emitCancel(currentTripId);
+      // Canonical cancellation via API
+      await cancelRide(currentTripId);
+    } else {
+      resetRide();
+    }
+  };
 
   const handleConfirmRequest = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -173,14 +188,17 @@ const RequestRideScreen: React.FC = () => {
       setShowDriverPicker(false);
     } catch (error: any) {
        // Handle 409 Conflict: Already being processed by backend
-       if (error.status === 409) {
-          addToast('Resolving previous request...', 'info');
-          const syncedTrip = await syncCurrentRide();
-          if (syncedTrip) {
-             setShowDriverPicker(false);
-             addToast('Request successfully recovered!', 'success');
-          }
-       }
+        if (error.status === 400) {
+           addToast('Status mismatch. Refreshing...', 'info');
+           await syncCurrentRide();
+        } else if (error.status === 409) {
+           addToast('Resolving previous request...', 'info');
+           const syncedTrip = await syncCurrentRide();
+           if (syncedTrip) {
+              setShowDriverPicker(false);
+              addToast('Request successfully recovered!', 'success');
+           }
+        }
     } finally {
       setIsSubmitting(false);
     }
@@ -390,7 +408,7 @@ const RequestRideScreen: React.FC = () => {
              onChat={() => {}}
              onTrack={() => {}}
              onSOS={() => {}}
-             onCancel={() => resetRide()}
+             onCancel={handleCancelRide}
            />
         )}
 

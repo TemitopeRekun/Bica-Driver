@@ -175,4 +175,14 @@ export const useOwnerRealtime = ({
       ownerSocketRef.current.emit('trackdriver', { driverId: driverInfoId });
     }
   }, [driverInfoId, rideState, trackedDriverIdRef]);
+
+  return {
+    isConnected: ownerSocketRef.current?.connected || false,
+    emitCancel: (tripId: string) => {
+      if (ownerSocketRef.current?.connected) {
+        console.log(`📡 [WS] Cancellation signal dispatched to Driver for trip: ${tripId}`);
+        ownerSocketRef.current.emit('ride:cancel', { tripId });
+      }
+    }
+  };
 };

@@ -95,12 +95,13 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
         </button>
       </div>
 
-      {rideState === 'ASSIGNED' && onCancel && (
+      {(rideState === 'ASSIGNED' || rideState === 'SEARCHING') && onCancel && (
         <button
           onClick={onCancel}
-          className="mt-4 w-full py-3 rounded-xl border border-red-500/20 text-red-500 font-bold text-sm hover:bg-red-500/5 transition-colors active:scale-95"
+          className="mt-4 w-full py-4 rounded-xl bg-red-600 text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-red-500/30 hover:bg-red-700 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
         >
-          Cancel Ride
+          <span className="material-symbols-outlined text-lg">close</span>
+          Cancel Ride Request
         </button>
       )}
 

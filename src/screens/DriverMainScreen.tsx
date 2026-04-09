@@ -48,6 +48,13 @@ const DriverMainScreen: React.FC = () => {
     approvalStatus: currentUser?.approvalStatus || 'PENDING',
     onOnlineStatusChange: handleOnlineStatusChange,
     onForcedLogout: handleForcedLogout,
+    onRideProgress: (payload) => {
+       const m = payload.milestone?.toLowerCase();
+       if (m === 'inprogress' || m === 'in_progress' || m === 'trip') setRideMilestone('in_progress');
+       else if (m === 'arrived') setRideMilestone('arrived');
+       else if (m === 'assigned') setRideMilestone('assigned');
+       else if (m === 'completed') setRideMilestone('completed');
+    },
   });
 
   useEffect(() => {
@@ -110,7 +117,16 @@ const DriverMainScreen: React.FC = () => {
         });
         setActiveRide(null);
       }
-    } catch (e) {}
+    } catch (error: any) {
+      // If we get an Invalid State (400), backend and frontend are out of sync
+      if (error.status === 400 || error.message?.includes('state')) {
+        addToast('Stale status detected. Refreshing ride...', 'info');
+        const trip = await syncCurrentRide();
+        if (!trip) {
+           setActiveRide(null);
+        }
+      }
+    }
   };
 
   const mapMarkers: any[] = [{ id: 'driver-me', position: driverPos, title: 'You', icon: 'taxi' }];

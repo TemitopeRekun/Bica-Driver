@@ -8,7 +8,7 @@ import { WalletSummary, Trip } from '@/types';
 export const useDriverManager = () => {
   const { currentUser } = useAuthStore();
   const { addToast } = useUIStore();
-  const { setRideState, setRideMilestone } = useRideStore();
+  const { setRideState, setRideMilestone, resetRide } = useRideStore();
   
   const [walletSummary, setWalletSummary] = useState<WalletSummary | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -84,11 +84,15 @@ export const useDriverManager = () => {
           setRideState(activeTrip.status as any);
           setRideMilestone(activeTrip.progressMilestone || 'assigned');
           return activeTrip;
+        } else {
+          // Force reset if backend says nothing is active
+          resetRide();
+          return null;
         }
-        return null;
       } catch (error) {
+        // On network error, we stay silent to avoid clearing state during transient disconnects
         return null;
       }
-    }, [setRideState, setRideMilestone]),
+    }, [setRideState, setRideMilestone, resetRide]),
   };
 }

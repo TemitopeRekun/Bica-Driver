@@ -28,6 +28,7 @@ interface UseDriverRealtimeOptions {
   approvalStatus: string;
   onOnlineStatusChange?: (isOnline: boolean) => void;
   onForcedLogout?: (message?: string) => void;
+  onRideProgress?: (payload: { tripId: string; milestone: string }) => void;
 }
 
 const DEFAULT_DRIVER_POS: [number, number] = [6.4549, 3.3896];
@@ -50,6 +51,7 @@ export const useDriverRealtime = ({
   approvalStatus,
   onOnlineStatusChange,
   onForcedLogout,
+  onRideProgress,
 }: UseDriverRealtimeOptions) => {
   const [isOnline, setIsOnline] = useState(Boolean(user?.isOnline));
   const [isLocationRefreshing, setIsLocationRefreshing] = useState(false);
@@ -202,6 +204,9 @@ export const useDriverRealtime = ({
       // payload: { tripId, status, milestone }
       if (data.status === 'CANCELLED' || data.status === 'COMPLETED') {
         removeRideRequest(data.tripId);
+      }
+      if (data.milestone) {
+        onRideProgress?.(data);
       }
     });
 

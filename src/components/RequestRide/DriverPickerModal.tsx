@@ -104,6 +104,15 @@ const DriverPickerModal: React.FC<DriverPickerModalProps> = ({
             </div>
           )}
         </div>
+
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+          <button
+            onClick={onClose}
+            className="w-full py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 transition-colors"
+          >
+            Cancel Request
+          </button>
+        </div>
       </div>
     </div>
   );

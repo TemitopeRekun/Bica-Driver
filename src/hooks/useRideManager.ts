@@ -21,6 +21,30 @@ export const useRideManager = () => {
     resetRide,
   } = useRideStore();
 
+  const syncCurrentRide = useCallback(async () => {
+    try {
+      const trip = await api.get<any>('/rides/current');
+      if (trip) {
+        setCurrentTripId(trip.id);
+        setDriverInfo({
+          ...trip.driver,
+          avatar: trip.driver?.avatarUrl || IMAGES.DRIVER_CARD,
+          timeAway: trip.estimatedArrivalMins || 5,
+          tripId: trip.id,
+        });
+        if (trip.status === 'SEARCHING') setRideState('SEARCHING');
+        else if (trip.status === 'ASSIGNED') setRideState('ASSIGNED');
+        else if (trip.status === 'IN_PROGRESS') setRideState('IN_PROGRESS');
+      } else {
+        // Force reset if backend says no ride active
+        resetRide();
+      }
+      return trip;
+    } catch (e) {
+      return null;
+    }
+  }, [setCurrentTripId, setDriverInfo, setRideState, resetRide]);
+
   const fetchAvailableDrivers = useCallback(async (pickup: LocationData | null, transmission: string) => {
     if (!pickup?.lat || !pickup?.lon) {
        console.warn('Cannot fetch drivers: Pickup location is invalid.');
@@ -97,31 +121,15 @@ export const useRideManager = () => {
       resetRide();
       addToast('Your ride has been cancelled as requested.', 'info');
     } catch (error: any) {
-      addToast(error.message || 'We had trouble cancelling the trip. Please try again or contact support if the issue persists.', 'error');
-    }
-  }, [resetRide, addToast]);
-  
-  const syncCurrentRide = useCallback(async () => {
-    try {
-      const trip = await api.get<any>('/rides/current');
-      if (trip) {
-        setCurrentTripId(trip.id);
-        setDriverInfo({
-          ...trip.driver,
-          avatar: trip.driver?.avatarUrl || IMAGES.DRIVER_CARD,
-          timeAway: trip.estimatedArrivalMins || 5,
-          tripId: trip.id,
-        });
-        if (trip.status === 'SEARCHING') setRideState('SEARCHING');
-        else if (trip.status === 'ASSIGNED') setRideState('ASSIGNED');
-        else if (trip.status === 'IN_PROGRESS') setRideState('IN_PROGRESS');
+      if (error.status === 400 || error.message?.includes('state')) {
+        addToast('State mismatch. Refreshing status...', 'info');
+        await syncCurrentRide();
+      } else {
+        addToast(error.message || 'We had trouble cancelling the trip. Please try again or contact support if the issue persists.', 'error');
       }
-      return trip;
-    } catch (e) {
-      return null;
     }
-  }, [setCurrentTripId, setDriverInfo, setRideState]);
-
+  }, [resetRide, addToast, syncCurrentRide]);
+  
   return {
     fetchAvailableDrivers,
     initiateRideRequest,
