@@ -234,13 +234,47 @@ const SignUpScreen: React.FC = () => {
 
     setIsLoading(true);
     try {
-      // Prepare payload (maps to backend expectations)
-      const payload = {
-        ...formData,
-        avatar: formData.selfieImage || formData.avatar, // Use selfie as avatar for drivers
+      // Create a clean, role-aware payload strictly following the Bica API Contract
+      const basePayload: any = {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone,
+        password: formData.password,
+        role: formData.role,
       };
 
-      const response = await api.post<AuthResponse>('/auth/register', payload, false);
+      let finalPayload: any = {};
+
+      if (isDriver) {
+        // Driver Specific Fields (Strictly following the contract)
+        finalPayload = {
+          ...basePayload,
+          nin: formData.nin,
+          transmission: formData.transmission.toUpperCase(),
+          licenseImageUrl: formData.licenseImage, // Base64 as per contract
+          ninImageUrl: formData.ninImage,         // Base64 as per contract
+          selfieImageUrl: formData.selfieImage,   // Base64 as per contract
+          bankName: formData.bankName,
+          bankCode: formData.bankCode,
+          accountNumber: formData.accountNumber,
+          accountName: formData.accountName.trim(),
+          backgroundCheckAccepted: formData.backgroundCheckAccepted,
+        };
+      } else {
+        // Owner Specific Fields (Strictly following the contract)
+        finalPayload = {
+          ...basePayload,
+          carType: formData.carType.toUpperCase(), // Normalize for contract safety
+          carModel: formData.carModel.trim(),
+          carYear: formData.carYear,
+          gender: formData.gender.toUpperCase(),
+          address: formData.address.trim(),
+          nationality: formData.nationality.trim(),
+          age: String(formData.age),
+        };
+      }
+
+      const response = await api.post<AuthResponse>('/auth/register', finalPayload, false);
 
       if (response.token) {
         const mapped = mapUser(response.user);
@@ -308,6 +342,7 @@ const SignUpScreen: React.FC = () => {
                             onBlur={() => handleBlur('name')}
                         />
                     </div>
+                    {errors.name && touched.name && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.name}</p>}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -326,6 +361,7 @@ const SignUpScreen: React.FC = () => {
                             onBlur={() => handleBlur('email')}
                         />
                     </div>
+                    {errors.email && touched.email && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.email}</p>}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -345,6 +381,7 @@ const SignUpScreen: React.FC = () => {
                             onBlur={() => handleBlur('phone')}
                         />
                     </div>
+                    {errors.phone && touched.phone && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.phone}</p>}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -356,25 +393,33 @@ const SignUpScreen: React.FC = () => {
                                 placeholder="18+"
                                 type="number"
                                 value={formData.age}
-                                onChange={e => setFormData({...formData, age: e.target.value})}
+                                onChange={e => {
+                                    setFormData({...formData, age: e.target.value});
+                                    setErrors(prev => ({...prev, age: ''}));
+                                }}
                                 onBlur={() => handleBlur('age')}
                             />
                         </div>
+                        {errors.age && touched.age && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.age}</p>}
                     </div>
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Gender</label>
-                        <div className="flex items-center bg-white dark:bg-surface-dark border border-slate-100 dark:border-white/5 rounded-2xl px-4 h-14">
+                        <div className={`flex items-center bg-white dark:bg-surface-dark border rounded-2xl px-4 h-14 transition-all ${errors.gender && touched.gender ? 'border-red-500 bg-red-500/5' : 'border-slate-100 dark:border-white/5'}`}>
                             <select 
                                 className="bg-transparent border-none text-slate-900 dark:text-white text-sm font-bold w-full focus:ring-0 p-0"
                                 value={formData.gender}
-                                onChange={e => setFormData({...formData, gender: e.target.value})}
+                                onChange={e => {
+                                    setFormData({...formData, gender: e.target.value});
+                                    setErrors(prev => ({...prev, gender: ''}));
+                                }}
+                                onBlur={() => handleBlur('gender')}
                             >
-                                <option value="" disabled>Select</option>
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
-                                <option value="Other">Other</option>
+                                <option value="" disabled className="text-slate-400 bg-white dark:bg-surface-dark">Select</option>
+                                <option value="Male" className="text-slate-900 dark:text-white bg-white dark:bg-surface-dark">Male</option>
+                                <option value="Female" className="text-slate-900 dark:text-white bg-white dark:bg-surface-dark">Female</option>
+                                <option value="Other" className="text-slate-900 dark:text-white bg-white dark:bg-surface-dark">Other</option>
                             </select>
                         </div>
+                        {errors.gender && touched.gender && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.gender}</p>}
                     </div>
                 </div>
 
@@ -386,10 +431,14 @@ const SignUpScreen: React.FC = () => {
                             className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                             placeholder="Residential Address"
                             value={formData.address}
-                            onChange={e => setFormData({...formData, address: e.target.value})}
+                            onChange={e => {
+                                setFormData({...formData, address: e.target.value});
+                                setErrors(prev => ({...prev, address: ''}));
+                            }}
                             onBlur={() => handleBlur('address')}
                         />
                     </div>
+                    {errors.address && touched.address && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.address}</p>}
                 </div>
 
                 <button 
@@ -421,10 +470,12 @@ const SignUpScreen: React.FC = () => {
                             onChange={e => {
                                 const val = filterDigits(e.target.value).slice(0, 11);
                                 setFormData({...formData, nin: val});
+                                setErrors(prev => ({...prev, nin: ''}));
                             }}
                             onBlur={() => handleBlur('nin')}
                         />
                     </div>
+                    {errors.nin && touched.nin && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.nin}</p>}
                 </div>
 
                 <div className="flex flex-col gap-4">
@@ -520,10 +571,14 @@ const SignUpScreen: React.FC = () => {
                                 className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
                                 placeholder="e.g. Camry"
                                 value={formData.carModel}
-                                onChange={e => setFormData({...formData, carModel: e.target.value})}
+                                onChange={e => {
+                                    setFormData({...formData, carModel: e.target.value});
+                                    setErrors(prev => ({...prev, carModel: ''}));
+                                }}
                                 onBlur={() => handleBlur('carModel')}
                             />
                         </div>
+                        {errors.carModel && touched.carModel && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.carModel}</p>}
                     </div>
                     <div className="flex flex-col gap-1.5">
                         <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Year</label>
@@ -533,26 +588,35 @@ const SignUpScreen: React.FC = () => {
                                 placeholder="20XX"
                                 inputMode="numeric"
                                 value={formData.carYear}
-                                onChange={e => setFormData({...formData, carYear: filterDigits(e.target.value).slice(0, 4)})}
+                                onChange={e => {
+                                    setFormData({...formData, carYear: filterDigits(e.target.value).slice(0, 4)});
+                                    setErrors(prev => ({...prev, carYear: ''}));
+                                }}
                                 onBlur={() => handleBlur('carYear')}
                             />
                         </div>
+                        {errors.carYear && touched.carYear && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.carYear}</p>}
                     </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Transmission</label>
-                    <div className="flex items-center bg-white dark:bg-surface-dark border border-slate-100 dark:border-white/5 rounded-2xl px-4 h-14">
-                        <select 
-                            className="bg-transparent border-none text-slate-900 dark:text-white text-base font-bold w-full focus:ring-0 p-0"
-                            value={formData.transmission}
-                            onChange={e => setFormData({...formData, transmission: e.target.value as any})}
-                        >
-                            <option value="Automatic">Automatic (Most Common)</option>
-                            <option value="Manual">Manual Transmission</option>
-                        </select>
+                        <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Transmission</label>
+                        <div className={`flex items-center bg-white dark:bg-surface-dark border rounded-2xl px-4 h-14 transition-all ${errors.transmission && touched.transmission ? 'border-red-500 bg-red-500/5' : 'border-slate-100 dark:border-white/5'}`}>
+                            <select 
+                                className="bg-transparent border-none text-slate-900 dark:text-white text-base font-bold w-full focus:ring-0 p-0"
+                                value={formData.transmission}
+                                onChange={e => {
+                                    setFormData({...formData, transmission: e.target.value as any});
+                                    setErrors(prev => ({...prev, transmission: ''}));
+                                }}
+                                onBlur={() => handleBlur('transmission')}
+                            >
+                                <option value="Automatic" className="text-slate-900 dark:text-white bg-white dark:bg-surface-dark">Automatic (Most Common)</option>
+                                <option value="Manual" className="text-slate-900 dark:text-white bg-white dark:bg-surface-dark">Manual Transmission</option>
+                            </select>
+                        </div>
+                        {errors.transmission && touched.transmission && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.transmission}</p>}
                     </div>
-                </div>
 
                 <button 
                     onClick={handleNext}
@@ -572,23 +636,26 @@ const SignUpScreen: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Your Bank</label>
-                    <div className="flex items-center bg-white dark:bg-surface-dark border border-slate-100 dark:border-white/5 rounded-2xl px-4 h-14">
-                        <select 
-                            className="bg-transparent border-none text-slate-900 dark:text-white text-base font-bold w-full focus:ring-0 p-0"
-                            value={formData.bankCode}
-                            onChange={e => {
-                                const bank = banks.find(b => b.code === e.target.value);
-                                setFormData({...formData, bankCode: e.target.value, bankName: bank?.name || ''});
-                            }}
-                        >
-                            <option value="" disabled>Select your bank</option>
-                            {banks.map(bank => (
-                                <option key={bank.code} value={bank.code}>{bank.name}</option>
-                            ))}
-                        </select>
+                        <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Your Bank</label>
+                        <div className={`flex items-center bg-white dark:bg-surface-dark border rounded-2xl px-4 h-14 transition-all ${errors.bankCode && touched.bankCode ? 'border-red-500 bg-red-500/5' : 'border-slate-100 dark:border-white/5'}`}>
+                            <select 
+                                className="bg-transparent border-none text-slate-900 dark:text-white text-base font-bold w-full focus:ring-0 p-0"
+                                value={formData.bankCode}
+                                onChange={e => {
+                                    const bank = banks.find(b => b.code === e.target.value);
+                                    setFormData({...formData, bankCode: e.target.value, bankName: bank?.name || ''});
+                                    setErrors(prev => ({...prev, bankCode: ''}));
+                                }}
+                                onBlur={() => handleBlur('bankCode')}
+                            >
+                                <option value="" disabled className="text-slate-400 bg-white dark:bg-surface-dark">Select your bank</option>
+                                {banks.map(bank => (
+                                    <option key={bank.code} value={bank.code} className="text-slate-900 dark:text-white bg-white dark:bg-surface-dark">{bank.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        {errors.bankCode && touched.bankCode && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.bankCode}</p>}
                     </div>
-                </div>
 
                 <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Account Number</label>
@@ -599,10 +666,14 @@ const SignUpScreen: React.FC = () => {
                             placeholder="10 Digits"
                             inputMode="numeric"
                             value={formData.accountNumber}
-                            onChange={e => setFormData({...formData, accountNumber: filterDigits(e.target.value).slice(0, 10)})}
+                            onChange={e => {
+                                setFormData({...formData, accountNumber: filterDigits(e.target.value).slice(0, 10)});
+                                setErrors(prev => ({...prev, accountNumber: ''}));
+                            }}
                             onBlur={() => handleBlur('accountNumber')}
                         />
                     </div>
+                    {errors.accountNumber && touched.accountNumber && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.accountNumber}</p>}
                 </div>
 
                 <div className="flex flex-col gap-1.5">
@@ -645,11 +716,15 @@ const SignUpScreen: React.FC = () => {
                             placeholder="Min. 6 characters"
                             type={showPassword ? "text" : "password"}
                             value={formData.password}
-                            onChange={e => setFormData({...formData, password: e.target.value})}
+                            onChange={e => {
+                                setFormData({...formData, password: e.target.value});
+                                setErrors(prev => ({...prev, password: ''}));
+                                }}
                             onBlur={() => handleBlur('password')}
                         />
                         <button onClick={() => setShowPassword(!showPassword)}><span className="material-symbols-outlined text-slate-400">{showPassword ? 'visibility_off' : 'visibility'}</span></button>
                     </div>
+                    {errors.password && touched.password && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.password}</p>}
                 </div>
                 
                 {isDriver && (
