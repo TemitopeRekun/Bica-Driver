@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useRideStore } from '@/stores/rideStore';
-import { useSettingsStore } from '@/stores/settingsStore';
 import { useRideManager } from '@/hooks/useRideManager';
 import { useOwnerLocationSearch } from '@/hooks/useOwnerLocationSearch';
 import { useOwnerRealtime } from '@/hooks/useOwnerRealtime';
@@ -29,7 +28,6 @@ const RequestRideScreen: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuthStore();
   const { addToast } = useUIStore();
-  const { settings } = useSettingsStore();
   const { 
     rideState, setRideState, rideMilestone, setRideMilestone,
     currentTripId, setCurrentTripId,
@@ -40,7 +38,7 @@ const RequestRideScreen: React.FC = () => {
   } = useRideStore();
   
   
-  const { fetchAvailableDrivers, initiateRideRequest, cancelRide, resetRide, syncCurrentRide, getRoute, initiatePayment } = useRideManager();
+  const { fetchAvailableDrivers, initiateRideRequest, cancelRide, resetRide, syncCurrentRide, getRoute, initiatePayment, getPaymentStatus } = useRideManager();
 
   // Reference-based tracking for the custom location search hook
   const trackedDriverIdRef = useRef<string | null>(null);
@@ -67,11 +65,11 @@ const RequestRideScreen: React.FC = () => {
     pickup, destination, mapCenter, estimatedPrice, estimatedDistance,
     isSearchingPickup, isSearchingDest, searchQuery, isFetchingRoute,
     searchResults, isSearching, isLocating, searchError, estimatedMins,
+    currentTrafficMins,
     setSearchQuery, setIsSearchingPickup, setIsSearchingDest,
     handleUseMyLocation, handleMarkerDragEnd, handleSelectLocation,
     handleCategoryTap, clearSearchState, refreshRoute, resetLocationSearch
   } = useOwnerLocationSearch({
-    settings,
     onPickupChanged: () => {}
   });
 
@@ -103,7 +101,23 @@ const RequestRideScreen: React.FC = () => {
       }
 
       try {
-        await syncCurrentRide();
+        const trip = await syncCurrentRide();
+        
+        if (isReturningFromPayment && trip?.id) {
+          const statusResult = await getPaymentStatus(trip.id);
+          
+          if (statusResult.paymentStatus === 'PAID') {
+            addToast('Payment verified successfully! Thank you.', 'success');
+            // Refresh trip data to reflect PAID status
+            await syncCurrentRide();
+          } else if (statusResult.paymentStatus === 'PARTIALLY_PAID') {
+            const remaining = statusResult.amountRemaining || 0;
+            addToast(`Partial payment of ₦${statusResult.amountPaid?.toLocaleString()} received. Please settle the remaining balance of ₦${remaining.toLocaleString()}.`, 'warning');
+            await syncCurrentRide();
+          } else {
+            addToast('Payment verification pending. It will be updated automatically once confirmed.', 'info');
+          }
+        }
       } catch (e) {
         console.error('Initial ride sync failed:', e);
       } finally {
@@ -423,7 +437,9 @@ const RequestRideScreen: React.FC = () => {
                              <div className="flex items-center gap-2 mt-0.5">
                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{estimatedDistance} km</p>
                                <span className="text-[10px] text-slate-300">•</span>
-                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{estimatedMins} mins</p>
+                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                 {currentTrafficMins > estimatedMins ? `${currentTrafficMins} mins (Traffic)` : `${estimatedMins} mins`}
+                               </p>
                              </div>
                            </>
                          )}

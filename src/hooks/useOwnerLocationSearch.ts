@@ -5,18 +5,15 @@ import { SystemSettings, LocationData } from '@/types';
 import { useToast } from './useToast';
 
 interface UseOwnerLocationSearchOptions {
-  settings: SystemSettings;
   onPickupChanged?: () => void;
 }
 
-const FALLBACK_MINUTES_PER_KM = 3;
-const MIN_FALLBACK_MINUTES = 5;
 const DEFAULT_MAP_CENTER: [number, number] = [6.4549, 3.4246];
 
 const isAbortError = (error: unknown): boolean =>
   error instanceof DOMException && error.name === 'AbortError';
 
-export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLocationSearchOptions) => {
+export const useOwnerLocationSearch = ({ onPickupChanged }: UseOwnerLocationSearchOptions) => {
   const { toast } = useToast();
   const [pickup, setPickup] = useState<LocationData | null>(null);
   const [destination, setDestination] = useState<LocationData | null>(null);
@@ -28,6 +25,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
   const [isSearchingDest, setIsSearchingDest] = useState(false);
   const [isFetchingRoute, setIsFetchingRoute] = useState(false);
   const [estimatedMins, setEstimatedMins] = useState<number>(0);
+  const [currentTrafficMins, setCurrentTrafficMins] = useState<number>(0);
   const [fareRange, setFareRange] = useState<{ low: number; high: number } | null>(null);
   const [searchResults, setSearchResults] = useState<LocationData[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -64,21 +62,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     setIsSearching(false);
   }, [cancelActiveSearch]);
 
-  function deg2rad(deg: number) {
-    return deg * (Math.PI / 180);
-  }
 
-  function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const r = 6371;
-    const dLat = deg2rad(lat2 - lat1);
-    const dLon = deg2rad(lon2 - lon1);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return r * c;
-  }
 
   const refreshRoute = useCallback(async () => {
     if (!pickup || !destination) return;
@@ -94,36 +78,21 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
 
       setEstimatedDistance(route.distanceKm.toFixed(1));
       setEstimatedMins(route.estimatedMins);
+      setCurrentTrafficMins(route.currentTrafficMins);
       setFareRange({ low: route.fareEstimate.low, high: route.fareEstimate.high });
       setEstimatedPrice(route.fareEstimate.low);
-    } catch {
-      const dist = Math.max(
-        calculateDistance(pickup.lat, pickup.lon, destination.lat, destination.lon),
-        1,
-      );
-      const fallbackEstimatedMins = Math.max(
-        Math.round(dist * FALLBACK_MINUTES_PER_KM),
-        MIN_FALLBACK_MINUTES,
-      );
-      const pricePerKm = settings.pricePerKm || 100;
-      const timeRate = settings.timeRate || 50;
-
-      const fallbackLowEstimate =
-        settings.baseFare + dist * pricePerKm + fallbackEstimatedMins * timeRate;
-      const bufferMins = Math.max(Math.ceil(fallbackEstimatedMins * 0.15), MIN_FALLBACK_MINUTES);
-      const fallbackHighEstimate =
-        settings.baseFare + dist * pricePerKm + (fallbackEstimatedMins + bufferMins) * timeRate;
-      const roundedLow = Math.round(fallbackLowEstimate / 50) * 50;
-      const roundedHigh = Math.max(roundedLow, Math.round(fallbackHighEstimate / 50) * 50);
-
-      setEstimatedDistance(dist.toFixed(1));
-      setEstimatedMins(fallbackEstimatedMins);
-      setEstimatedPrice(roundedLow);
-      setFareRange({ low: roundedLow, high: roundedHigh });
+    } catch (error) {
+      console.error('Failed to refresh route from backend:', error);
+      toast.error('Could not get a fare estimate right now. Please check your connection.');
+      // Reset estimates on error
+      setEstimatedDistance('');
+      setEstimatedMins(0);
+      setEstimatedPrice(0);
+      setFareRange(null);
     } finally {
       setIsFetchingRoute(false);
     }
-  }, [destination, pickup, settings.baseFare]);
+  }, [destination, pickup, toast]);
 
   const handleUseMyLocation = async () => {
     setIsLocating(true);
@@ -242,6 +211,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     setEstimatedPrice(0);
     setEstimatedDistance('');
     setEstimatedMins(0);
+    setCurrentTrafficMins(0);
     setFareRange(null);
     setIsSearchingPickup(false);
     setIsSearchingDest(false);
@@ -397,6 +367,7 @@ export const useOwnerLocationSearch = ({ settings, onPickupChanged }: UseOwnerLo
     searchQuery: searchQueryState,
     isFetchingRoute,
     estimatedMins,
+    currentTrafficMins,
     fareRange,
     searchResults,
     isSearching,

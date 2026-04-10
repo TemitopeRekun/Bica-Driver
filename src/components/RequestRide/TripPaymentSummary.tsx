@@ -12,7 +12,7 @@ interface TripPaymentSummaryProps {
     totalAmount?: number;
     driverEarnings?: number;
   } | null;
-  paymentStatus?: 'UNPAID' | 'SUCCESS' | 'FAILED' | 'PENDING';
+  paymentStatus?: 'UNPAID' | 'SUCCESS' | 'FAILED' | 'PENDING' | 'PAID' | 'PARTIALLY_PAID';
   paymentMessage?: string | null;
   onPayNow?: () => void;
   onClose: () => void;
@@ -104,15 +104,21 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
           </div>
 
           {/* Payment Status Alert for Owner */}
-          {!isDriver && (paymentMessage || paymentStatus === 'SUCCESS') && (
+          {!isDriver && (paymentMessage || paymentStatus === 'SUCCESS' || paymentStatus === 'PAID' || paymentStatus === 'PARTIALLY_PAID') && (
             <div className={`p-4 rounded-2xl flex gap-3 items-start border-2 animate-in slide-in-from-top-4 duration-500 ${
-              paymentStatus === 'SUCCESS' ? 'bg-green-500/5 border-green-500/20 text-green-600' : 'bg-red-500/5 border-red-500/20 text-red-600'
+              (paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
+                ? 'bg-green-500/5 border-green-500/20 text-green-600' 
+                : (paymentStatus === 'PARTIALLY_PAID' ? 'bg-amber-500/5 border-amber-500/20 text-amber-600' : 'bg-red-500/5 border-red-500/20 text-red-600')
             }`}>
               <span className="material-symbols-outlined text-base">
-                {paymentStatus === 'SUCCESS' ? 'verified' : 'error'}
+                {(paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
+                  ? 'verified' 
+                  : (paymentStatus === 'PARTIALLY_PAID' ? 'warning' : 'error')}
               </span>
               <p className="text-[10px] font-black uppercase leading-relaxed">
-                {paymentStatus === 'SUCCESS' ? 'Trip settlement confirmed successfully!' : paymentMessage}
+                {(paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
+                  ? 'Trip settlement confirmed successfully!' 
+                  : paymentMessage}
               </p>
             </div>
           )}
@@ -130,7 +136,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                 ) : (
                   <span className="material-symbols-outlined">payments</span>
                 )}
-                {isInitiatingPayment ? 'SECURE CONNECTION...' : 'PAY NGN ' + (fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0).toLocaleString()}
+                {isInitiatingPayment ? 'VERIFYING WITH MONNIFY...' : 'PAY NGN ' + (fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0).toLocaleString()}
               </button>
             )}
 

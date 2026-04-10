@@ -17,7 +17,7 @@ export type TripStatus =
   | 'SCHEDULED'
   | 'DECLINED';
 
-export type PaymentStatus = 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED';
+export type PaymentStatus = 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'PARTIALLY_PAID';
 
 export interface UserProfile {
   id: string;
@@ -202,6 +202,9 @@ export interface PaymentStatusResponse {
   paymentRecordId: string | null;
   paymentMethod: string | null;
   paymentRecordCreatedAt: string | null;
+  amountPaid?: number;
+  amountRemaining?: number;
+  message?: string;
 }
 
 export interface PendingPaymentTrip extends Trip {
@@ -285,5 +288,5 @@ export interface AdminDashboardStats {
   totalOwners: number;
   totalTrips: number;
   pendingDriversCount: number;
-  totalEarnings: number;
+  totalEarnings: number; // Platform Total Commission
 }

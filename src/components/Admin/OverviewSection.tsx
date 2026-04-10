@@ -33,7 +33,8 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
 }) => {
   // Use server side stats if available
   const displayPendingDriversCount = stats?.pendingDriversCount ?? pendingDrivers.length;
-  const displayTotalRevenue = stats?.totalEarnings ? (stats.totalEarnings * 0.15) : platformFees; // Assume 15% fee for display if using total earnings
+  // Strictly use platformFees from props (which now comes from stats.platformEarnings)
+  const displayTotalRevenue = platformFees; 
   const displayCompletedTrips = stats?.totalTrips ?? completedTripsCount;
   const displayTotalDrivers = stats?.totalDrivers ?? onlineDriversCount;
   const displayTotalOwners = stats?.totalOwners ?? totalOwnersCount;
@@ -108,7 +109,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
       )}
 
       {/* Main Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4">
         {/* Revenue */}
         <div className="bg-surface-light dark:bg-surface-dark p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm group">
           <div className="flex items-center justify-between mb-3">
@@ -117,7 +118,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
             </span>
             <span className="text-[9px] font-black text-green-500 px-2 py-0.5 bg-green-500/10 rounded-full italic">+12%</span>
           </div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Revenue</p>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Platform Revenue</p>
           <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{formatCurrency(displayTotalRevenue)}</p>
         </div>
 

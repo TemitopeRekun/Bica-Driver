@@ -180,6 +180,15 @@ export const useRideManager = () => {
       }
     }
   }, [resetRide, addToast, syncCurrentRide]);
+
+  const getPaymentStatus = useCallback(async (tripId: string) => {
+    try {
+      return await api.get<any>(`/payments/status/${tripId}`);
+    } catch (error: any) {
+      console.error('Failed to get payment status:', error);
+      throw error;
+    }
+  }, []);
   
   return {
     fetchAvailableDrivers,
@@ -190,5 +199,6 @@ export const useRideManager = () => {
     syncCurrentRide,
     getRoute,
     initiatePayment,
+    getPaymentStatus,
   };
 };

@@ -196,8 +196,6 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
     }
   };
 
-  const totalSettled = settlements.reduce((sum, settlement) => sum + (settlement.driverAmount || 0), 0);
-
   const renderEmptyState = (tab: DriverActivityTab) => {
     const theme = ACTIVITY_THEME[tab];
     const isTripTab = tab === 'trips';
@@ -209,10 +207,10 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
           <span className="material-symbols-outlined">{theme.icon}</span>
         </div>
         <h3 className="text-lg font-black text-slate-900 dark:text-white">
-          {isTripTab ? 'No trips yet' : 'No settlements yet'}
+          {tab === 'trips' ? 'No trips yet' : 'No settlements yet'}
         </h3>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          {isTripTab
+          {tab === 'trips'
             ? 'Completed and active ride history will show up here once owners start booking you.'
             : 'Confirmed payouts from completed rides will appear here as soon as payments are settled.'}
         </p>
@@ -419,17 +417,23 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
             </div>
           </div>
 
-          <div className="relative mt-4 grid grid-cols-2 gap-3">
-            <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.trips.metricSurface}`}>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Trips logged</p>
-              <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
-                {walletSummary?.totalTrips ?? trips.length}
+          <div className="relative mt-4 grid grid-cols-3 gap-2">
+            <div className={`rounded-2xl border px-2 py-3 ${ACTIVITY_THEME.trips.metricSurface}`}>
+              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Trips</p>
+              <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">
+                {walletSummary?.totalTrips ?? 0}
               </p>
             </div>
-            <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.settlements.metricSurface}`}>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Cleared balance</p>
-              <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
-                {formatCurrency(walletSummary?.currentBalance ?? totalSettled)}
+            <div className={`rounded-2xl border px-2 py-3 ${ACTIVITY_THEME.settlements.metricSurface}`}>
+              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Lifetime</p>
+              <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">
+                {formatCurrency(walletSummary?.totalEarned ?? 0)}
+              </p>
+            </div>
+            <div className={`rounded-2xl border px-2 py-3 ${ACTIVITY_THEME.settlements.metricSurface}`}>
+              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Balance</p>
+              <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">
+                {formatCurrency(walletSummary?.currentBalance ?? 0)}
               </p>
             </div>
           </div>

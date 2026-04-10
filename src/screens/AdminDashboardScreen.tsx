@@ -84,9 +84,9 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   const drivers = allKnownDrivers;
   const owners = allKnownOwners;
   
-  // Use server stats if available, fallback to local (though discouraged by contract)
-  const totalRevenue = stats?.totalEarnings || trips.reduce((acc, t) => t.status === 'COMPLETED' ? acc + t.amount : acc, 0);
-  const platformFees = totalRevenue * (settings.commission / 100);
+  // Use server stats strictly
+  const totalRevenue = stats?.totalEarnings || 0; // Accumulated revenue for the business
+  const platformFees = stats?.totalEarnings || 0; // Platform Total Commission
 
   // Profile Detail Sync
   useEffect(() => {
