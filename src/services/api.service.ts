@@ -88,9 +88,12 @@ async function request<T>(
      throw new Error(`Client is throttled. Retrying in ${remaining}s...`);
   }
 
-  const headers: Record<string, string> = {
-    'ngrok-skip-browser-warning': 'true',
-  };
+  const headers: Record<string, string> = {};
+  
+  // Skip ngrok warning only if using an ngrok URL (development only)
+  if (baseUrl.includes('ngrok-free.dev')) {
+    headers['ngrok-skip-browser-warning'] = 'true';
+  }
 
   // Automated Idempotency-Key for all mutation requests
   if (currentIdempotencyKey) {

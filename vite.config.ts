@@ -22,11 +22,10 @@ export default defineConfig(({ mode }) => {
     new Set([
       'localhost',
       '127.0.0.1',
-      'rodney-registrable-poutingly.ngrok-free.dev',
       frontendHost,
       ...extraAllowedHosts,
     ]),
-  );
+  ).filter(Boolean);
   const proxyConfig = {
     target: backendProxyTarget,
     changeOrigin: true,
