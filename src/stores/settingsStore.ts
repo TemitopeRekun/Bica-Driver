@@ -24,7 +24,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   loadSettings: async () => {
     set({ isLoading: true });
     try {
-      const settings = await api.get<SystemSettings>('/settings', false);
+      const settings = await api.get<SystemSettings>('/admin/settings', false);
       set({ settings, isLoading: false });
     } catch (e) {
       console.warn('Could not load settings, using defaults');
@@ -33,7 +33,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   },
 
   updateSettings: async (newSettings) => {
-    await api.patch('/settings', newSettings);
+    await api.patch('/admin/settings', newSettings);
     set({ settings: newSettings });
   },
 }));
