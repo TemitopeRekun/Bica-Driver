@@ -1,0 +1,385 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
+import { CapacitorService } from '@/services/CapacitorService';
+import { api } from '@/services/api.service';
+import { Config } from '@/services/Config';
+import { IMAGES } from '@/constants';
+import { UserProfile } from '@/types';
+import { sounds } from '@/services/SoundService';
+import { Geolocation } from '@capacitor/geolocation';
+
+const API_URL = Config.apiUrl;
+
+export interface DriverRideRequest {
+  id: string;
+  ownerName: string;
+  pickup: string;
+  destination: string;
+  distance: string;
+  price: string;
+  timeToPickup: string;
+  tripDuration: string;
+  avatar: string;
+  coords: [number, number];
+  destCoords: [number, number];
+}
+
+interface UseDriverRealtimeOptions {
+  user: UserProfile | null;
+  approvalStatus: string;
+  onOnlineStatusChange?: (isOnline: boolean) => void;
+  onForcedLogout?: (message?: string) => void;
+  onRideProgress?: (payload: { tripId: string; milestone: string }) => void;
+}
+
+const DEFAULT_DRIVER_POS: [number, number] = [6.4549, 3.3896];
+
+const isPermissionDeniedError = (error: unknown): boolean => {
+  const typedError = error as { code?: number | string; message?: string; cause?: { code?: number | string } };
+  const code = typedError?.code ?? typedError?.cause?.code;
+  if (code === 1 || code === 'PERMISSION_DENIED') return true;
+
+  const message = String(typedError?.message ?? error ?? '').toLowerCase();
+  return (
+    (message.includes('permission') && message.includes('denied')) ||
+    message.includes('location permission') ||
+    message.includes('not allowed')
+  );
+};
+
+export const useDriverRealtime = ({
+  user,
+  approvalStatus,
+  onOnlineStatusChange,
+  onForcedLogout,
+  onRideProgress,
+}: UseDriverRealtimeOptions) => {
+  const [isOnline, setIsOnline] = useState(Boolean(user?.isOnline));
+  const [isLocationRefreshing, setIsLocationRefreshing] = useState(false);
+  const [availabilityIssue, setAvailabilityIssue] = useState<string | null>(null);
+  const [driverPos, setDriverPos] = useState<[number, number]>(() =>
+    user?.currentLocation ? [user.currentLocation.lat, user.currentLocation.lng] : DEFAULT_DRIVER_POS,
+  );
+  const [liveRideRequests, setLiveRideRequests] = useState<DriverRideRequest[]>([]);
+
+  const socketRef = useRef<Socket | null>(null);
+  const trackingInterval = useRef<any>(null);
+  const isInitializing = useRef(false);
+  const updateOnlineState = useCallback(
+    (nextIsOnline: boolean) => {
+      setIsOnline(nextIsOnline);
+      onOnlineStatusChange?.(nextIsOnline);
+    },
+    [onOnlineStatusChange],
+  );
+
+  const registerDriverSocket = useCallback(() => {
+    if (!socketRef.current?.connected || !user?.id) return;
+    socketRef.current.emit('driver:register', { driverId: user.id });
+  }, [user?.id]);
+
+  const pushDriverLocation = useCallback(async (latitude: number, longitude: number) => {
+    if (!user?.id) return;
+
+    // A: Local UI update
+    setDriverPos([latitude, longitude]);
+
+    try {
+      // B: State persistence (canonical path)
+      await api.patch('/users/location', { lat: latitude, lng: longitude });
+
+      // C: Live broadcast (socket distribute state)
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('driverlocation', {
+          driverId: user.id,
+          lat: latitude,
+          lng: longitude,
+        });
+      }
+    } catch (error: any) {
+      if (error.message?.includes('401') || error.message?.includes('403')) {
+        onForcedLogout?.(error.message);
+      } else {
+        console.error('Failed to persist driver location:', error);
+      }
+    }
+  }, [user?.id, onForcedLogout]);
+
+  const enableOnline = useCallback(async () => {
+    setAvailabilityIssue(null);
+    // Get GPS position immediately when driver taps "Go Online"
+    // and send it together with the online status in one request
+    try {
+      const pos = await CapacitorService.getCurrentLocation();
+      if (pos?.coords) {
+        const { latitude, longitude } = pos.coords;
+        await api.patch('/users/online', {
+          isOnline: true,
+          lat: latitude,
+          lng: longitude,
+        });
+        setDriverPos([latitude, longitude]);
+      } else {
+        await api.patch('/users/online', { isOnline: true });
+      }
+    } catch {
+      // If GPS fails, still go online — the tracking interval will fix location
+      await api.patch('/users/online', { isOnline: true }).catch(() => {});
+    }
+    updateOnlineState(true);
+  }, [updateOnlineState]);
+
+  const disableOnline = useCallback(async () => {
+<<<<<<< HEAD
+    await api.patch('/users/online', { isOnline: false });
+    await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
+=======
+    try {
+      await api.patch('/users/online', { isOnline: false });
+      await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
+    } catch (error: any) {
+      if (error.message?.includes('401') || error.message?.includes('403')) {
+        onForcedLogout?.(error.message);
+      }
+    }
+>>>>>>> main
+    setAvailabilityIssue(null);
+    updateOnlineState(false);
+  }, [updateOnlineState, onForcedLogout]);
+
+  const removeRideRequest = useCallback((rideId: string) => {
+    setLiveRideRequests((prev) => prev.filter((ride) => ride.id !== rideId));
+  }, []);
+
+  const restoreRideRequest = useCallback((rideRequest: DriverRideRequest) => {
+    setLiveRideRequests((prev) => {
+      if (prev.some((ride) => ride.id === rideRequest.id)) return prev;
+      return [rideRequest, ...prev];
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setIsOnline(false);
+      setAvailabilityIssue(null);
+      setDriverPos(DEFAULT_DRIVER_POS);
+      setLiveRideRequests([]);
+      return;
+    }
+
+    setIsOnline(Boolean(user.isOnline));
+    if (user.currentLocation) {
+      setDriverPos([user.currentLocation.lat, user.currentLocation.lng]);
+    }
+  }, [user?.id, user?.isOnline, user?.currentLocation?.lat, user?.currentLocation?.lng]);
+
+  useEffect(() => {
+    if (approvalStatus !== 'APPROVED' || !user?.id || !API_URL) return;
+
+    socketRef.current = io(`${API_URL}/rides`, {
+      transports: ['websocket'],
+      autoConnect: false,
+    });
+
+    socketRef.current.on('connect', () => {
+      registerDriverSocket();
+    });
+
+    const handleIncomingRequest = (trip: any) => {
+      sounds.playNotification();
+      const rideRequest: DriverRideRequest = {
+        id: trip.id,
+        ownerName: trip.owner?.name || 'Car Owner',
+        pickup: trip.pickupAddress,
+        destination: trip.destAddress,
+        distance: `${trip.distanceKm?.toFixed(1)} km`,
+        price: trip.driverEarnings?.toLocaleString() || trip.amount?.toLocaleString(),
+        timeToPickup: `${trip.estimatedArrivalMins || 5}m to pickup`,
+        tripDuration: `${trip.estimatedMins || trip.fareBreakdown?.totalMins || 10}m trip`,
+        avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
+        coords: [trip.pickupLat, trip.pickupLng],
+        destCoords: [trip.destLat, trip.destLng],
+      };
+
+      setLiveRideRequests((prev) => {
+        if (prev.some((ride) => ride.id === trip.id)) return prev;
+        return [rideRequest, ...prev];
+      });
+    };
+
+    // Aligned with Integration Guide: Supporting both legacy and new events
+    socketRef.current.on('ride:assigned', handleIncomingRequest);
+    socketRef.current.on('ride:request', handleIncomingRequest);
+
+    socketRef.current.on('ride:cancelled', (data: any) => {
+      removeRideRequest(data.tripId || data.id);
+    });
+
+    // Boot-time Sync: Recover any pending or active requests after socket is ready
+    const bootSync = async () => {
+      try {
+        const trip = await api.get<any>('/rides/current');
+        if (!trip) return;
+
+        if (trip.status === 'PENDING_ACCEPTANCE' || trip.status === 'SEARCHING') {
+          // It's a pending request, add to the card queue
+          handleIncomingRequest(trip);
+        } else if (['ASSIGNED', 'IN_PROGRESS', 'ARRIVED'].includes(trip.status)) {
+          // It's an active trip, restore state
+          onRideProgress?.({ tripId: trip.id, milestone: trip.status.toLowerCase() });
+        }
+      } catch (err) {
+        console.warn('[DriverSync] Could not recover active ride:', err);
+      }
+    };
+    
+    bootSync();
+
+    socketRef.current.on('trip:status', (data: any) => {
+      // payload: { tripId, status, milestone }
+      if (data.status === 'CANCELLED' || data.status === 'COMPLETED') {
+        removeRideRequest(data.tripId);
+      }
+      if (data.milestone) {
+        onRideProgress?.(data);
+      }
+    });
+
+    return () => {
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
+  }, [approvalStatus, user?.id, registerDriverSocket]);
+
+  useEffect(() => {
+    if (approvalStatus !== 'APPROVED' || !user?.id || !socketRef.current) return;
+
+    if (!isOnline) {
+      clearInterval(trackingInterval.current);
+      if (socketRef.current?.connected) {
+        socketRef.current.disconnect();
+      }
+      return;
+    }
+
+    const initLocation = async () => {
+      if (isInitializing.current) return;
+      isInitializing.current = true;
+      
+      setIsLocationRefreshing(true);
+      setAvailabilityIssue(null);
+      try {
+        const pos = await CapacitorService.getCurrentLocation();
+        if (
+          !pos?.coords ||
+          typeof pos.coords.latitude !== 'number' ||
+          typeof pos.coords.longitude !== 'number'
+        ) {
+          throw new Error('Live location was unavailable.');
+        }
+
+        if (!socketRef.current?.connected) {
+          socketRef.current.connect();
+        } else {
+          registerDriverSocket();
+        }
+
+        const { latitude, longitude } = pos.coords;
+        // Send isOnline + lat + lng in ONE atomic request — not two separate calls
+        await api.patch('/users/online', {
+          isOnline: true,
+          lat: latitude,
+          lng: longitude,
+        });
+        setDriverPos([latitude, longitude]);
+        setAvailabilityIssue(null);
+<<<<<<< HEAD
+      } catch (error) {
+        console.error('Initial location failed:', error);
+
+=======
+      } catch (error: any) {
+        console.error('Initial location failed:', error);
+
+        if (error.message?.includes('401') || error.message?.includes('403')) {
+          onForcedLogout?.(error.message);
+          return;
+        }
+
+>>>>>>> main
+        let permissionDenied = isPermissionDeniedError(error);
+        if (!permissionDenied) {
+          try {
+            const permissions = await Geolocation.checkPermissions();
+            permissionDenied =
+              permissions.location === 'denied' || permissions.coarseLocation === 'denied';
+          } catch {
+            // If permission state cannot be determined, treat as transient.
+          }
+        }
+
+        if (permissionDenied) {
+          await api.patch('/users/online', { isOnline: false }).catch(() => {});
+          await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
+          if (socketRef.current?.connected) {
+            socketRef.current.disconnect();
+          }
+          setAvailabilityIssue(
+            'Location permission is disabled. Enable location permission and go online again.',
+          );
+          updateOnlineState(false);
+        } else {
+          // Transient issues (timeouts/network hiccups) should not force drivers offline.
+          if (!socketRef.current?.connected) {
+            socketRef.current.connect();
+          }
+          // Keep driver online — next heartbeat interval will resend coords
+          await api.patch('/users/online', { isOnline: true }).catch(() => {});
+          setAvailabilityIssue(
+            'We could not refresh live location yet. You are still online and retries will continue automatically.',
+          );
+        }
+      } finally {
+        setIsLocationRefreshing(false);
+        isInitializing.current = false;
+      }
+    };
+
+    initLocation();
+
+    trackingInterval.current = setInterval(async () => {
+      try {
+        const pos = await CapacitorService.getCurrentLocation();
+        if (pos) {
+          const { latitude, longitude } = pos.coords;
+          // Heartbeat: keep online flag fresh + broadcast location in one request
+          await api.patch('/users/online', {
+            isOnline: true,
+            lat: latitude,
+            lng: longitude,
+          });
+          setDriverPos([latitude, longitude]);
+          setAvailabilityIssue(null);
+        }
+      } catch (error) {
+        console.error('Location interval failed:', error);
+      }
+    }, 10000);
+
+    return () => {
+      clearInterval(trackingInterval.current);
+    };
+  }, [isOnline, approvalStatus, user?.id]);
+
+  return {
+    isOnline,
+    isLocationRefreshing,
+    availabilityIssue,
+    driverPos,
+    liveRideRequests,
+    enableOnline,
+    disableOnline,
+    removeRideRequest,
+    restoreRideRequest,
+  };
+};

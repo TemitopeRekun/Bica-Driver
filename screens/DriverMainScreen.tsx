@@ -53,11 +53,7 @@ const CountUpTimer: React.FC = () => {
 // ... existing imports
 
 const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
-<<<<<<< HEAD
-  user, onOpenProfile, onOpenActivity, onBack, onUpdateEarnings, onUpdateOnlineStatus, onRideComplete
-=======
   user, onOpenProfile, onOpenActivity, onBack, onForcedLogout, onUpdateEarnings, onUpdateOnlineStatus, onRideComplete
->>>>>>> main
 }) => {
   const { toast } = useToast();
   const [activeRide, setActiveRide] = useState<DriverRideRequest | null>(null);
@@ -97,12 +93,9 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
       setWalletSummary(summary);
     } catch (error: any) {
       console.error('Failed to load wallet summary:', error);
-<<<<<<< HEAD
-=======
       if (error.message?.includes('401') || error.message?.includes('403')) {
         onForcedLogout(error.message);
       }
->>>>>>> main
     }
   };
 
@@ -601,25 +594,8 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
               {isOnline ? (
                 liveRideRequests.length > 0 ? (
                   liveRideRequests.map(req => (
-<<<<<<< HEAD
-                    <div key={req.id} className="bg-input-dark/40 p-5 rounded-3xl border border-white/5 flex flex-col gap-4 shadow-lg animate-slide-up">
-
-                      {/* Owner info */}
-                      <div className="flex items-center gap-4">
-                        <img
-                          src={req.avatar}
-                          className="w-12 h-12 rounded-full object-cover ring-2 ring-white/10"
-                          alt=""
-                        />
-                        <div className="flex-1">
-                          <h4 className="font-bold text-white text-base">{req.ownerName}</h4>
-                          <p className="text-slate-400 text-xs mt-0.5">Verified Car Owner</p>
-                        </div>
-                        {/* Count-up timer */}
-                        <CountUpTimer />
-=======
                     <div key={req.id} className="bg-input-dark/40 p-5 rounded-3xl border border-white/5 flex flex-col gap-5 shadow-2xl animate-slide-up relative overflow-hidden group">
-                      
+
                       {/* Top Header: Owner and Earnings */}
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
@@ -640,7 +616,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                           <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-0.5">Est. Earnings</p>
                           <p className="text-2xl font-black text-primary leading-none">₦{req.price}</p>
                         </div>
->>>>>>> main
                       </div>
 
                       {/* Route Summary */}
@@ -689,7 +664,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
 
                       {/* Expiry Timer Bar (Visual Polish) */}
                       <div className="absolute bottom-0 left-0 h-1 bg-primary/20 w-full overflow-hidden">
-                         <div className="h-full bg-primary animate-shrink-width origin-left"></div>
+                        <div className="h-full bg-primary animate-shrink-width origin-left"></div>
                       </div>
                     </div>
                   ))
@@ -704,17 +679,10 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                       <div className="absolute inset-0 rounded-full border border-primary/30 animate-ping"></div>
                       <div className="absolute inset-0 rounded-full border border-primary/20 animate-ping [animation-delay:0.5s]"></div>
                     </div>
-<<<<<<< HEAD
-                    <div>
-                      <h3 className="text-lg font-bold text-white mb-1">Waiting for owner requests</h3>
-                      <p className="text-slate-400 text-xs font-medium max-w-[200px] mx-auto leading-relaxed">
-                        Stay online and keep your location fresh. Owners who select you will appear here instantly.
-=======
                     <div className="space-y-2">
                       <h3 className="text-xl font-black text-white">Searching for Rides</h3>
                       <p className="text-slate-400 text-sm font-medium max-w-[260px] mx-auto leading-relaxed">
                         You're live and visible to nearby owners. Stay on this screen to catch the latest requests.
->>>>>>> main
                       </p>
                     </div>
                   </div>
@@ -725,20 +693,13 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                   <div className="w-24 h-24 rounded-full bg-slate-800/30 flex items-center justify-center border border-slate-700/50 shadow-inner">
                     <span className="material-symbols-outlined text-5xl text-slate-600">power_settings_new</span>
                   </div>
-<<<<<<< HEAD
-                  <div>
-                    <h3 className="text-lg font-bold text-white mb-1">You're Offline</h3>
-                    <p className="text-slate-400 text-xs font-medium max-w-[200px] mx-auto leading-relaxed">
-                      Switch to online mode above to start receiving owner requests.
-=======
                   <div className="space-y-2">
                     <h3 className="text-xl font-black text-white">You're Offline</h3>
                     <p className="text-slate-500 text-sm font-medium max-w-[240px] mx-auto leading-relaxed">
                       Your status is hidden from owners. Go online to start receiving ride requests.
->>>>>>> main
                     </p>
                   </div>
-                  <button 
+                  <button
                     onClick={toggleOnline}
                     className="px-8 py-4 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 active:scale-95 transition-all flex items-center gap-2"
                   >
@@ -751,7 +712,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
             </>
           ) : (
             <div className="flex flex-col gap-6 animate-slide-up">
-              
+
               {/* Timeline Header */}
               <TripProgressTimeline milestone={ridePhase} />
 
@@ -827,22 +788,22 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
               {/* Dynamic Action Area */}
               <div className="space-y-4">
                 {ridePhase === 'pickup' && (
-                  <button 
-                    onClick={handleArrival} 
+                  <button
+                    onClick={handleArrival}
                     className="w-full bg-primary text-white font-black py-5 rounded-3xl shadow-2xl shadow-primary/30 active:scale-95 transition-all flex items-center justify-center gap-3 text-lg"
                   >
                     <span className="material-symbols-outlined">location_on</span>
                     I Have Arrived
                   </button>
                 )}
-                
+
                 {ridePhase === 'arrived' && (
                   <div className="flex flex-col gap-3">
                     <div className="bg-green-500/10 p-4 rounded-2xl border border-green-500/20 text-center">
                       <p className="text-xs font-bold text-green-500">Wait for the owner before starting the trip</p>
                     </div>
-                    <button 
-                      onClick={handleStartTrip} 
+                    <button
+                      onClick={handleStartTrip}
                       className="w-full bg-green-500 text-white font-black py-5 rounded-3xl shadow-2xl shadow-green-500/30 active:scale-95 transition-all flex items-center justify-center gap-3 text-lg"
                     >
                       <span className="material-symbols-outlined">play_arrow</span>
@@ -850,7 +811,7 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                     </button>
                   </div>
                 )}
-                
+
                 {ridePhase === 'trip' && (
                   <div className="flex flex-col gap-4">
                     {/* Premium Live Timer */}
@@ -881,12 +842,12 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
               </div>
               {ridePhase === 'completed' && (
                 <div className="flex flex-col gap-6 animate-scale-in">
-                  
+
                   {/* Victory Header */}
                   <div className="text-center py-8 bg-primary/5 rounded-[2.5rem] border border-primary/10 relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full -mr-16 -mt-16 blur-3xl"></div>
                     <div className="absolute bottom-0 left-0 w-24 h-24 bg-primary/20 rounded-full -ml-12 -mb-12 blur-2xl"></div>
-                    
+
                     <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center text-white mx-auto mb-4 shadow-[0_0_40px_rgba(34,197,94,0.4)]">
                       <span className="material-symbols-outlined text-4xl filled">verified</span>
                     </div>
@@ -980,108 +941,6 @@ const DriverMainScreen: React.FC<DriverMainScreenProps> = ({
                       The owner has been notified. Earnings are typically reflected in your wallet instantly.
                     </p>
                   </div>
-<<<<<<< HEAD
-
-                  {/* Fare breakdown */}
-                  <div className="bg-input-dark/50 rounded-2xl border border-white/10 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-white/5">
-                      <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Trip Summary</p>
-                    </div>
-
-                    <div className="px-4 py-3 space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 text-sm">Base fare</span>
-                        <span className="text-white font-bold text-sm">
-                          {formatCurrency(fareBreakdown.baseFare ?? 0)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 text-sm">Distance charge</span>
-                        <span className="text-white font-bold text-sm">
-                          {formatCurrency(fareBreakdown.distanceComponent ?? 0)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 text-sm">Time charge</span>
-                        <span className="text-white font-bold text-sm">
-                          {formatCurrency(fareBreakdown.timeComponent ?? 0)}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center text-xs text-slate-500">
-                        <span>
-                          Actual: {fareBreakdown.actualMins ?? fareBreakdown.totalMins ?? 0} mins
-                        </span>
-                        <span>
-                          Estimated: {fareBreakdown.estimatedMins ?? 0} mins
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Divider */}
-                    <div className="mx-4 border-t border-white/10"></div>
-
-                    <div className="px-4 py-3 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 text-sm">Total fare</span>
-                        <span className="text-white font-bold">
-                          {formatCurrency(fareBreakdown.finalFare)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-400 text-sm">BICA commission</span>
-                        <span className="text-slate-400 text-sm">
-                          -{formatCurrency(fareBreakdown.commissionAmount)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center pt-2 border-t border-white/10">
-                        <span className="text-primary font-black text-sm uppercase tracking-wide">Your earnings</span>
-                        <span className="text-primary font-black text-xl">
-                          {formatCurrency(fareBreakdown.driverEarnings)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-center text-slate-400 text-xs">
-                    Owner has been notified to make payment
-                  </p>
-
-                  <button
-                    onClick={() => {
-                      setActiveRide(null);
-                      setRidePhase('pickup');
-                      setFareBreakdown(null);
-                      setTripTimer(0);
-                    }}
-                    className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold active:scale-95 transition-all"
-                  >
-                    Back to Requests
-                  </button>
-                </div>
-              )}
-
-              {ridePhase === 'completed' && !fareBreakdown && (
-                <div className="w-full py-6 text-center bg-green-500/10 border-2 border-green-500/30 rounded-[2rem] animate-scale-in flex flex-col items-center gap-2">
-                  <div className="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center text-white mb-2 shadow-lg shadow-green-500/40">
-                    <span className="material-symbols-outlined text-3xl filled">verified</span>
-                  </div>
-                  <p className="text-green-500 text-xl font-black">Trip Success!</p>
-                  <button
-                    onClick={() => {
-                      setActiveRide(null);
-                      setRidePhase('pickup');
-                      setFareBreakdown(null);
-                      setTripTimer(0);
-                    }}
-                    className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold active:scale-95 transition-all"
-                  >
-                    Back to Requests
-                  </button>
-=======
->>>>>>> main
                 </div>
               )}
             </div>

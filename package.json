@@ -9,17 +9,28 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/app": "^8.1.0",
     "@capacitor/camera": "^6.0.0",
     "@capacitor/cli": "^6.0.0",
+    "@capacitor/core": "^8.3.0",
     "@capacitor/geolocation": "^6.0.0",
     "@capacitor/haptics": "^6.0.0",
+    "@capacitor/push-notifications": "^8.0.3",
     "@capacitor/status-bar": "^6.0.0",
     "@google/genai": "^1.40.0",
     "@ionic/pwa-elements": "^3.4.0",
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/react-window": "^1.8.8",
     "localforage": "^1.10.0",
+    "lucide-react": "^1.7.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "socket.io-client": "^4.8.3"
+    "react-router-dom": "^7.14.0",
+    "react-window": "^2.2.7",
+    "socket.io-client": "^4.8.3",
+    "tailwindcss": "^4.2.2",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

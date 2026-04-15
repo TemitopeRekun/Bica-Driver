@@ -10,61 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
   
-  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <script>
-    tailwind.config = {
-      darkMode: "class",
-      theme: {
-        extend: {
-          colors: {
-            "primary": "#045828",
-            "accent": "#f17606",
-            "background-light": "#f6fbf8",
-            "background-dark": "#032e02",
-            "surface-light": "#ffffff",
-            "surface-dark": "#044422",
-            "input-dark": "#055a29",
-            "text-secondary": "#a2b4a8",
-          },
-          fontFamily: {
-            "display": ["Plus Jakarta Sans", "sans-serif"]
-          },
-          borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "3xl": "1.5rem", "full": "9999px" },
-          animation: {
-            'fade-in': 'fadeIn 0.4s ease-out forwards',
-            'slide-up': 'slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-            'scale-in': 'scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
-            'soft-pulse': 'softPulse 2s infinite',
-            'ping-slow': 'ping 3s cubic-bezier(0, 0, 0.2, 1) infinite',
-            'spin-slow': 'spin 3s linear infinite',
-            'pop-in': 'popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
-          },
-          keyframes: {
-            popIn: {
-              '0%': { opacity: '0', transform: 'scale(0.5)' },
-              '100%': { opacity: '1', transform: 'scale(1)' },
-            },
-            fadeIn: {
-              '0%': { opacity: '0' },
-              '100%': { opacity: '1' },
-            },
-            slideUp: {
-              '0%': { transform: 'translateY(20px)', opacity: '0' },
-              '100%': { transform: 'translateY(0)', opacity: '1' },
-            },
-            scaleIn: {
-              '0%': { transform: 'scale(0.9)', opacity: '0' },
-              '100%': { transform: 'scale(1)', opacity: '1' },
-            },
-            softPulse: {
-              '0%, 100%': { opacity: '1', transform: 'scale(1)' },
-              '50%': { opacity: '0.8', transform: 'scale(0.98)' },
-            }
-          }
-        },
-      },
-    }
-  </script>
+
   <style>
     body {
       min-height: 100vh;
@@ -101,28 +47,11 @@
       border: none !important;
     }
   </style>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "@capacitor/cli": "https://esm.sh/@capacitor/cli@^6.0.0",
-    "@capacitor/haptics": "https://esm.sh/@capacitor/haptics@^6.0.0",
-    "@capacitor/geolocation": "https://esm.sh/@capacitor/geolocation@^6.0.0",
-    "@capacitor/status-bar": "https://esm.sh/@capacitor/status-bar@^6.0.0",
-    "@capacitor/camera": "https://esm.sh/@capacitor/camera@^6.0.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.40.0",
-    "@ionic/pwa-elements/loader": "https://esm.sh/@ionic/pwa-elements@^3.4.0/loader"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
+
+<link rel="stylesheet" href="/src/index.css">
 </head>
 <body class="bg-[#032e02] text-slate-900 dark:text-white font-display antialiased">
   <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
+  <script type="module" src="/src/index.tsx"></script>
 </body>
 </html>
