@@ -14,16 +14,16 @@ const AdminDashboardPage: React.FC = () => {
   const { logout } = useAuthStore();
   const {
     adminUsers, usersMeta, adminTrips, tripsMeta, adminPendingDrivers, adminStats,
-    adminPendingPayments, pendingPaymentsMeta, 
+    adminPendingPayments, pendingPaymentsMeta,
     adminPaymentHistory, paymentHistoryMeta,
     adminSettings, adminDashboardLoading, adminDashboardError, lastUpdated,
-    loadAdminDashboard, loadUsersPage, loadTripsPage, 
+    loadAdminDashboard, loadUsersPage, loadTripsPage,
     loadPendingPaymentsPage, loadPaymentHistoryPage
   } = useAdminDashboard();
   const { currentUser } = useAuthStore();
 
   const handleNewRegistration = React.useCallback(() => {
-    loadAdminDashboard().catch(() => {});
+    loadAdminDashboard().catch(() => { });
   }, [loadAdminDashboard]);
 
   // Hook up real-time monitoring
@@ -41,7 +41,7 @@ const AdminDashboardPage: React.FC = () => {
   }, [loadAdminDashboard]);
 
   const handlePageChange = (section: 'users' | 'trips' | 'pending' | 'history', page: number) => {
-    switch(section) {
+    switch (section) {
       case 'users': loadUsersPage(page); break;
       case 'trips': loadTripsPage(page); break;
       case 'pending': loadPendingPaymentsPage(page); break;
@@ -93,7 +93,7 @@ const AdminDashboardPage: React.FC = () => {
   };
 
   return (
-    <AdminDashboardScreen 
+    <AdminDashboardScreen
       users={adminUsers || []}
       usersMeta={usersMeta}
       trips={adminTrips || []}
@@ -104,7 +104,7 @@ const AdminDashboardPage: React.FC = () => {
       pendingPaymentsMeta={pendingPaymentsMeta}
       paymentHistory={adminPaymentHistory || []}
       paymentHistoryMeta={paymentHistoryMeta}
-      settings={adminSettings || { commission: 15, baseFare: 500, timeRate: 50, pricePerKm: 200, autoApprove: true }}
+      settings={adminSettings || { commission: 25, baseFare: 500, timeRate: 50, pricePerKm: 100, autoApprove: false }}
       isLoading={adminDashboardLoading}
       error={adminDashboardError}
       lastUpdated={lastUpdated}
@@ -115,7 +115,7 @@ const AdminDashboardPage: React.FC = () => {
       onForcedLogout={() => logout()}
       onRetry={() => loadAdminDashboard()}
       onBack={() => navigate('/')}
-      onSimulate={() => {}}
+      onSimulate={() => { }}
       onPageChange={handlePageChange}
     />
   );

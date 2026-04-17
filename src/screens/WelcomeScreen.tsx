@@ -85,23 +85,33 @@ const WelcomeScreen: React.FC = () => {
           <p className="text-[11px] text-gray-500 dark:text-slate-500 font-medium tracking-tight">
             Safety first. Read our <span className="text-accent font-bold cursor-pointer hover:underline">Guidelines</span>.
           </p>
-          <div className="flex gap-4 items-center">
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex gap-4 items-center">
+              <a 
+                href="https://sammy001-ship.github.io/Bica-Driver-Web/terms.html" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[10px] text-gray-400 hover:text-primary transition-colors hover:underline"
+              >
+                Terms of Service
+              </a>
+              <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-slate-700"></span>
+              <a 
+                href="https://sammy001-ship.github.io/Bica-Driver-Web/privacy.html" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-[10px] text-gray-400 hover:text-primary transition-colors hover:underline"
+              >
+                Privacy Policy
+              </a>
+            </div>
             <a 
-              href="https://sammy001-ship.github.io/Bica-Driver-Web/terms.html" 
+              href="https://www.bicadriver.com" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-[10px] text-gray-400 hover:text-primary transition-colors hover:underline"
+              className="text-[10px] text-primary/60 hover:text-primary transition-colors font-bold tracking-tight"
             >
-              Terms of Service
-            </a>
-            <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-slate-700"></span>
-            <a 
-              href="https://sammy001-ship.github.io/Bica-Driver-Web/privacy.html" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-[10px] text-gray-400 hover:text-primary transition-colors hover:underline"
-            >
-              Privacy Policy
+              www.bicadriver.com
             </a>
           </div>
         </div>

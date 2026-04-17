@@ -85,7 +85,7 @@ const SupportChatbot: React.FC<SupportChatbotProps> = ({ user }) => {
           setMessages(prev => [...prev, {
             id: (Date.now() + 1).toString(),
             role: 'model',
-            text: "I'm currently offline. Please contact support via email at support@bicadrive.app."
+            text: "I'm currently offline. Please contact support via email at support@bicadriver.com or call +234 903 898 7333."
           }]);
           setIsLoading(false);
         }, 1000);

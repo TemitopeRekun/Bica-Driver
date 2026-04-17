@@ -263,6 +263,38 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
               </a>
             </div>
           </div>
+
+          <div className="mt-4 px-2">
+            <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2 px-2">Support & Feedback</h3>
+            <div className="flex flex-col gap-1">
+              <a 
+                href="mailto:support@bicadriver.com"
+                className="flex items-center justify-between w-full p-4 rounded-xl bg-surface-light dark:bg-surface-dark hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-text-secondary group-hover:text-primary transition-colors">mail</span>
+                  <div className="flex flex-col">
+                    <span className="font-medium text-sm text-left">Email Support</span>
+                    <span className="text-[10px] text-text-secondary text-left">support@bicadriver.com</span>
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-text-secondary" style={{ fontSize: '18px' }}>chevron_right</span>
+              </a>
+              <a 
+                href="tel:+2349038987333"
+                className="flex items-center justify-between w-full p-4 rounded-xl bg-surface-light dark:bg-surface-dark hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-text-secondary group-hover:text-primary transition-colors">call</span>
+                  <div className="flex flex-col">
+                    <span className="font-medium text-sm text-left">Call Center</span>
+                    <span className="text-[10px] text-text-secondary text-left">+234 903 898 7333</span>
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-text-secondary" style={{ fontSize: '18px' }}>chevron_right</span>
+              </a>
+            </div>
+          </div>
           <button onClick={onLogout} className="mt-4 w-full py-4 rounded-xl bg-red-500/10 text-red-500 font-bold text-base hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2 active:scale-[0.98]">
             <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>logout</span>
             Log Out
