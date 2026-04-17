@@ -233,6 +233,36 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
             </div>
             <span className="material-symbols-outlined text-text-secondary" style={{ fontSize: '20px' }}>chevron_right</span>
           </button>
+
+          <div className="mt-4 px-2">
+            <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2 px-2">Legal</h3>
+            <div className="flex flex-col gap-1">
+              <a 
+                href="https://sammy001-ship.github.io/Bica-Driver-Web/terms.html" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center justify-between w-full p-4 rounded-xl bg-surface-light dark:bg-surface-dark hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-text-secondary group-hover:text-primary transition-colors">gavel</span>
+                  <span className="font-medium text-sm">Terms and Conditions</span>
+                </div>
+                <span className="material-symbols-outlined text-text-secondary" style={{ fontSize: '18px' }}>open_in_new</span>
+              </a>
+              <a 
+                href="https://sammy001-ship.github.io/Bica-Driver-Web/privacy.html" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center justify-between w-full p-4 rounded-xl bg-surface-light dark:bg-surface-dark hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-text-secondary group-hover:text-primary transition-colors">shield</span>
+                  <span className="font-medium text-sm">Privacy Policy</span>
+                </div>
+                <span className="material-symbols-outlined text-text-secondary" style={{ fontSize: '18px' }}>open_in_new</span>
+              </a>
+            </div>
+          </div>
           <button onClick={onLogout} className="mt-4 w-full py-4 rounded-xl bg-red-500/10 text-red-500 font-bold text-base hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2 active:scale-[0.98]">
             <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>logout</span>
             Log Out

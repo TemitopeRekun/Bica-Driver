@@ -81,10 +81,29 @@ const WelcomeScreen: React.FC = () => {
         >
           Sign In
         </button>
-        <div className="flex items-center justify-center gap-4 mt-1">
+        <div className="flex flex-col items-center justify-center gap-3 mt-1">
           <p className="text-[11px] text-gray-500 dark:text-slate-500 font-medium tracking-tight">
             Safety first. Read our <span className="text-accent font-bold cursor-pointer hover:underline">Guidelines</span>.
           </p>
+          <div className="flex gap-4 items-center">
+            <a 
+              href="https://sammy001-ship.github.io/Bica-Driver-Web/terms.html" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-[10px] text-gray-400 hover:text-primary transition-colors hover:underline"
+            >
+              Terms of Service
+            </a>
+            <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-slate-700"></span>
+            <a 
+              href="https://sammy001-ship.github.io/Bica-Driver-Web/privacy.html" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-[10px] text-gray-400 hover:text-primary transition-colors hover:underline"
+            >
+              Privacy Policy
+            </a>
+          </div>
         </div>
       </div>
     </div>
