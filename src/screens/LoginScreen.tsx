@@ -58,11 +58,10 @@ const LoginScreen: React.FC = () => {
         navigate('/owner');
       }
     } catch (error: any) {
-      if (error.message?.includes('404')) {
+      if (error.status === 404) {
         addToast('No account found with this email. Would you like to create one?', 'warning');
-      } else if (error.message?.includes('401')) {
-        addToast('The password you entered is incorrect. Please try again.', 'error');
       } else {
+        // Use the context-aware message from our API service (Prettified)
         addToast(error.message || "We're having trouble logging you in. Please check your connection.", 'error');
       }
     } finally {

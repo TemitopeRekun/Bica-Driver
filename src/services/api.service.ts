@@ -150,11 +150,41 @@ async function request<T>(
         return request<T>(method, path, body, requiresAuth, options, retryCount + 1, currentIdempotencyKey);
       }
 
+  // Prettify common backend technical jargon into user-friendly copy
+  const prettifyBackendMessage = (raw: string): string | null => {
+    if (!raw) return null;
+    
+    const friendlyMap: Record<string, string> = {
+      'Invalid credentials': 'The email or password you entered is incorrect. Please try again.',
+      'User not found': 'We couldn\'t find an account with that email address.',
+      'An account with this email already exists': 'This email is already registered. Did you mean to log in instead?',
+      'Account suspended. Please contact support.': 'Your account has been suspended. Please contact support for assistance.',
+      'Your driver account is pending admin approval.': 'Your driver account is still pending admin approval. We will notify you once it\'s ready!',
+    };
+
+    // Return mapped friendly message or null to fallback to generic handler
+    return friendlyMap[raw] || null;
+  };
+
   // Human-friendly error normalization
   const normalizeErrorMessage = (status: number, originalMessage: string) => {
+    // Priority 1: Check if the backend message is one we want to "Prettify" (e.g. Invalid credentials)
+    const friendlyMessage = prettifyBackendMessage(originalMessage);
+    if (friendlyMessage) return friendlyMessage;
+
+    // Priority 2: Use the original message if it's not technical-sounding (non-empty)
+    if (originalMessage && originalMessage.length > 3 && !originalMessage.includes('Request failed')) {
+      return originalMessage;
+    }
+
+    // Priority 3: Status-based fallbacks
     switch (status) {
-      case 401: return 'Your session has expired. Please log in again to continue.';
-      case 403: return 'You don\'t have permission to perform this action. If you believe this is an error, please contact support.';
+      case 401: 
+        if (path.includes('/auth/login') || !requiresAuth) {
+          return 'Invalid email or password. Please try again.';
+        }
+        return 'Your session has expired. Please log in again to continue.';
+      case 403: return originalMessage || 'You don\'t have permission to perform this action.';
       case 404: return 'We couldn\'t find what you were looking for. It might have been moved or deleted.';
       case 409: 
         if (originalMessage.includes('idempotency')) return 'This request is already being processed. Please wait a moment.';
