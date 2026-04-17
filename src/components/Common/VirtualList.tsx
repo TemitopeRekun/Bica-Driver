@@ -1,7 +1,9 @@
-import * as ReactWindow from 'react-window';
+import * as ReactWindowNamespace from 'react-window';
 
 // Handle CommonJS/ESM interop for react-window in Vite
-const List = ((ReactWindow as any).default?.FixedSizeList || (ReactWindow as any).FixedSizeList) as any;
+// Using bracket notation to bypass Rollup's static analysis for non-standard CJS exports
+const ReactWindow: any = ReactWindowNamespace;
+const List = ReactWindow.FixedSizeList || ReactWindow['default']?.FixedSizeList || ReactWindow['FixedSizeList'];
 
 interface VirtualListProps<T> {
   items: T[];
