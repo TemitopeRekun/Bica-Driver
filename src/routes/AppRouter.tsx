@@ -16,6 +16,7 @@ import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 import AdminDashboardPage from '../screens/AdminDashboardPage';
 import OwnerActivityScreen from '../screens/OwnerActivityScreen';
 import LoadingScreen from '../screens/LoadingScreen';
+import PaymentCompleteScreen from '../screens/PaymentCompleteScreen';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: UserRole[] }> = ({ children, roles }) => {
   const { currentUser, isAuthenticated, isInitializing } = useAuthStore();
@@ -147,5 +148,10 @@ export const router = createHashRouter([
         <ProfileWrapper />
       </ProtectedRoute>
     ),
+  },
+  // Payment redirect handler (public — screen handles its own auth guard)
+  {
+    path: '/payment/complete',
+    element: <PaymentCompleteScreen />,
   },
 ]);

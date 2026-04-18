@@ -111,6 +111,8 @@ export const useRideManager = () => {
     try {
       const response = await api.post<any>(`/payments/initiate/${tripId}`);
       if (response.checkoutUrl) {
+        // Stash tripId so PaymentCompleteScreen can poll status on return
+        localStorage.setItem('bica_pending_payment_tripId', tripId);
         // Redirect to Monnify Sandbox/Live checkout
         window.location.href = response.checkoutUrl;
       }

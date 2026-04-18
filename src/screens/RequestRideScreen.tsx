@@ -102,39 +102,10 @@ const RequestRideScreen: React.FC = () => {
         return; // Start fresh for the new user
       }
 
-      const urlParams = new URLSearchParams(window.location.search);
-      const isReturningFromPayment = urlParams.has('paymentReference') || urlParams.has('transactionReference');
-      
-      if (isReturningFromPayment) {
-        setIsInitiatingPayment(true);
-      }
-
       try {
-        const trip = await syncCurrentRide();
-        
-        if (isReturningFromPayment && trip?.id) {
-          const statusResult = await getPaymentStatus(trip.id);
-          
-          if (statusResult.paymentStatus === 'PAID') {
-            addToast('Payment verified successfully! Thank you.', 'success');
-            // Refresh trip data to reflect PAID status
-            await syncCurrentRide();
-          } else if (statusResult.paymentStatus === 'PARTIALLY_PAID') {
-            const remaining = statusResult.amountRemaining || 0;
-            addToast(`Partial payment of ₦${statusResult.amountPaid?.toLocaleString()} received. Please settle the remaining balance of ₦${remaining.toLocaleString()}.`, 'warning');
-            await syncCurrentRide();
-          } else {
-            addToast('Payment verification pending. It will be updated automatically once confirmed.', 'info');
-          }
-        }
+        await syncCurrentRide();
       } catch (e) {
         console.error('Initial ride sync failed:', e);
-      } finally {
-        setIsInitiatingPayment(false);
-        // Clear the query params to prevent re-triggering on refresh
-        if (isReturningFromPayment) {
-           window.history.replaceState({}, document.title, window.location.pathname);
-        }
       }
     };
     initSync();
