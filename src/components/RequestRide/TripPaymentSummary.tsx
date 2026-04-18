@@ -84,10 +84,10 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                 <span className="text-sm font-black text-slate-900 dark:text-white">{fareBreakdown?.actualMins || fareBreakdown?.totalMins || 0} mins</span>
              </div>
 
-             {isDriver ? (
+              {isDriver ? (
                <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex justify-between items-center opacity-70">
-                    <span className="text-xs font-bold text-slate-500 uppercase">Customer Paid</span>
+                    <span className="text-xs font-bold text-slate-500 uppercase">Trip Fare</span>
                     <span className="text-sm font-black text-slate-900 dark:text-white">₦{(fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -103,8 +103,8 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
              )}
           </div>
 
-          {/* Payment Status Alert for Owner */}
-          {!isDriver && (paymentMessage || paymentStatus === 'SUCCESS' || paymentStatus === 'PAID' || paymentStatus === 'PARTIALLY_PAID') && (
+          {/* Payment Status Alert */}
+          {(paymentMessage || paymentStatus === 'SUCCESS' || paymentStatus === 'PAID' || paymentStatus === 'PARTIALLY_PAID') ? (
             <div className={`p-4 rounded-2xl flex gap-3 items-start border-2 animate-in slide-in-from-top-4 duration-500 ${
               (paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
                 ? 'bg-green-500/5 border-green-500/20 text-green-600' 
@@ -117,11 +117,20 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
               </span>
               <p className="text-[10px] font-black uppercase leading-relaxed">
                 {(paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
-                  ? 'Trip settlement confirmed successfully!' 
+                  ? (isDriver ? 'Payment received and Wallet updated!' : 'Trip settlement confirmed successfully!')
                   : paymentMessage}
               </p>
             </div>
-          )}
+          ) : (
+            isDriver && (
+              <div className="p-4 rounded-2xl flex gap-3 items-start border-2 border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-white/5 text-slate-500 animate-pulse">
+                <span className="material-symbols-outlined text-base">hourglass_empty</span>
+                <p className="text-[10px] font-black uppercase leading-relaxed">
+                  Awaiting customer payment confirmation...
+                </p>
+              </div>
+            )
+          )}    )}
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-3">

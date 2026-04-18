@@ -56,6 +56,12 @@ const DriverMainScreen: React.FC = () => {
        else if (m === 'assigned') setRideMilestone('assigned');
        else if (m === 'completed') setRideMilestone('completed');
     },
+    onPaymentUpdated: (payload) => {
+       if (payload.paymentStatus === 'PAID') {
+          addToast('Payment received! The customer has settled the fare.', 'success');
+          setCompletedTripSummary((prev: any) => prev ? { ...prev, paymentStatus: 'PAID' } : null);
+       }
+    }
   });
 
   // Boot-time Sync: Recover active trip if page refreshed
@@ -279,6 +285,8 @@ const DriverMainScreen: React.FC = () => {
               finalFare: completedTripSummary.finalFare || completedTripSummary.amount || completedTripSummary.fareBreakdown?.finalFare || 0,
               driverEarnings: completedTripSummary.driverEarnings || completedTripSummary.fareBreakdown?.driverEarnings || 0
             }}
+            paymentStatus={completedTripSummary.paymentStatus || 'UNPAID'}
+            paymentMessage={completedTripSummary.paymentStatus === 'PAID' ? 'Payment confirmed! Thank you.' : ''}
             onClose={() => {
                setCompletedTripSummary(null);
                setRideState('IDLE');

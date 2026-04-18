@@ -30,6 +30,7 @@ interface UseDriverRealtimeOptions {
   onOnlineStatusChange?: (isOnline: boolean) => void;
   onForcedLogout?: (message?: string) => void;
   onRideProgress?: (payload: { tripId: string; milestone: string }) => void;
+  onPaymentUpdated?: (payload: { tripId: string; paymentStatus: string; paidAt?: string; amount?: number; message?: string }) => void;
 }
 
 const DEFAULT_DRIVER_POS: [number, number] = [6.4549, 3.3896];
@@ -53,6 +54,7 @@ export const useDriverRealtime = ({
   onOnlineStatusChange,
   onForcedLogout,
   onRideProgress,
+  onPaymentUpdated,
 }: UseDriverRealtimeOptions) => {
   const [isOnline, setIsOnline] = useState(Boolean(user?.isOnline));
   const [isLocationRefreshing, setIsLocationRefreshing] = useState(false);
@@ -237,6 +239,13 @@ export const useDriverRealtime = ({
       }
       if (data.milestone) {
         onRideProgress?.(data);
+      }
+    });
+
+    socketRef.current.on('payment:updated', (data: any) => {
+      onPaymentUpdated?.(data);
+      if (data.paymentStatus === 'PAID') {
+        sounds.playNotification();
       }
     });
 
