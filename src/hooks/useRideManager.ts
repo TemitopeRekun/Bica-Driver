@@ -33,9 +33,12 @@ export const useRideManager = () => {
     try {
       const trip = await api.get<any>('/rides/current');
       // Access current state via store to avoid dependency loop
-      const currentState = useRideStore.getState().rideState;
+      const { rideState: currentState, setLastUserId } = useRideStore.getState();
 
-      if (trip) {
+      if (trip && currentUser?.id) {
+        // Record who this trip belongs to for persistence security
+        setLastUserId(currentUser.id);
+        
         setCurrentTripId(trip.id);
         setDriverInfo({
           ...trip.driver,
@@ -61,9 +64,12 @@ export const useRideManager = () => {
       }
       return trip;
     } catch (e) {
+      console.error('Ride sync failed (server error):', e);
+      // Resilience: If the server is 500ing, we don't wipe local state blindly. 
+      // We keep the current UI but return null to the caller.
       return null;
     }
-  }, [setCurrentTripId, setDriverInfo, setRideState, setCompletedTripData, resetRide]);
+  }, [setCurrentTripId, setDriverInfo, setRideState, setCompletedTripData, resetRide, currentUser?.id]);
 
   const fetchAvailableDrivers = useCallback(async (pickup: LocationData | null, transmission: string) => {
     if (!pickup?.lat || !pickup?.lon) {

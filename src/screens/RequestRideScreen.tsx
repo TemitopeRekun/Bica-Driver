@@ -93,6 +93,15 @@ const RequestRideScreen: React.FC = () => {
   // Auto-Sync on Mount to recover any active ride
   useEffect(() => {
     const initSync = async () => {
+      // 🛡️ [SENIOR_FIX] Session Identity Validation
+      // Check if the persisted ride context belongs to the current user
+      const { lastUserId, resetRide: clearStaleRide } = useRideStore.getState();
+      if (lastUserId && currentUser?.id && lastUserId !== currentUser.id) {
+        console.warn(`🕵️ Session mismatch detected (${lastUserId} !== ${currentUser.id}). Isolating accounts...`);
+        clearStaleRide();
+        return; // Start fresh for the new user
+      }
+
       const urlParams = new URLSearchParams(window.location.search);
       const isReturningFromPayment = urlParams.has('paymentReference') || urlParams.has('transactionReference');
       
