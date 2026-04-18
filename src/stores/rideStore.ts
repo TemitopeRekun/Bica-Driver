@@ -1,27 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import localforage from 'localforage';
 import { Trip, LocationData, UserProfile } from '../types';
-
-// Configure localforage for production reliability
-localforage.config({
-  name: 'BicaDriver',
-  storeName: 'ride_state'
-});
-
-// Custom storage bridge for localforage
-const forageStorage = {
-  getItem: async (name: string) => {
-    const value = await localforage.getItem(name);
-    return value ? JSON.stringify(value) : null;
-  },
-  setItem: async (name: string, value: string) => {
-    await localforage.setItem(name, JSON.parse(value));
-  },
-  removeItem: async (name: string) => {
-    await localforage.removeItem(name);
-  },
-};
+import { rideForageStorage } from '@/utils/storage';
 
 export type RideState = 'IDLE' | 'SEARCHING' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'SCHEDULED';
 export type RideMilestone = 'requested' | 'scheduled' | 'assigned' | 'arrived' | 'in_progress' | 'completed';
@@ -93,7 +73,7 @@ export const useRideStore = create<RideStateData>()(
     }),
     {
       name: 'ride-storage',
-      storage: createJSONStorage(() => forageStorage),
+      storage: createJSONStorage(() => rideForageStorage),
       // Only persist critical live state, skip volatile data like availableDrivers
       partialize: (state) => ({
         rideState: state.rideState,

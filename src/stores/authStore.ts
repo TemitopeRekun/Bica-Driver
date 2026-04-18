@@ -1,9 +1,10 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { UserProfile } from '@/types';
 import { clearToken, saveToken, api } from '@/services/api.service';
 import { telemetry } from '@/services/TelemetryService';
 import localforage from 'localforage';
+import { authForageStorage } from '@/utils/storage';
 
 interface AuthState {
   currentUser: UserProfile | null;
@@ -35,6 +36,10 @@ export const useAuthStore = create<AuthState>()(
       setInitializing: (val) => set({ isInitializing: val }),
 
       login: async (user, token) => {
+        // Clear any stale ride data that may belong to a previous user on this device
+        const { useRideStore } = await import('./rideStore');
+        useRideStore.getState().resetRide();
+
         saveToken(token);
         await localforage.setItem('bicadriver_current_user', user);
         set({ currentUser: user, isAuthenticated: true });
@@ -67,6 +72,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'bica-auth-storage',
+      storage: createJSONStorage(() => authForageStorage),
       partialize: (state) => ({ currentUser: state.currentUser, isAuthenticated: state.isAuthenticated }),
     }
   )
