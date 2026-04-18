@@ -12,7 +12,7 @@ interface TripPaymentSummaryProps {
     totalAmount?: number;
     driverEarnings?: number;
   } | null;
-  paymentStatus?: 'UNPAID' | 'SUCCESS' | 'FAILED' | 'PENDING' | 'PAID' | 'PARTIALLY_PAID';
+  paymentStatus?: 'UNPAID' | 'SUCCESS' | 'FAILED' | 'PENDING' | 'PAID' | 'PARTIALLY_PAID' | 'CANCELLED';
   paymentMessage?: string | null;
   onPayNow?: () => void;
   onClose: () => void;
@@ -39,14 +39,22 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
         <div className="px-6 py-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
           <div>
             <h3 className="text-xl font-black text-slate-900 dark:text-white">
-              {isDriver ? 'Trip Earnings' : (paymentStatus === 'SUCCESS' ? 'Trip Paid!' : 'Trip Result')}
+              {isDriver ? 'Trip Earnings' : (
+                (paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
+                  ? 'Trip Paid!' 
+                  : (paymentStatus === 'FAILED' ? 'Payment Failed' : (paymentStatus === 'CANCELLED' ? 'Payment Cancelled' : 'Trip Result'))
+              )}
             </h3>
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-              {isDriver ? 'Performance Summary' : (paymentStatus === 'SUCCESS' ? 'Thank you for riding' : 'Final Settlement')}
+              {isDriver ? 'Performance Summary' : (
+                (paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
+                  ? 'Thank you for riding' 
+                  : (paymentStatus === 'FAILED' || paymentStatus === 'CANCELLED' ? 'Please try again' : 'Final Settlement')
+              )}
             </p>
           </div>
           {/* Only allow closing if driver OR if owner has paid. Prevents "mistaken dismiss" before payment. */}
-          {(isDriver || paymentStatus === 'SUCCESS') && (
+          {(isDriver || paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') && (
             <button 
               onClick={onClose}
               className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors animate-in fade-in"
@@ -134,7 +142,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-3">
-            {!isDriver && paymentStatus !== 'SUCCESS' && onPayNow && (
+            {!isDriver && paymentStatus !== 'SUCCESS' && paymentStatus !== 'PAID' && onPayNow && (
               <button 
                 onClick={onPayNow}
                 disabled={isInitiatingPayment}
@@ -145,15 +153,17 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                 ) : (
                   <span className="material-symbols-outlined">payments</span>
                 )}
-                {isInitiatingPayment ? 'VERIFYING WITH MONNIFY...' : 'PAY NGN ' + (fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0).toLocaleString()}
+                {isInitiatingPayment 
+                  ? 'VERIFYING WITH MONNIFY...' 
+                  : (paymentStatus === 'FAILED' || paymentStatus === 'CANCELLED' ? 'RETRY PAYMENT: NGN ' : 'PAY NGN ') + (fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0).toLocaleString()}
               </button>
             )}
 
-            {(isDriver || paymentStatus === 'SUCCESS') && (
+            {(isDriver || paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') && (
               <button 
                 onClick={onClose}
                 className={`w-full font-black py-4 rounded-2xl hover:opacity-90 transition-all uppercase tracking-widest text-xs animate-in zoom-in duration-300 ${
-                  paymentStatus === 'SUCCESS' 
+                  (paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
                     ? 'bg-primary text-white shadow-lg shadow-primary/20' 
                     : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900'
                 }`}
@@ -162,7 +172,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
               </button>
             )}
             
-            {!isDriver && paymentStatus !== 'SUCCESS' && (
+            {!isDriver && paymentStatus !== 'SUCCESS' && paymentStatus !== 'PAID' && (
               <p className="text-center text-[8px] font-black text-slate-400 uppercase tracking-widest opacity-60">
                 Payment is required to complete engagement
               </p>

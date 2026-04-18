@@ -17,7 +17,7 @@ export type TripStatus =
   | 'SCHEDULED'
   | 'DECLINED';
 
-export type PaymentStatus = 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'PARTIALLY_PAID';
+export type PaymentStatus = 'UNPAID' | 'PENDING' | 'PAID' | 'FAILED' | 'PARTIALLY_PAID' | 'CANCELLED';
 
 export interface UserProfile {
   id: string;

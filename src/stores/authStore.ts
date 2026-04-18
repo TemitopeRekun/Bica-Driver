@@ -57,6 +57,10 @@ export const useAuthStore = create<AuthState>()(
         
         telemetry.info('User logged out successfully');
         
+        // 🛡️ Clear persistent ride state to prevent data leakage between users
+        const { useRideStore } = await import('./rideStore');
+        useRideStore.getState().resetRide();
+
         // Ensure the screen is cleared and sockets in hooks are disconnected by navigation
         window.location.hash = '/login';
       },
