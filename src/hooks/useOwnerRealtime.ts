@@ -90,6 +90,9 @@ export const useOwnerRealtime = ({
     ownerSocketRef.current = io(`${API_URL}/rides`, {
       transports: ['websocket'],
       autoConnect: false,
+      auth: {
+        token: localStorage.getItem('bica_token'),
+      },
     });
 
     const connectTimer = setTimeout(() => {

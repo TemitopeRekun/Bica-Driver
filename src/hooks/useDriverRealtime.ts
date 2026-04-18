@@ -176,6 +176,9 @@ export const useDriverRealtime = ({
     socketRef.current = io(`${API_URL}/rides`, {
       transports: ['websocket'],
       autoConnect: false,
+      auth: {
+        token: localStorage.getItem('bica_token'),
+      },
     });
 
     socketRef.current.on('connect', () => {

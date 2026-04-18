@@ -130,7 +130,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                 </p>
               </div>
             )
-          )}    )}
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-3">
