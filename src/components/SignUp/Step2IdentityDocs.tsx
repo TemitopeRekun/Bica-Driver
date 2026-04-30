@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CameraSource, CameraDirection } from '@capacitor/camera';
-import { snapAndUpload } from '@/utils/photoUtils';
+import { CapacitorService } from '@/services/CapacitorService';
+import { api } from '@/services/api.service';
 
 interface StepProps {
   formData: any;
@@ -13,18 +14,33 @@ interface StepProps {
 const Step2IdentityDocs: React.FC<StepProps> = ({ formData, errors, updateField, onNext, isDriver }) => {
   const [isCapturing, setIsCapturing] = useState<'license' | 'selfie' | 'nin' | null>(null);
 
-  const handleCapture = async (type: 'license' | 'selfie' | 'nin', source: CameraSource, direction: CameraDirection) => {
-    try {
-      const url = await snapAndUpload(source, direction, 'registration', (status) => {
-        if (status === 'CAPTURING' || status === 'UPLOADING') setIsCapturing(type);
-        else setIsCapturing(null);
+  const handleCapture = (type: 'license' | 'selfie' | 'nin', source: CameraSource, direction: CameraDirection) => {
+    if (isCapturing) return;
+
+    // 🛡️ Trigger camera immediately to preserve User Gesture context
+    CapacitorService.takePhoto(source, direction)
+      .then(async (base64) => {
+        if (!base64) return;
+
+        setIsCapturing(type);
+        try {
+          const { url } = await api.post<{ url: string }>('/rides/upload-photo', { 
+            image: base64, 
+            folder: 'registration' 
+          });
+          
+          if (url) {
+            updateField(`${type}Image`, url);
+          }
+        } catch (error) {
+          console.error('Upload failed', error);
+        } finally {
+          setIsCapturing(null);
+        }
+      })
+      .catch((error) => {
+        console.error('Capture failed', error);
       });
-      if (url) {
-        updateField(`${type}Image`, url);
-      }
-    } catch (error) {
-      console.error('Capture failed', error);
-    }
   };
 
   if (isDriver) {
