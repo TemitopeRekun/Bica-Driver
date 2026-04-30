@@ -109,7 +109,7 @@ const DriverMainScreen: React.FC = () => {
   };
 
   const handleCaptureSelfie = () => {
-    if (isUploading || selfieImage) return;
+    if (isUploading) return;
     
     console.log('Attempting to trigger camera...');
     
@@ -309,10 +309,20 @@ const DriverMainScreen: React.FC = () => {
                 <h3 className="text-xl font-bold text-white">Security Check</h3>
                 <p className="text-sm text-slate-400 text-center">Take a quick selfie to confirm identity.</p>
                 <div 
-                   onClick={() => !selfieImage && handleCaptureSelfie()} 
-                   className={`size-48 rounded-full bg-white/5 border-2 border-dashed border-primary/40 flex items-center justify-center overflow-hidden transition-all active:scale-95 cursor-pointer ${!selfieImage ? 'hover:bg-primary/5 hover:border-primary' : ''}`}
+                   onClick={handleCaptureSelfie} 
+                   className={`group relative size-48 rounded-full bg-white/5 border-2 border-dashed border-primary/40 flex items-center justify-center overflow-hidden transition-all active:scale-95 cursor-pointer hover:bg-primary/5 hover:border-primary`}
                 >
-                   {selfieImage ? <img src={selfieImage} className="w-full h-full object-cover" alt="" /> : <span className="material-symbols-outlined text-4xl text-primary animate-pulse">face_retouching_natural</span>}
+                   {selfieImage ? (
+                      <>
+                        <img src={selfieImage} className="w-full h-full object-cover" alt="" />
+                        <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                           <span className="material-symbols-outlined text-white text-3xl mb-1">cached</span>
+                           <span className="text-white text-[10px] font-black uppercase tracking-widest">Retake</span>
+                        </div>
+                      </>
+                   ) : (
+                      <span className="material-symbols-outlined text-4xl text-primary animate-pulse">face_retouching_natural</span>
+                   )}
                 </div>
                 {selfieImage ? (
                    <button onClick={confirmSelfieAndRide} disabled={isUploading} className="w-full bg-primary py-4 rounded-2xl text-white font-bold flex items-center justify-center gap-2">
