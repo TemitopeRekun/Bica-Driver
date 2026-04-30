@@ -43,6 +43,8 @@ export const useRideManager = () => {
         setDriverInfo({
           ...trip.driver,
           avatar: trip.driver?.avatarUrl || IMAGES.DRIVER_CARD,
+          otp: trip.otp,
+          acceptanceImageUrl: trip.acceptanceImageUrl,
           timeAway: trip.estimatedArrivalMins || 5,
           tripId: trip.id,
         });

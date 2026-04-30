@@ -64,36 +64,56 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
 
       {/* 🛡️ Verification Panel */}
       {driverInfo.otp && (rideMilestone === 'assigned' || rideMilestone === 'arrived') && (
-        <div className="mb-6 bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-             <div className="size-10 rounded-xl bg-primary/20 flex items-center justify-center">
-               <span className="material-symbols-outlined text-primary text-xl">verified_user</span>
+        <div className="mb-6 group relative overflow-hidden bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-[2rem] p-5 shadow-inner">
+          <div className="absolute top-0 right-0 p-3 opacity-20">
+            <span className="material-symbols-outlined text-4xl text-primary animate-pulse">shield_lock</span>
+          </div>
+          <div className="flex items-center gap-5">
+             <div className="size-14 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+               <span className="material-symbols-outlined text-white text-2xl">verified_user</span>
              </div>
              <div>
-               <p className="text-[10px] font-bold text-primary uppercase tracking-widest leading-none mb-1">Start Code</p>
-               <p className="text-xl font-black tracking-[0.2em]">{driverInfo.otp}</p>
+               <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] leading-none mb-1.5">Secure Start Code</p>
+               <div className="flex items-baseline gap-1">
+                 <p className="text-3xl font-black tracking-[0.25em] text-slate-900 dark:text-white">{driverInfo.otp}</p>
+                 <span className="material-symbols-outlined text-primary text-sm filled">verified</span>
+               </div>
              </div>
           </div>
-          <p className="text-[10px] font-bold text-slate-400 italic max-w-[100px] text-right leading-tight">Share this with driver to start trip</p>
+          <div className="mt-4 pt-4 border-t border-primary/10">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest text-center">Share this code with chauffeur to authorize trip</p>
+          </div>
         </div>
       )}
 
-      <div className="flex items-center gap-4 mb-6">
-        <div className="relative">
-          <img src={driverInfo.avatar || IMAGES.DRIVER_CARD} className="w-16 h-16 rounded-2xl object-cover ring-2 ring-primary/20" alt="Driver" />
+      <div className="flex items-center gap-5 mb-6">
+        <div className="relative group/avatar">
+          <img 
+            src={driverInfo.avatar || IMAGES.DRIVER_CARD} 
+            className="w-20 h-20 rounded-[1.5rem] object-cover ring-4 ring-slate-100 dark:ring-white/5 transition-transform group-hover/avatar:scale-105" 
+            alt="Driver" 
+          />
           {driverInfo.acceptanceImageUrl && (
-            <div className="absolute -bottom-1 -right-1 size-8 rounded-lg border-2 border-surface-light dark:border-surface-dark overflow-hidden shadow-lg">
-              <img src={driverInfo.acceptanceImageUrl} className="w-full h-full object-cover" title="Driver Verification Selfie" alt="" />
+            <div 
+              className="absolute -bottom-1 -right-1 size-16 rounded-2xl border-4 border-surface-light dark:border-surface-dark overflow-hidden shadow-2xl ring-2 ring-primary bg-slate-900 cursor-zoom-in group-hover/avatar:scale-110 transition-transform"
+              onClick={() => window.open(driverInfo.acceptanceImageUrl, '_blank')}
+            >
+              <img src={driverInfo.acceptanceImageUrl} className="w-full h-full object-cover" title="Tap to expand verification selfie" alt="" />
+              <div className="absolute top-0 right-0 bg-primary px-1 rounded-bl-lg">
+                <span className="material-symbols-outlined text-[8px] text-white font-black">face</span>
+              </div>
             </div>
           )}
         </div>
-        <div className="flex-1">
-          <h3 className="text-lg font-bold leading-tight">{driverInfo.name}</h3>
-          <p className="text-sm text-slate-500">{driverInfo.car} • {driverInfo.plate}</p>
-          <div className="flex items-center gap-1 mt-1">
-            <span className="material-symbols-outlined text-yellow-500 text-sm filled">star</span>
-            <span className="text-xs font-bold">{driverInfo.rating}</span>
-            <span className="text-xs text-slate-400">({driverInfo.trips} trips)</span>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xl font-black leading-tight truncate">{driverInfo.name}</h3>
+          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{driverInfo.car} • <span className="text-slate-900 dark:text-slate-300">{driverInfo.plate}</span></p>
+          <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-0.5 rounded-lg border border-yellow-500/20">
+              <span className="material-symbols-outlined text-yellow-500 text-[14px] filled">star</span>
+              <span className="text-[11px] font-black text-yellow-700 dark:text-yellow-500">{driverInfo.rating}</span>
+            </div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{driverInfo.trips} Trips</span>
           </div>
         </div>
         <div className="flex flex-col gap-2">
