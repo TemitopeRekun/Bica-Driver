@@ -224,9 +224,13 @@ export const CapacitorService = {
   },
 
   async takePhoto(source: CameraSource = CameraSource.Prompt, direction: CameraDirection = CameraDirection.Rear): Promise<string | null> {
+    // 🛡️ If on Web, skip Capacitor UI which often fails without PWA elements
+    if (!Capacitor.isNativePlatform()) {
+      return this.useWebCameraFallback(direction);
+    }
+
     try {
       const image = await Camera.getPhoto({
-        // Keep base64 payloads reasonably small for backend upload limits.
         quality: 80,
         allowEditing: true,
         resultType: CameraResultType.Base64,
@@ -235,31 +239,41 @@ export const CapacitorService = {
       });
       return `data:image/jpeg;base64,${image.base64String}`;
     } catch (e) {
-      console.warn('Capacitor Camera failed or cancelled. Using web fallback...', e);
-      return new Promise((resolve) => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        if (source === CameraSource.Camera) {
-          (input as any).capture = direction === CameraDirection.Front ? 'user' : 'environment';
-        }
-        
-        input.onchange = (event: any) => {
-          const file = event.target.files[0];
-          if (!file) {
-            resolve(null);
-            return;
-          }
-          const reader = new FileReader();
-          reader.onload = (e: any) => {
-            resolve(e.target.result as string);
-          };
-          reader.onerror = () => resolve(null);
-          reader.readAsDataURL(file);
-        };
-        input.click();
-      });
+      console.warn('Capacitor Camera failed. Falling back...', e);
+      return this.useWebCameraFallback(direction);
     }
+  },
+
+  async useWebCameraFallback(direction: CameraDirection): Promise<string | null> {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      
+      // 🛡️ This attribute is key: it tells mobile browsers to open the CAMERA directly
+      if (direction === CameraDirection.Front) {
+        input.setAttribute('capture', 'user');
+      } else {
+        input.setAttribute('capture', 'environment');
+      }
+      
+      input.onchange = (event: any) => {
+        const file = event.target.files[0];
+        if (!file) {
+          resolve(null);
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e: any) => resolve(e.target.result as string);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      };
+
+      // Ensure the input is not garbage collected before the dialog opens
+      document.body.appendChild(input);
+      input.click();
+      document.body.removeChild(input);
+    });
   },
 
   async triggerHaptic() {
