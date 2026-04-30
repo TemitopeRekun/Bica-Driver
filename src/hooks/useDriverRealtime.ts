@@ -31,6 +31,7 @@ interface UseDriverRealtimeOptions {
   onOnlineStatusChange?: (isOnline: boolean) => void;
   onForcedLogout?: (message?: string) => void;
   onRideProgress?: (payload: { tripId: string; milestone: string }) => void;
+  onRideCancelled?: (payload: { tripId: string; message?: string }) => void;
   onPaymentUpdated?: (payload: { tripId: string; paymentStatus: string; paidAt?: string; amount?: number; message?: string }) => void;
 }
 
@@ -55,6 +56,7 @@ export const useDriverRealtime = ({
   onOnlineStatusChange,
   onForcedLogout,
   onRideProgress,
+  onRideCancelled,
   onPaymentUpdated,
 }: UseDriverRealtimeOptions) => {
   const [isOnline, setIsOnline] = useState(Boolean(user?.isOnline));
@@ -213,7 +215,9 @@ export const useDriverRealtime = ({
     socketRef.current.on('ride:request', handleIncomingRequest);
 
     socketRef.current.on('ride:cancelled', (data: any) => {
-      removeRideRequest(data.tripId || data.id);
+      const tripId = data.tripId || data.id;
+      removeRideRequest(tripId);
+      onRideCancelled?.({ tripId, message: data.message });
     });
 
     // Boot-time Sync: Recover any pending or active requests after socket is ready
@@ -238,8 +242,9 @@ export const useDriverRealtime = ({
 
     socketRef.current.on('trip:status', (data: any) => {
       // payload: { tripId, status, milestone }
-      if (data.status === 'CANCELLED' || data.status === 'COMPLETED') {
-        removeRideRequest(data.tripId);
+      if (data.status === 'CANCELLED') {
+        removeRideRequest(data.tripId || data.id);
+        onRideCancelled?.({ tripId: data.tripId || data.id, message: data.message });
       }
       if (data.milestone) {
         onRideProgress?.(data);

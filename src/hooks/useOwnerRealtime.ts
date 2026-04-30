@@ -114,6 +114,8 @@ export const useOwnerRealtime = ({
       onDriverAcceptedRef.current({
         driver: {
           ...data.driver,
+          car: `${data.carModel || ''} ${data.carYear || ''}`.trim() || 'BICA Chauffeur',
+          plate: data.plate || '---',
           avatar: data.driver?.avatarUrl || IMAGES.DRIVER_CARD,
           otp: data.otp,
           acceptanceImageUrl: data.acceptanceImageUrl || data.driver?.acceptanceImageUrl

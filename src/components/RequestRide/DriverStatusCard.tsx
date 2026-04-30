@@ -1,6 +1,7 @@
 import React from 'react';
 import RideStoryTimeline from './RideStoryTimeline';
 import { IMAGES } from '../../constants';
+import { LocationService } from '@/services/LocationService';
 
 interface DriverStatusCardProps {
   rideState: string;
@@ -17,6 +18,8 @@ interface DriverStatusCardProps {
     otp?: string;
     acceptanceImageUrl?: string;
   };
+  trackedDriverPos?: [number, number] | null;
+  pickup?: { lat: number; lon: number } | null;
   onCall: () => void;
   onChat: () => void;
   onTrack: () => void;
@@ -36,7 +39,29 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   onSOS,
   onCancel,
   onArrived,
+  trackedDriverPos,
+  pickup,
 }) => {
+  const isDark = document.documentElement.classList.contains('dark');
+  
+  // 🧭 Real-time ETA Logic
+  const getDynamicTimeAway = () => {
+    if (!trackedDriverPos || !pickup || rideMilestone !== 'assigned') {
+      return driverInfo.timeAway;
+    }
+    
+    // Simple 2km/min average speed for city driving (rough estimate)
+    // 60 km/h = 1 km/min
+    const distance = LocationService.calculateDistance(
+      trackedDriverPos[0], trackedDriverPos[1],
+      pickup.lat, pickup.lon
+    );
+    
+    const minutes = Math.max(Math.ceil(distance * 2), 1);
+    return minutes;
+  };
+
+  const timeAway = getDynamicTimeAway();
   return (
     <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-slide-up">
       <RideStoryTimeline milestone={rideMilestone} lastUpdate={lastMilestoneUpdate} />
@@ -55,7 +80,7 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
           </span>
         </div>
         <span className="text-xs font-bold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-500">
-          {rideMilestone === 'assigned' ? driverInfo.timeAway + ' mins away' : 
+          {rideMilestone === 'assigned' ? timeAway + ' mins away' : 
            rideMilestone === 'arrived' ? 'At pickup location' : 
            (rideMilestone === 'in_progress' || rideMilestone === 'inprogress' || rideMilestone === 'trip') ? 'Heading to Destination' : 
            rideMilestone === 'completed' ? 'Arrived at destination' : ''}

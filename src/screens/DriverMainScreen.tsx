@@ -62,6 +62,13 @@ const DriverMainScreen: React.FC = () => {
        else if (m === 'assigned') setRideMilestone('assigned');
        else if (m === 'completed') setRideMilestone('completed');
     },
+    onRideCancelled: (payload) => {
+       if (payload.tripId === activeRide?.id) {
+         addToast(payload.message || 'Ride was cancelled by the owner.', 'info');
+         setActiveRide(null);
+         setRideMilestone('requested');
+       }
+    },
     onPaymentUpdated: (payload) => {
        if (payload.paymentStatus === 'PAID') {
           addToast('Payment received! Fare settled.', 'success');

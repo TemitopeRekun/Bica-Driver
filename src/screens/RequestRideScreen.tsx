@@ -165,11 +165,12 @@ const RequestRideScreen: React.FC = () => {
 
        // Update driver info with new security fields if they arrive via socket
        if (payload.otp || payload.acceptanceImageUrl) {
-         setDriverInfo((prev: any) => ({
-           ...prev,
-           otp: payload.otp || prev?.otp,
-           acceptanceImageUrl: payload.acceptanceImageUrl || prev?.acceptanceImageUrl
-         }));
+         const { driverInfo: currentInfo, setDriverInfo: updateInfo } = useRideStore.getState();
+         updateInfo({
+           ...(currentInfo || {}),
+           otp: payload.otp || currentInfo?.otp,
+           acceptanceImageUrl: payload.acceptanceImageUrl || currentInfo?.acceptanceImageUrl
+         });
        }
     },
     onPaymentUpdated: (data) => {
@@ -457,6 +458,8 @@ const RequestRideScreen: React.FC = () => {
              onTrack={() => {}}
              onSOS={() => {}}
              onCancel={handleCancelRide}
+             trackedDriverPos={trackedDriverPos}
+             pickup={pickup}
            />
         )}
 
