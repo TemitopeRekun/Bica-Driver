@@ -85,9 +85,16 @@ export const useSignUpForm = (initialRole: UserRole) => {
 
     setIsLoading(true);
     try {
-      // Transform data for API to match backend contract
+      // Transform data for API to match backend contract exactly
+      // 🛡️ We destructure to pull out UI-specific names and avoid "extra field" errors (400)
+      const { 
+        licenseImage, selfieImage, ninImage, 
+        carType, carModel, carYear,
+        ...rest 
+      } = formData;
+
       const basePayload = {
-        ...formData,
+        ...rest,
         gender: formData.gender?.toUpperCase(),
         transmission: formData.transmission?.toUpperCase(),
       };
@@ -97,14 +104,16 @@ export const useSignUpForm = (initialRole: UserRole) => {
       if (isDriver) {
         finalPayload = {
           ...basePayload,
-          licenseImageUrl: formData.licenseImage,
-          selfieImageUrl: formData.selfieImage,
-          ninImageUrl: formData.ninImage,
+          licenseImageUrl: licenseImage,
+          selfieImageUrl: selfieImage,
+          ninImageUrl: ninImage,
         };
       } else {
         finalPayload = {
           ...basePayload,
-          carType: formData.carType?.toUpperCase(),
+          carType: carType?.toUpperCase(),
+          carModel,
+          carYear,
         };
       }
 
