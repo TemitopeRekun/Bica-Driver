@@ -224,11 +224,6 @@ export const CapacitorService = {
   },
 
   async takePhoto(source: CameraSource = CameraSource.Prompt, direction: CameraDirection = CameraDirection.Rear): Promise<string | null> {
-    // 🛡️ If on Web, skip Capacitor UI which often fails without PWA elements
-    if (!Capacitor.isNativePlatform()) {
-      return this.useWebCameraFallback(direction);
-    }
-
     try {
       const image = await Camera.getPhoto({
         quality: 80,
