@@ -285,8 +285,11 @@ const DriverMainScreen: React.FC = () => {
              <div className="w-full max-w-sm bg-surface-dark rounded-[2rem] p-8 flex flex-col items-center gap-6">
                 <h3 className="text-xl font-bold text-white">Security Check</h3>
                 <p className="text-sm text-slate-400 text-center">Take a quick selfie to confirm identity.</p>
-                <div onClick={() => !selfieImage && handleCaptureSelfie()} className="size-48 rounded-full bg-white/5 border-2 border-dashed border-primary/40 flex items-center justify-center overflow-hidden">
-                   {selfieImage ? <img src={selfieImage} className="w-full h-full object-cover" alt="" /> : <span className="material-symbols-outlined text-4xl text-primary">face_retouching_natural</span>}
+                <div 
+                   onClick={() => !selfieImage && handleCaptureSelfie()} 
+                   className={`size-48 rounded-full bg-white/5 border-2 border-dashed border-primary/40 flex items-center justify-center overflow-hidden transition-all active:scale-95 cursor-pointer ${!selfieImage ? 'hover:bg-primary/5 hover:border-primary' : ''}`}
+                >
+                   {selfieImage ? <img src={selfieImage} className="w-full h-full object-cover" alt="" /> : <span className="material-symbols-outlined text-4xl text-primary animate-pulse">face_retouching_natural</span>}
                 </div>
                 {selfieImage ? (
                    <button onClick={confirmSelfieAndRide} disabled={isUploading} className="w-full bg-primary py-4 rounded-2xl text-white font-bold flex items-center justify-center gap-2">
