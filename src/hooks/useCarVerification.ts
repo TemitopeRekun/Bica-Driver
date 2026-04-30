@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { CameraSource, CameraDirection } from '@capacitor/camera';
-import { snapAndUpload } from '@/utils/photoUtils';
+import { CapacitorService } from '@/services/CapacitorService';
+import { api } from '@/services/api.service';
 import { useUIStore } from '@/stores/uiStore';
 
 export type CarSide = 'FRONT' | 'RIGHT' | 'BACK' | 'LEFT';
@@ -14,29 +15,38 @@ export const useCarVerification = (tripId: string) => {
 
   const sides: CarSide[] = ['FRONT', 'RIGHT', 'BACK', 'LEFT'];
 
-  const handleSnap = useCallback(async (side: CarSide) => {
-    try {
-      const url = await snapAndUpload(
-        CameraSource.Camera, 
-        CameraDirection.Rear, 
-        `condition/${tripId}`,
-        (status) => setIsCapturing(status === 'CAPTURING' || status === 'UPLOADING')
-      );
-      
-      if (url) {
-        setCarPhotos(prev => ({ ...prev, [side]: url }));
-        // Auto-advance to next side if available
-        const currentIndex = sides.indexOf(side);
-        if (currentIndex < sides.length - 1) {
-          setConditionStep(sides[currentIndex + 1]);
+  const handleSnap = useCallback((side: CarSide) => {
+    if (isCapturing) return;
+
+    // 🛡️ Call takePhoto immediately to preserve User Gesture context
+    CapacitorService.takePhoto(CameraSource.Camera, CameraDirection.Rear)
+      .then(async (base64) => {
+        if (!base64) return;
+
+        setIsCapturing(true);
+        try {
+          const { url } = await api.post<{ url: string }>('/rides/upload-photo', { 
+            image: base64, 
+            folder: `condition/${tripId}/${side.toLowerCase()}` 
+          });
+          
+          setCarPhotos(prev => ({ ...prev, [side]: url }));
+          
+          // Auto-advance to next side if available
+          const currentIndex = sides.indexOf(side);
+          if (currentIndex < sides.length - 1) {
+            setConditionStep(sides[currentIndex + 1]);
+          }
+        } catch (error: any) {
+          addToast('Failed to upload photo. Please try again.', 'error');
+        } finally {
+          setIsCapturing(false);
         }
-      }
-    } catch (error: any) {
-      if (error.message !== 'Photo capture cancelled') {
-        addToast('Failed to upload photo. Please try again.', 'error');
-      }
-    }
-  }, [tripId, addToast, sides]);
+      })
+      .catch(() => {
+        addToast('Could not open camera.', 'error');
+      });
+  }, [tripId, addToast, sides, isCapturing]);
 
   const reset = useCallback(() => {
     setConditionStep('FRONT');

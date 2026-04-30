@@ -257,22 +257,36 @@ export const CapacitorService = {
         input.setAttribute('capture', 'environment');
       }
       
+      const cleanup = () => {
+        if (input.parentNode) {
+          document.body.removeChild(input);
+        }
+      };
+
       input.onchange = (event: any) => {
         const file = event.target.files[0];
         if (!file) {
+          cleanup();
           resolve(null);
           return;
         }
         const reader = new FileReader();
-        reader.onload = (e: any) => resolve(e.target.result as string);
-        reader.onerror = () => resolve(null);
+        reader.onload = (e: any) => {
+          cleanup();
+          resolve(e.target.result as string);
+        };
+        reader.onerror = () => {
+          cleanup();
+          resolve(null);
+        };
         reader.readAsDataURL(file);
       };
 
       // Ensure the input is not garbage collected before the dialog opens
+      input.style.display = 'none';
       document.body.appendChild(input);
       input.click();
-      document.body.removeChild(input);
+      // Wait for the change event instead of removing immediately
     });
   },
 

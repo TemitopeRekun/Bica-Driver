@@ -108,16 +108,39 @@ const DriverMainScreen: React.FC = () => {
     setShowSelfieModal(true);
   };
 
-  const handleCaptureSelfie = async () => {
-    try {
-      const url = await snapAndUpload(
-        CameraSource.Camera,
-        CameraDirection.Front,
-        'selfies',
-        (status) => setIsUploading(status === 'CAPTURING' || status === 'UPLOADING')
-      );
-      if (url) setSelfieImage(url);
-    } catch (e) {}
+  const handleCaptureSelfie = () => {
+    if (isUploading || selfieImage) return;
+    
+    console.log('Attempting to trigger camera...');
+    
+    // 🛡️ IMPORTANT: Call takePhoto immediately to preserve User Gesture context for Web browsers
+    CapacitorService.takePhoto(CameraSource.Camera, CameraDirection.Front)
+      .then(async (base64) => {
+        if (!base64) {
+          console.log('Capture cancelled by user');
+          return;
+        }
+
+        console.log('Photo captured, starting upload...');
+        setIsUploading(true);
+        try {
+          const { url } = await api.post<{ url: string }>('/rides/upload-photo', { 
+            image: base64, 
+            folder: 'selfies' 
+          });
+          setSelfieImage(url);
+          addToast('Selfie verified!', 'success');
+        } catch (error: any) {
+          console.error('Selfie upload failed:', error);
+          addToast('Upload failed. Please try again.', 'error');
+        } finally {
+          setIsUploading(false);
+        }
+      })
+      .catch((error) => {
+        console.error('Camera trigger failed:', error);
+        addToast('Could not open camera.', 'error');
+      });
   };
 
   const confirmSelfieAndRide = async () => {
