@@ -118,6 +118,14 @@ export interface Trip {
   progressMilestone?: 'assigned' | 'arrived' | 'in_progress' | 'completed';
   coords?: [number, number];   // [lat, lng] for pickup
   destCoords?: [number, number]; // [lat, lng] for destination
+  // Security & Verification
+  otp?: string;
+  otpAttempts?: number;
+  acceptanceImageUrl?: string;
+  carFrontUrl?: string;
+  carBackUrl?: string;
+  carLeftUrl?: string;
+  carRightUrl?: string;
 }
 
 export interface Payout {

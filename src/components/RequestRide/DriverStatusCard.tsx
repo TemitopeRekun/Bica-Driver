@@ -14,6 +14,8 @@ interface DriverStatusCardProps {
     trips: number;
     avatar: string;
     timeAway: number;
+    otp?: string;
+    acceptanceImageUrl?: string;
   };
   onCall: () => void;
   onChat: () => void;
@@ -60,8 +62,31 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
         </span>
       </div>
 
+      {/* 🛡️ Verification Panel */}
+      {driverInfo.otp && (rideMilestone === 'assigned' || rideMilestone === 'arrived') && (
+        <div className="mb-6 bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <div className="size-10 rounded-xl bg-primary/20 flex items-center justify-center">
+               <span className="material-symbols-outlined text-primary text-xl">verified_user</span>
+             </div>
+             <div>
+               <p className="text-[10px] font-bold text-primary uppercase tracking-widest leading-none mb-1">Start Code</p>
+               <p className="text-xl font-black tracking-[0.2em]">{driverInfo.otp}</p>
+             </div>
+          </div>
+          <p className="text-[10px] font-bold text-slate-400 italic max-w-[100px] text-right leading-tight">Share this with driver to start trip</p>
+        </div>
+      )}
+
       <div className="flex items-center gap-4 mb-6">
-        <img src={driverInfo.avatar || IMAGES.DRIVER_CARD} className="w-16 h-16 rounded-2xl object-cover ring-2 ring-primary/20" alt="Driver" />
+        <div className="relative">
+          <img src={driverInfo.avatar || IMAGES.DRIVER_CARD} className="w-16 h-16 rounded-2xl object-cover ring-2 ring-primary/20" alt="Driver" />
+          {driverInfo.acceptanceImageUrl && (
+            <div className="absolute -bottom-1 -right-1 size-8 rounded-lg border-2 border-surface-light dark:border-surface-dark overflow-hidden shadow-lg">
+              <img src={driverInfo.acceptanceImageUrl} className="w-full h-full object-cover" title="Driver Verification Selfie" alt="" />
+            </div>
+          )}
+        </div>
         <div className="flex-1">
           <h3 className="text-lg font-bold leading-tight">{driverInfo.name}</h3>
           <p className="text-sm text-slate-500">{driverInfo.car} • {driverInfo.plate}</p>

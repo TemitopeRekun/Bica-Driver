@@ -19,7 +19,7 @@ interface UseOwnerRealtimeOptions {
   onDriverDeclined: (payload: { message?: string }) => void;
   onTripCompleted: (payload: { fareBreakdown?: any }) => void;
   onPaymentUpdated: (payload: { tripId: string; paymentStatus: string; paidAt: string | null; transactionReference: string | null; message: string }) => void;
-  onRideProgress?: (payload: { tripId: string; milestone: 'assigned' | 'arrived' | 'inprogress' | 'in_progress' | 'completed'; timestamp?: string; status?: any }) => void;
+  onRideProgress?: (payload: { tripId: string; milestone: 'assigned' | 'arrived' | 'inprogress' | 'in_progress' | 'completed'; timestamp?: string; status?: any; otp?: string; acceptanceImageUrl?: string }) => void;
   onLocationUpdated: (lat: number, lng: number) => void;
   syncCurrentRide?: () => Promise<any>;
 }
@@ -115,6 +115,8 @@ export const useOwnerRealtime = ({
         driver: {
           ...data.driver,
           avatar: data.driver?.avatarUrl || IMAGES.DRIVER_CARD,
+          otp: data.otp,
+          acceptanceImageUrl: data.acceptanceImageUrl || data.driver?.acceptanceImageUrl
         },
         estimatedArrivalMins: data.estimatedArrivalMins,
       });
@@ -123,6 +125,15 @@ export const useOwnerRealtime = ({
       if (data.driver?.id) {
         trackedDriverIdRef.current = data.driver.id;
       }
+    });
+
+    ownerSocketRef.current.on('ride:otp_regenerated', (data: any) => {
+      onRideProgressRef.current?.({
+        tripId: data.tripId,
+        milestone: 'assigned',
+        otp: data.otp
+      });
+      sounds.playNotification();
     });
 
     ownerSocketRef.current.on('ride:declined', (data: any) => {
@@ -162,7 +173,9 @@ export const useOwnerRealtime = ({
         // Aligned with Guide: Fail-Forward sync logic
         onRideProgressRef.current?.({
           tripId: data.tripId || data.id,
-          milestone: (data.milestone || data.status.toLowerCase()) as any
+          milestone: (data.milestone || data.status.toLowerCase()) as any,
+          otp: data.otp,
+          acceptanceImageUrl: data.acceptanceImageUrl
         });
         if (data.milestone === 'arrived' || data.status === 'ARRIVED') {
           sounds.playAlert();

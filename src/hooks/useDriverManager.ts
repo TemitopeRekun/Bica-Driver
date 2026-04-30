@@ -24,16 +24,19 @@ export const useDriverManager = () => {
     }
   }, []);
 
-  const updateRideStatus = useCallback(async (tripId: string, status: 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED') => {
+  const updateRideStatus = useCallback(async (tripId: string, status: 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED', extraData?: any) => {
+    if (isUpdatingStatus) return; // Prevent concurrent updates
     setIsUpdatingStatus(true);
     try {
-      const result = await api.patch<any>(`/rides/${tripId}/status`, { status });
+      const result = await api.patch<any>(`/rides/${tripId}/status`, { status, ...extraData });
       
       if (status === 'ARRIVED') {
         setRideMilestone('arrived');
       } else if (status === 'IN_PROGRESS') {
         setRideMilestone('in_progress');
-      }      if (status === 'COMPLETED') {
+      }
+      
+      if (status === 'COMPLETED') {
         setRideState('COMPLETED');
         setRideMilestone('completed');
         addToast('Great job! Trip completed successfully.', 'success');
@@ -49,9 +52,9 @@ export const useDriverManager = () => {
     }
   }, [addToast, setRideMilestone, setRideState, loadWalletSummary]);
 
-  const acceptRide = useCallback(async (tripId: string) => {
+  const acceptRide = useCallback(async (tripId: string, acceptanceImageUrl: string) => {
     try {
-      await api.post(`/rides/${tripId}/accept`);
+      await api.post(`/rides/${tripId}/accept`, { acceptanceImageUrl });
       setRideState('ASSIGNED');
       setRideMilestone('assigned');
       addToast('Ride accepted! You can now proceed to the pickup location.', 'success');

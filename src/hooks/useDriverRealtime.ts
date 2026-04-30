@@ -22,6 +22,7 @@ export interface DriverRideRequest {
   avatar: string;
   coords: [number, number];
   destCoords: [number, number];
+  acceptanceImageUrl?: string;
 }
 
 interface UseDriverRealtimeOptions {

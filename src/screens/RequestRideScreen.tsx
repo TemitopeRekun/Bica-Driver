@@ -162,6 +162,15 @@ const RequestRideScreen: React.FC = () => {
             syncCurrentRide();
           }
        }
+
+       // Update driver info with new security fields if they arrive via socket
+       if (payload.otp || payload.acceptanceImageUrl) {
+         setDriverInfo((prev: any) => ({
+           ...prev,
+           otp: payload.otp || prev?.otp,
+           acceptanceImageUrl: payload.acceptanceImageUrl || prev?.acceptanceImageUrl
+         }));
+       }
     },
     onPaymentUpdated: (data) => {
       addToast(data.message || `Payment ${data.paymentStatus}`, data.paymentStatus === 'PAID' ? 'success' : 'info');

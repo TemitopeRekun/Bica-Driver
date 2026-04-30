@@ -57,5 +57,10 @@ export default defineConfig(({ mode }) => {
     optimizeDeps: {
       include: ['react-window'],
     },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './src/test/setup.ts',
+    },
   };
 });
