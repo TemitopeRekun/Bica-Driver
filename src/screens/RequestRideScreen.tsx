@@ -178,6 +178,14 @@ const RequestRideScreen: React.FC = () => {
     }
   });
 
+  // 🚀 [PREMIUM_UX] Dedicated Trip Status Redirect
+  // If we have an active ride, move to the dedicated status screen for a better UX
+  useEffect(() => {
+    if (['SEARCHING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED'].includes(rideState)) {
+      navigate('/owner/status');
+    }
+  }, [rideState, navigate]);
+
   const handleCancelRide = async () => {
     if (currentTripId) {
       console.log(`[ACTION] Owner initiating cancellation for trip: ${currentTripId}`);
@@ -445,41 +453,6 @@ const RequestRideScreen: React.FC = () => {
                  </div>
                )}
            </div>
-        )}
-
-        {(rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS' || rideState === 'SEARCHING') && (
-           <DriverStatusCard
-             rideState={rideState}
-             driverInfo={driverInfo || { name: 'Searching', car: 'Please wait', plate: '---', rating: 5, trips: 0, avatar: IMAGES.DRIVER_CARD, timeAway: 0 }}
-             rideMilestone={rideMilestone}
-             lastMilestoneUpdate={new Date().toISOString()}
-             onCall={() => {}}
-             onChat={() => {}}
-             onTrack={() => {}}
-             onSOS={() => {}}
-             onCancel={handleCancelRide}
-             trackedDriverPos={trackedDriverPos}
-             pickup={pickup}
-           />
-        )}
-
-        {rideState === 'COMPLETED' && (
-          <TripPaymentSummary
-            role="OWNER"
-            pickup={pickup ? getLocationShortText(pickup) : undefined}
-            destination={destination ? getLocationShortText(destination) : undefined}
-            onClose={() => resetRide()}
-            fareBreakdown={{
-              distanceKm: completedTripData?.fareBreakdown?.distanceKm ?? completedTripData?.distanceKm ?? 0,
-              actualMins: completedTripData?.fareBreakdown?.actualMins ?? completedTripData?.actualMins ?? completedTripData?.fareBreakdown?.totalMins ?? completedTripData?.totalMins ?? 0,
-              finalFare: completedTripData?.fareBreakdown?.finalFare ?? completedTripData?.finalFare ?? completedTripData?.amount ?? 0,
-              totalAmount: completedTripData?.fareBreakdown?.totalAmount,
-            }}
-            paymentStatus={completedTripData?.paymentStatus || 'UNPAID'}
-            paymentMessage={completedTripData?.paymentStatus === 'PAID' ? 'Payment confirmed! Thank you.' : ''}
-            onPayNow={handlePayNow}
-            isInitiatingPayment={isInitiatingPayment}
-          />
         )}
       </div>
     </div>

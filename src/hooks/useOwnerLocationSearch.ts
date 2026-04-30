@@ -3,6 +3,7 @@ import { CapacitorService } from '@/services/CapacitorService';
 import { LocationService } from '@/services/LocationService';
 import { SystemSettings, LocationData } from '@/types';
 import { useToast } from './useToast';
+import { useRideStore } from '@/stores/rideStore';
 
 interface UseOwnerLocationSearchOptions {
   onPickupChanged?: () => void;
@@ -15,8 +16,7 @@ const isAbortError = (error: unknown): boolean =>
 
 export const useOwnerLocationSearch = ({ onPickupChanged }: UseOwnerLocationSearchOptions) => {
   const { toast } = useToast();
-  const [pickup, setPickup] = useState<LocationData | null>(null);
-  const [destination, setDestination] = useState<LocationData | null>(null);
+  const { pickup, setPickup, destination, setDestination } = useRideStore();
   const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_MAP_CENTER);
   const [deviceGpsBias, setDeviceGpsBias] = useState<{ lat: number; lng: number } | null>(null);
   const [estimatedPrice, setEstimatedPrice] = useState<number>(0);

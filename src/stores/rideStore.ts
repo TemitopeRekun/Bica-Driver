@@ -17,6 +17,8 @@ interface RideStateData {
   completedTripData: any | null;
   routePreview: { distanceKm: number; estimatedMins: number } | null;
   lastUserId: string | null;
+  pickup: LocationData | null;
+  destination: LocationData | null;
   
   // Setters
   setRideState: (state: RideState) => void;
@@ -29,6 +31,8 @@ interface RideStateData {
   setCompletedTripData: (data: any | null) => void;
   setRoutePreview: (route: { distanceKm: number; estimatedMins: number } | null) => void;
   setLastUserId: (id: string | null) => void;
+  setPickup: (location: LocationData | null) => void;
+  setDestination: (location: LocationData | null) => void;
   
   resetRide: () => void;
 }
@@ -46,6 +50,8 @@ export const useRideStore = create<RideStateData>()(
       availableDrivers: [],
       completedTripData: null,
       routePreview: null,
+      pickup: null,
+      destination: null,
 
       setRideState: (rideState) => set({ rideState }),
       setRideMilestone: (rideMilestone) => set({ rideMilestone }),
@@ -57,6 +63,8 @@ export const useRideStore = create<RideStateData>()(
       setCompletedTripData: (completedTripData) => set({ completedTripData }),
       setRoutePreview: (routePreview) => set({ routePreview }),
       setLastUserId: (lastUserId) => set({ lastUserId }),
+      setPickup: (pickup) => set({ pickup }),
+      setDestination: (destination) => set({ destination }),
 
       resetRide: () => set({
         rideState: 'IDLE',
@@ -69,6 +77,8 @@ export const useRideStore = create<RideStateData>()(
         completedTripData: null,
         routePreview: null,
         lastUserId: null,
+        pickup: null,
+        destination: null,
       }),
     }),
     {
@@ -83,6 +93,8 @@ export const useRideStore = create<RideStateData>()(
         trackedDriverPos: state.trackedDriverPos,
         completedTripData: state.completedTripData,
         lastUserId: state.lastUserId,
+        pickup: state.pickup,
+        destination: state.destination,
       }),
     }
   )

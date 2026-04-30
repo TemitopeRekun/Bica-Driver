@@ -15,6 +15,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 import AdminDashboardPage from '../screens/AdminDashboardPage';
 import OwnerActivityScreen from '../screens/OwnerActivityScreen';
+import TripStatusScreen from '../screens/TripStatusScreen';
 import LoadingScreen from '../screens/LoadingScreen';
 import PaymentCompleteScreen from '../screens/PaymentCompleteScreen';
 
@@ -103,6 +104,14 @@ export const router = createHashRouter([
     element: (
       <ProtectedRoute roles={[UserRole.OWNER, UserRole.ADMIN]}>
         <RequestRideScreen />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/owner/status',
+    element: (
+      <ProtectedRoute roles={[UserRole.OWNER, UserRole.ADMIN]}>
+        <TripStatusScreen />
       </ProtectedRoute>
     ),
   },
