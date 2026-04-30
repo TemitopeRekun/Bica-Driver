@@ -229,11 +229,15 @@ const DriverMainScreen: React.FC = () => {
           <button onClick={() => navigate('/profile')} className="size-11 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 overflow-hidden" aria-label="Profile">
              {currentUser?.avatar ? <img src={currentUser.avatar} className="w-full h-full object-cover" alt="" /> : <span className="material-symbols-outlined text-white">person</span>}
           </button>
-          <div className="flex-1 mx-4 h-12 bg-white/10 backdrop-blur-md rounded-full border border-white/10 p-1 flex">
+          <div className={`flex-1 mx-4 h-12 bg-white/10 backdrop-blur-md rounded-full border border-white/10 p-1 flex ${activeRide || completedTripSummary ? 'opacity-50 pointer-events-none' : ''}`}>
              <button onClick={handleToggleOnline} className={`flex-1 rounded-full text-[10px] font-black uppercase transition-all ${!isOnline ? 'bg-slate-600 text-white' : 'text-slate-400'}`}>Offline</button>
              <button onClick={handleToggleOnline} className={`flex-1 rounded-full text-[10px] font-black uppercase transition-all ${isOnline ? 'bg-primary text-white' : 'text-slate-400'}`}>Online</button>
           </div>
-          <button onClick={() => navigate('/driver/activity')} className="size-11 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 text-white" aria-label="Activity">
+          <button 
+            onClick={() => !activeRide && !completedTripSummary && navigate('/driver/activity')} 
+            className={`size-11 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 text-white ${activeRide || completedTripSummary ? 'opacity-50 cursor-not-allowed' : ''}`} 
+            aria-label="Activity"
+          >
              <span className="material-symbols-outlined">receipt_long</span>
           </button>
        </header>
@@ -269,7 +273,7 @@ const DriverMainScreen: React.FC = () => {
                    </div>
                     {rideMilestone === 'assigned' && <button onClick={() => handleUpdateStatus('ARRIVED')} className="w-full bg-primary py-5 rounded-2xl text-white font-black text-lg">I Have Arrived</button>}
                     {rideMilestone === 'arrived' && <button onClick={() => setShowConditionModal(true)} className="w-full bg-accent py-5 rounded-2xl text-white font-black text-lg">Upload Car Photos</button>}
-                    {rideMilestone === 'in_progress' && <button onClick={() => handleUpdateStatus('COMPLETED')} className="w-full bg-red-500 py-5 rounded-2xl text-white font-black text-lg">End Trip</button>}
+                    {rideMilestone === 'in_progress' && <button onClick={() => handleUpdateStatus('COMPLETED')} className="w-full bg-red-500 py-5 rounded-2xl text-white font-black text-lg">Complete Trip</button>}
                  </div>
               </div>
            )}
@@ -347,7 +351,7 @@ const DriverMainScreen: React.FC = () => {
             fareBreakdown={{
               distanceKm: completedTripSummary.distanceKm || 0,
               actualMins: completedTripSummary.actualMins || 0,
-              finalFare: completedTripSummary.finalFare || 0,
+              finalFare: completedTripSummary.amount || completedTripSummary.finalFare || 0,
               driverEarnings: completedTripSummary.driverEarnings || 0
             }}
             paymentStatus={completedTripSummary.paymentStatus || 'UNPAID'}

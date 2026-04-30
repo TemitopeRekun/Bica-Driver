@@ -17,7 +17,7 @@ const TripStatusScreen: React.FC = () => {
   const { currentUser } = useAuthStore();
   const { addToast } = useUIStore();
   const { 
-    rideState, rideMilestone, setRideMilestone,
+    rideState, setRideState, rideMilestone, setRideMilestone,
     currentTripId, driverInfo, setDriverInfo,
     trackedDriverPos, setTrackedDriverPos,
     completedTripData, setCompletedTripData,
@@ -56,6 +56,14 @@ const TripStatusScreen: React.FC = () => {
     },
     onTripCompleted: (data) => {
       setCompletedTripData(data);
+      setRideState('COMPLETED');
+      setRideMilestone('completed');
+    },
+    onPaymentUpdated: (payload) => {
+       if (payload.paymentStatus === 'PAID') {
+          addToast('Payment confirmed! Your ride is fully settled.', 'success');
+          setCompletedTripData((prev: any) => ({ ...prev, paymentStatus: 'PAID' }));
+       }
     },
     onLocationUpdated: (lat, lng) => setTrackedDriverPos([lat, lng]),
     syncCurrentRide,
@@ -148,7 +156,7 @@ const TripStatusScreen: React.FC = () => {
                finalFare: completedTripData?.amount || 0,
              }}
              paymentStatus={completedTripData?.paymentStatus || 'UNPAID'}
-             onPayNow={() => initiatePayment(completedTripId!)}
+             onPayNow={() => currentTripId && initiatePayment(currentTripId)}
            />
         ) : (
           <DriverStatusCard
