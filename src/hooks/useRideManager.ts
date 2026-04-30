@@ -58,8 +58,8 @@ export const useRideManager = () => {
         }
       } else {
         // IMPORTANT: Only reset if we aren't currently in a "Live" transition state.
-        // During SEARCHING or ASSIGNED, a null response might just be a backend delay (race condition).
-        const PROTECTED_STATES: string[] = ['SEARCHING', 'ASSIGNED', 'COMPLETED'];
+        // This prevents accidental "automatic cancellations" if the sync call fails or returns null temporarily.
+        const PROTECTED_STATES: string[] = ['SEARCHING', 'ASSIGNED', 'IN_PROGRESS', 'SCHEDULED', 'COMPLETED'];
         if (!PROTECTED_STATES.includes(currentState)) {
           resetRide();
         }
