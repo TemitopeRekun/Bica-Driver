@@ -11,6 +11,7 @@ interface TripPaymentSummaryProps {
     finalFare: number;
     totalAmount?: number;
     driverEarnings?: number;
+    platformFee?: number;
   } | null;
   paymentStatus?: 'UNPAID' | 'SUCCESS' | 'FAILED' | 'PENDING' | 'PAID' | 'PARTIALLY_PAID' | 'CANCELLED';
   paymentMessage?: string | null;
@@ -31,146 +32,121 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
   isInitiatingPayment = false
 }) => {
   const isDriver = role === 'DRIVER';
+  const isPaid = paymentStatus === 'SUCCESS' || paymentStatus === 'PAID';
+
+  // Calculate platform fee for driver if not provided
+  const total = fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0;
+  const earnings = fareBreakdown?.driverEarnings || 0;
+  const commission = fareBreakdown?.platformFee || (total - earnings);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-sm bg-white dark:bg-surface-dark rounded-[2.5rem] shadow-2xl overflow-hidden animate-slide-up">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in font-display">
+      <div className="w-full max-w-sm bg-white dark:bg-surface-dark rounded-[3rem] shadow-2xl overflow-hidden animate-slide-up border border-white/10">
         {/* Header */}
-        <div className="px-6 py-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+        <div className="px-8 py-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-white/5">
           <div>
-            <h3 className="text-xl font-black text-slate-900 dark:text-white">
-              {isDriver ? 'Trip Earnings' : (
-                (paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
-                  ? 'Trip Paid!' 
-                  : (paymentStatus === 'FAILED' ? 'Payment Failed' : (paymentStatus === 'CANCELLED' ? 'Payment Cancelled' : 'Trip Result'))
-              )}
+            <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase">
+              {isDriver ? 'Earnings' : (isPaid ? 'Settled!' : 'Trip Bill')}
             </h3>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-              {isDriver ? 'Performance Summary' : (
-                (paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
-                  ? 'Thank you for riding' 
-                  : (paymentStatus === 'FAILED' || paymentStatus === 'CANCELLED' ? 'Please try again' : 'Final Settlement')
-              )}
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mt-1">
+              {isDriver ? 'Performance Audit' : (isPaid ? 'Verification Complete' : 'Awaiting Settlement')}
             </p>
           </div>
-          {/* Only allow closing if payment is confirmed. Prevents "mistaken dismiss" before settlement. */}
-          {(paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') && (
+          {isPaid && (
             <button 
               onClick={onClose}
-              className="size-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors animate-in fade-in"
+              className="size-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-all active:scale-90"
             >
-              <span className="material-symbols-outlined text-lg">close</span>
+              <span className="material-symbols-outlined">close</span>
             </button>
           )}
         </div>
 
-        <div className="p-8 space-y-6">
-          {/* Route Summary (Optional for Owner) */}
-          {!isDriver && pickup && destination && (
-            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-white/5 rounded-2xl">
-              <div className="flex flex-col items-center gap-1">
-                <div className="size-2 rounded-full bg-primary" />
-                <div className="w-0.5 h-4 bg-slate-200 dark:bg-slate-700" />
-                <div className="size-2 rounded-full bg-accent" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold text-slate-400 uppercase truncate">{pickup}</p>
-                <div className="h-2" />
-                <p className="text-[10px] font-bold text-slate-400 uppercase truncate">{destination}</p>
-              </div>
-            </div>
-          )}
-
+        <div className="p-8 space-y-8">
           {/* Detailed Breakdown */}
           <div className="space-y-4">
-             <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Distance traveled</span>
-                <span className="text-sm font-black text-slate-900 dark:text-white">{fareBreakdown?.distanceKm || 0} km</span>
-             </div>
-             <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Elapsed Time</span>
-                <span className="text-sm font-black text-slate-900 dark:text-white">{fareBreakdown?.actualMins || fareBreakdown?.totalMins || 0} mins</span>
+             <div className="flex justify-between items-center opacity-70">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Distance / Time</span>
+                <span className="text-xs font-black text-slate-900 dark:text-white italic">{fareBreakdown?.distanceKm || 0}km · {fareBreakdown?.actualMins || fareBreakdown?.totalMins || 0}m</span>
              </div>
 
               {isDriver ? (
-               <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                  <div className="flex justify-between items-center opacity-70">
-                    <span className="text-xs font-bold text-slate-500 uppercase">Trip Fare</span>
-                    <span className="text-sm font-black text-slate-900 dark:text-white">₦{(fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0).toLocaleString()}</span>
+               <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex justify-between items-center opacity-60">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Gross Trip Fare</span>
+                    <span className="text-sm font-black text-slate-900 dark:text-white">₦{total.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">Your Earnings</span>
-                    <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">₦{(fareBreakdown?.driverEarnings || 0).toLocaleString()}</span>
+                  <div className="flex justify-between items-center opacity-60">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">BICA Commission</span>
+                    <span className="text-sm font-black text-red-500">- ₦{commission.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-5 rounded-3xl bg-emerald-500/5 border border-emerald-500/10 mt-2">
+                    <span className="text-[11px] font-black text-emerald-600 uppercase tracking-widest">Net Earnings</span>
+                    <span className="text-3xl font-black text-emerald-600 tracking-tighter italic">₦{earnings.toLocaleString()}</span>
                   </div>
                </div>
-             ) : (
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                   <span className="text-sm font-black text-slate-900 dark:text-white">Total Amount</span>
-                   <span className="text-3xl font-black text-primary">₦{(fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0).toLocaleString()}</span>
+              ) : (
+                <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                   <div className="flex justify-between items-center p-6 rounded-[2.5rem] bg-primary/5 border border-primary/10">
+                      <span className="text-[11px] font-black text-primary uppercase tracking-widest">Total Fare</span>
+                      <span className="text-4xl font-black text-primary tracking-tighter italic">₦{total.toLocaleString()}</span>
+                   </div>
                 </div>
-             )}
+              )}
           </div>
 
-          {/* Payment Status Alert */}
-          {(paymentMessage || paymentStatus === 'SUCCESS' || paymentStatus === 'PAID' || paymentStatus === 'PARTIALLY_PAID') ? (
-            <div className={`p-4 rounded-2xl flex gap-3 items-start border-2 animate-in slide-in-from-top-4 duration-500 ${
-              (paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
-                ? 'bg-green-500/5 border-green-500/20 text-green-600' 
-                : (paymentStatus === 'PARTIALLY_PAID' ? 'bg-amber-500/5 border-amber-500/20 text-amber-600' : 'bg-red-500/5 border-red-500/20 text-red-600')
-            }`}>
-              <span className="material-symbols-outlined text-base">
-                {(paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
-                  ? 'verified' 
-                  : (paymentStatus === 'PARTIALLY_PAID' ? 'warning' : 'error')}
-              </span>
-              <p className="text-[10px] font-black uppercase leading-relaxed">
-                {(paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') 
-                  ? (isDriver ? 'Payment received and Wallet updated!' : 'Trip settlement confirmed successfully!')
-                  : paymentMessage}
-              </p>
+          {/* Contextual Status Info */}
+          {isPaid ? (
+            <div className="p-5 rounded-3xl bg-emerald-500/5 border border-emerald-500/10 flex gap-4 items-start animate-fade-in">
+               <span className="material-symbols-outlined text-emerald-500 mt-0.5">verified</span>
+               <div>
+                  <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Payment Confirmed</h4>
+                  <p className="text-[10px] text-emerald-700/70 font-bold leading-relaxed">
+                    {isDriver ? 'Funds have been credited to your internal ledger and will be settled automatically.' : 'Trip settlement has been verified by Monnify and BICA.'}
+                  </p>
+               </div>
             </div>
           ) : (
-            isDriver && (
-              <div className="p-4 rounded-2xl flex gap-3 items-start border-2 border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-white/5 text-slate-500 animate-pulse">
-                <span className="material-symbols-outlined text-base">hourglass_empty</span>
-                <p className="text-[10px] font-black uppercase leading-relaxed">
-                  Awaiting customer payment confirmation...
-                </p>
-              </div>
-            )
+            <div className="p-5 rounded-3xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 flex gap-4 items-start">
+               <span className="material-symbols-outlined text-slate-400 mt-0.5">{isDriver ? 'hourglass_top' : 'account_balance'}</span>
+               <div>
+                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{isDriver ? 'Awaiting Confirmation' : 'Safe Checkout'}</h4>
+                  <p className="text-[10px] text-slate-400 font-bold leading-relaxed italic">
+                    {isDriver ? 'Verification is required before earnings are credited to your active wallet.' : 'BICA uses bank-grade encryption to secure every transaction.'}
+                  </p>
+               </div>
+            </div>
           )}
 
           {/* Action Buttons */}
           <div className="flex flex-col gap-3">
-            {!isDriver && paymentStatus !== 'SUCCESS' && paymentStatus !== 'PAID' && onPayNow && (
+            {!isDriver && !isPaid && onPayNow && (
               <button 
                 onClick={onPayNow}
                 disabled={isInitiatingPayment}
-                className="w-full bg-primary hover:bg-primary-dark text-white font-black py-4 rounded-2xl shadow-xl shadow-primary/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full bg-primary hover:bg-primary/90 text-white font-black h-16 rounded-2xl shadow-xl shadow-primary/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-widest text-xs"
               >
                 {isInitiatingPayment ? (
                   <span className="material-symbols-outlined animate-spin">progress_activity</span>
                 ) : (
                   <span className="material-symbols-outlined">payments</span>
                 )}
-                {isInitiatingPayment 
-                  ? 'VERIFYING WITH MONNIFY...' 
-                  : (paymentStatus === 'FAILED' || paymentStatus === 'CANCELLED' ? 'RETRY PAYMENT: NGN ' : 'PAY NGN ') + (fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0).toLocaleString()}
+                {isInitiatingPayment ? 'SECUREING LINK...' : 'Confirm & Pay Now'}
               </button>
             )}
 
-            {(paymentStatus === 'SUCCESS' || paymentStatus === 'PAID') && (
+            {isPaid && (
               <button 
                 onClick={onClose}
-                className="w-full font-black py-4 rounded-2xl bg-primary text-white shadow-lg shadow-primary/20 hover:opacity-90 transition-all uppercase tracking-widest text-xs animate-in zoom-in duration-300"
+                className="w-full h-16 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black uppercase tracking-widest text-xs shadow-xl transition-all active:scale-95"
               >
-                {isDriver ? 'Payment Confirmed: Return Home' : 'Finish & Return Home'}
+                {isDriver ? 'Return Home' : 'Back to Dashboard'}
               </button>
             )}
             
-            {!isDriver && paymentStatus !== 'SUCCESS' && paymentStatus !== 'PAID' && (
-              <p className="text-center text-[8px] font-black text-slate-400 uppercase tracking-widest opacity-60">
-                Payment is required to complete engagement
+            {!isDriver && !isPaid && (
+              <p className="text-center text-[8px] font-black text-slate-400 uppercase tracking-[0.3em] opacity-60">
+                Payment verified by Monnify Infrastructure
               </p>
             )}
           </div>

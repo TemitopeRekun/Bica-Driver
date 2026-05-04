@@ -359,30 +359,44 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
               <span className="material-symbols-outlined text-2xl">{activeTheme.icon}</span>
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Your Records</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Financial Overview</p>
               <h2 className="mt-1 text-xl font-black text-slate-900 dark:text-white leading-tight uppercase tracking-tight">
-                {activeTab === 'trips' ? 'Performance history' : 'Financial records'}
+                {activeTab === 'trips' ? 'Performance history' : 'Earnings Dashboard'}
               </h2>
             </div>
           </div>
           <div className="relative mt-6 grid grid-cols-3 gap-3">
             <div className={`rounded-2xl border p-3 ${ACTIVITY_THEME.trips.metricSurface}`}>
-              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Trips</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Total Rides</p>
               <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">{walletSummary?.totalTrips ?? 0}</p>
             </div>
             <div className={`rounded-2xl border p-3 ${ACTIVITY_THEME.settlements.metricSurface}`}>
-              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Earned</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Lifetime</p>
               <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">{formatCurrency(walletSummary?.totalEarned ?? 0)}</p>
             </div>
             <div className={`rounded-2xl border p-3 ${ACTIVITY_THEME.settlements.metricSurface}`}>
-              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Balance</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Current</p>
               <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">{formatCurrency(walletSummary?.currentBalance ?? 0)}</p>
             </div>
           </div>
         </div>
+
+        {/* New Wallet Clarity Card */}
+        <div className="bg-primary/5 border border-primary/10 rounded-3xl p-5 flex gap-4 items-start animate-fade-in shadow-sm shadow-primary/5">
+           <div className="size-10 shrink-0 bg-primary/20 rounded-2xl flex items-center justify-center text-primary">
+              <span className="material-symbols-outlined text-xl">account_balance</span>
+           </div>
+           <div>
+              <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest mb-1">Autonomous Settlement Policy</h4>
+              <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
+                Your current balance tracks cleared earnings for the active period. BICA settles funds <strong>directly to your bank account</strong> via Monnify split-payments. No manual withdrawal is required.
+              </p>
+           </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-1.5 shadow-sm backdrop-blur-md dark:border-white/5 dark:bg-white/5">
-          <button onClick={() => setActiveTab('trips')} className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'trips' ? ACTIVITY_THEME.trips.activeTab : ACTIVITY_THEME.trips.inactiveTab}`}>Trips</button>
-          <button onClick={() => setActiveTab('settlements')} className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'settlements' ? ACTIVITY_THEME.settlements.activeTab : ACTIVITY_THEME.settlements.inactiveTab}`}>Settlements</button>
+          <button onClick={() => setActiveTab('trips')} className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'trips' ? ACTIVITY_THEME.trips.activeTab : ACTIVITY_THEME.trips.inactiveTab}`}>History</button>
+          <button onClick={() => setActiveTab('settlements')} className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'settlements' ? ACTIVITY_THEME.settlements.activeTab : ACTIVITY_THEME.settlements.inactiveTab}`}>Ledger</button>
         </div>
         {error ? (
            <InlineError message={error} onRetry={loadActivity} />

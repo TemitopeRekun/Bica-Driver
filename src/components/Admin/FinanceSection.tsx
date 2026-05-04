@@ -28,7 +28,7 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
   onPageChange
 }) => {
   return (
-    <div className="space-y-8 animate-slide-up">
+    <div className="space-y-8 animate-slide-up font-display">
        {/* Platform Financial Summary */}
        <div className="relative overflow-hidden p-8 rounded-[3rem] bg-slate-900 shadow-2xl group">
           <div className="absolute top-0 right-0 size-64 bg-primary/20 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-primary/30 transition-all"></div>
@@ -37,31 +37,31 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
               <div className="size-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
                 <span className="material-symbols-outlined filled">account_balance</span>
               </div>
-              <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">Operational Liquidity</h3>
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Operational Liquidity</h3>
             </div>
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5 opacity-80">Platform Net Commission</p>
-            <h2 className="text-5xl font-black text-white tracking-tighter">{formatCurrency(platformFees)}</h2>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 opacity-80 italic">Platform Net Commission</p>
+            <h2 className="text-5xl font-black text-white tracking-tighter italic uppercase">{formatCurrency(platformFees)}</h2>
             <div className="flex gap-6 mt-8">
               <div>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Throughput</p>
-                <p className="text-xl font-black text-white">{formatCurrency(totalRevenue)}</p>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Gross Throughput</p>
+                <p className="text-xl font-black text-white tracking-tighter">{formatCurrency(totalRevenue)}</p>
               </div>
               <div className="w-px h-10 bg-white/10"></div>
               <div>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Fee Rate</p>
-                <p className="text-xl font-black text-primary">{settings.commission}%</p>
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Global Fee</p>
+                <p className="text-xl font-black text-primary tracking-tighter">{settings.commission}%</p>
               </div>
             </div>
           </div>
        </div>
 
        {/* Settlement Model Info */}
-       <div className="bg-blue-500/5 border border-blue-500/10 p-6 rounded-[2.5rem] flex gap-4 items-start">
-          <span className="material-symbols-outlined text-blue-500 mt-1">info</span>
+       <div className="bg-emerald-500/5 border border-emerald-500/10 p-6 rounded-[2.5rem] flex gap-4 items-start shadow-sm shadow-emerald-500/5">
+          <span className="material-symbols-outlined text-emerald-500 mt-0.5">verified_user</span>
           <div>
-            <h4 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-1">Auto-Settlement Intelligence</h4>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Bica utilizes Monnify Split Payments for real-time driver settlement. <strong>No manual payout approval is required</strong> for standard trips. Monitor this ledger for failed split attempts or dispute resolutions only.
+            <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest mb-1">Autonomous Settlement Policy</h4>
+            <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
+              BICA utilizes Monnify Split Payments for real-time driver settlement. <strong>No manual payout approval is required</strong> for standard trips. This ledger serves for reconciliation and operational monitoring only.
             </p>
           </div>
        </div>
@@ -71,7 +71,7 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-2">
               <span className="size-2 rounded-full bg-orange-500 animate-pulse"></span>
-              <h3 className="font-black text-sm uppercase tracking-[0.2em] text-slate-500">Monitoring Queue</h3>
+              <h3 className="font-black text-[11px] uppercase tracking-[0.2em] text-slate-500">Settlement Watchlist (Anomalies)</h3>
             </div>
             
             {/* Pagination Controls */}
@@ -100,26 +100,27 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {pendingPayments.map((payment) => (
-              <div key={payment.id} className="bg-white dark:bg-surface-dark border-2 border-slate-100 dark:border-slate-800 p-5 rounded-[2rem] shadow-sm hover:border-orange-500/30 transition-all">
+              <div key={payment.id} className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 p-6 rounded-[2rem] shadow-lg shadow-black/5 hover:border-orange-500/30 transition-all group">
                 <div className="flex justify-between items-start mb-4">
-                  <div className="size-10 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500">
-                    <span className="material-symbols-outlined">feedback</span>
+                  <div className="size-10 bg-orange-500/10 rounded-2xl flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-all">
+                    <span className="material-symbols-outlined">query_stats</span>
                   </div>
-                  <span className="text-[9px] font-black text-orange-500 bg-orange-500/10 px-2 py-1 rounded-lg uppercase tracking-tight">Pending Split</span>
+                  <span className="text-[9px] font-black text-orange-500 bg-orange-500/10 px-2 py-1 rounded-lg uppercase tracking-widest">Pending Verification</span>
                 </div>
-                <h4 className="font-black text-sm text-slate-900 dark:text-white truncate mb-1">{payment.location}</h4>
-                <p className="text-[10px] text-slate-500 font-bold uppercase truncate mb-4">
-                  Owner: {payment.owner?.name} · Driver: {payment.driver?.name || 'Searching'}
+                <h4 className="font-black text-sm text-slate-900 dark:text-white truncate mb-1 uppercase tracking-tight italic">{payment.location}</h4>
+                <p className="text-[10px] text-slate-500 font-bold uppercase truncate mb-4 italic">
+                   {payment.owner?.name} <span className="text-slate-300 mx-1">→</span> {payment.driver?.name || 'Searching'}
                 </p>
-                <div className="flex items-center justify-between pt-3 border-t border-slate-50 dark:border-white/5">
-                  <p className="text-[10px] font-black text-slate-400 uppercase">{payment.date}</p>
-                  <p className="text-base font-black text-slate-900 dark:text-white">{formatCurrency(payment.amount)}</p>
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">{payment.date}</p>
+                  <p className="text-base font-black text-slate-900 dark:text-white tracking-tighter">{formatCurrency(payment.amount)}</p>
                 </div>
               </div>
             ))}
             {pendingPayments.length === 0 && (
-              <div className="col-span-full py-12 bg-slate-50 dark:bg-white/5 rounded-[2rem] border border-dashed border-slate-200 dark:border-slate-800 text-center text-slate-400">
-                 <p className="text-xs font-bold uppercase tracking-widest">No transaction issues detected</p>
+              <div className="col-span-full py-16 bg-slate-50 dark:bg-white/5 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 text-center text-slate-400">
+                 <span className="material-symbols-outlined text-3xl mb-2 opacity-30">verified_user</span>
+                 <p className="text-[10px] font-black uppercase tracking-[0.2em]">No transactional anomalies detected</p>
               </div>
             )}
           </div>
@@ -128,7 +129,7 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
        {/* Archive History */}
        <section className="space-y-4">
           <div className="flex items-center justify-between px-2">
-            <h3 className="font-black text-sm uppercase tracking-[0.2em] text-slate-500">Settlement Archive</h3>
+            <h3 className="font-black text-[11px] uppercase tracking-[0.2em] text-slate-500">Confirmed Settlement Ledger</h3>
             
             {/* Pagination Controls */}
             {paymentHistoryMeta && paymentHistoryMeta.totalPages > 1 && (
@@ -154,36 +155,36 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
             )}
           </div>
 
-          <div className="bg-white dark:bg-surface-dark rounded-[2.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+          <div className="bg-white dark:bg-surface-dark rounded-[2.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl shadow-black/5">
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {paymentHistory.map((record) => (
-                <div key={record.id} className="p-5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                <div key={record.id} className="p-6 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
                   <div className="flex items-center gap-4 min-w-0">
-                    <div className="size-10 bg-green-500/10 rounded-xl flex items-center justify-center text-green-500">
-                      <span className="material-symbols-outlined text-base">receipt_long</span>
+                    <div className="size-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500">
+                      <span className="material-symbols-outlined text-lg">payments</span>
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-black text-slate-900 dark:text-white truncate">
+                      <p className="text-sm font-black text-slate-900 dark:text-white truncate uppercase tracking-tight italic">
                         {record.trip.pickupAddress.split(',')[0]} → {record.trip.destAddress.split(',')[0]}
                       </p>
-                      <p className="text-[10px] text-slate-500 font-bold uppercase truncate">
-                        Ref: {record.monnifyTxRef.slice(0, 12)}... · {formatShortDate(record.paidAt)}
+                      <p className="text-[10px] text-slate-500 font-bold uppercase truncate italic opacity-70">
+                        Ref: {record.monnifyTxRef.slice(-12)} · {formatShortDate(record.paidAt)}
                       </p>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-black text-slate-900 dark:text-white">{formatCurrency(record.totalAmount)}</p>
-                    <p className="text-[9px] font-black text-green-500 uppercase tracking-widest mt-1">Cleared</p>
+                    <p className="text-lg font-black text-slate-900 dark:text-white tracking-tighter">{formatCurrency(record.totalAmount)}</p>
+                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mt-1 italic">Verified Clean</p>
                   </div>
                 </div>
               ))}
               {paymentHistory.length === 0 && (
-                <div className="p-16 text-center text-slate-400 italic text-sm">Historical archive is empty.</div>
+                <div className="p-16 text-center text-slate-400 italic text-sm font-bold uppercase tracking-widest opacity-30">Archive empty</div>
               )}
             </div>
             {paymentHistory.length > 0 && (
               <div className="p-4 bg-slate-50 dark:bg-white/5 text-center">
-                 <button className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-primary transition-colors">Export Ledger (.csv)</button>
+                 <button className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] hover:text-primary transition-all">Download Settlement Log (.csv)</button>
               </div>
             )}
           </div>

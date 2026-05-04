@@ -230,13 +230,21 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
                   <span className="material-symbols-outlined">route</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">{getTripTitle(trip)}</p>
-                  <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest">{formatDate(trip.createdAt || trip.date)}</p>
+                  <p className="truncate text-base font-black text-slate-900 dark:text-white uppercase tracking-tight italic">{getTripTitle(trip)}</p>
+                  <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest italic">{formatDate(trip.createdAt || trip.date)}</p>
                 </div>
               </div>
-              <span className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${getStatusClassName(trip.status)}`}>
-                {trip.status.replace(/_/g, ' ')}
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                 <span className={`shrink-0 rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-widest ${getStatusClassName(trip.status)}`}>
+                   {trip.status.replace(/_/g, ' ')}
+                 </span>
+                 {trip.paymentStatus === 'PAID' && (
+                    <span className="bg-emerald-500/10 text-emerald-600 text-[8px] font-black uppercase px-2 py-0.5 rounded-lg flex items-center gap-1">
+                       <span className="material-symbols-outlined text-[10px]">verified</span>
+                       Confirmed
+                    </span>
+                 )}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -245,7 +253,7 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
                 <p className="mt-1 font-black text-sm text-slate-800 dark:text-slate-100 truncate">{trip.driverName || 'Pending'}</p>
               </div>
               <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.trips.metricSurface}`}>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Fare</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Total Fare</p>
                 <p className={`mt-1 font-black text-sm ${ACTIVITY_THEME.trips.accentText}`}>{formatCurrency(trip.amount || 0)}</p>
               </div>
             </div>
@@ -296,36 +304,38 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
                   <span className="material-symbols-outlined">receipt_long</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                  <p className="truncate text-base font-black text-slate-900 dark:text-white uppercase tracking-tight italic">
                     {payment.trip.pickupAddress.split(',')[0]} → {payment.trip.destAddress.split(',')[0]}
                   </p>
-                  <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest">
+                  <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest italic">
                     {formatDate(payment.paidAt || payment.createdAt)}
                   </p>
                 </div>
               </div>
-              <span className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${getStatusClassName('PAID')}`}>
-                Paid
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                 <span className={`shrink-0 rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-widest ${getStatusClassName('PAID')}`}>
+                   Cleared
+                 </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.payments.metricSurface}`}>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Driver</p>
-                <p className="mt-1 font-black text-sm text-slate-800 dark:text-slate-100 truncate">{payment.trip.driver?.name || 'Pending'}</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Merchant</p>
+                <p className="mt-1 font-black text-sm text-slate-800 dark:text-slate-100 truncate">BICA · Monnify</p>
               </div>
               <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.payments.metricSurface}`}>
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Amount</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Total Paid</p>
                 <p className={`mt-1 font-black text-sm ${ACTIVITY_THEME.payments.accentText}`}>{formatCurrency(payment.totalAmount)}</p>
               </div>
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px]">
               <span className={`rounded-lg px-2.5 py-1.5 font-black uppercase tracking-widest ${ACTIVITY_THEME.payments.badge}`}>
-                {payment.paymentMethod || 'Monnify'}
+                {payment.paymentMethod || 'SECURE CHECKOUT'}
               </span>
               <span className="rounded-lg bg-slate-100 px-2.5 py-1.5 font-mono font-black text-slate-500 dark:bg-white/5 dark:text-slate-400">
-                REF: {payment.monnifyTxRef?.slice(-8) || 'N/A'}
+                REF: {payment.monnifyTxRef?.slice(-12) || 'N/A'}
               </span>
             </div>
           </div>
@@ -349,13 +359,13 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-black italic uppercase tracking-tighter">Activity</h1>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">History & Payments</p>
+            <h1 className="text-lg font-black italic uppercase tracking-tighter">Your Activity</h1>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Trip History & Receipts</p>
           </div>
           <button
             onClick={() => loadActivity()}
             className="flex size-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-all hover:bg-slate-200 active:scale-90 dark:bg-white/5 dark:text-slate-200"
-            title="Refresh activity"
+            title="Refresh records"
           >
             <span className={`material-symbols-outlined ${isLoading ? 'animate-spin' : ''}`}>refresh</span>
           </button>
@@ -370,21 +380,23 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
               <span className="material-symbols-outlined text-2xl">{activeTheme.icon}</span>
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Your Records</p>
-              <h2 className="mt-1 text-xl font-black text-slate-900 dark:text-white leading-tight uppercase tracking-tight">
-                {activeTab === 'trips' ? 'Track your ride history' : 'Verify every payment'}
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Engagement History</p>
+              <h2 className="mt-1 text-xl font-black text-slate-900 dark:text-white leading-tight uppercase tracking-tight italic">
+                {activeTab === 'trips' ? 'Track your ride records' : 'Verified settlement ledger'}
               </h2>
             </div>
           </div>
 
           <div className="relative mt-6 grid grid-cols-2 gap-4">
             <div className={`rounded-2xl border p-4 ${ACTIVITY_THEME.trips.metricSurface}`}>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Total Rides</p>
-              <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">{trips.length}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Trips</p>
+              <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic">{trips.length}</p>
             </div>
             <div className={`rounded-2xl border p-4 ${ACTIVITY_THEME.payments.metricSurface}`}>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Payments</p>
-              <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">{payments.length}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Total Spent</p>
+              <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic">
+                 ₦{payments.reduce((acc, curr) => acc + curr.totalAmount, 0).toLocaleString()}
+              </p>
             </div>
           </div>
         </div>
@@ -396,7 +408,7 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
               activeTab === 'trips' ? activeTheme.activeTab : activeTheme.inactiveTab
             }`}
           >
-            Trips
+            History
           </button>
           <button
             onClick={() => setActiveTab('payments')}
@@ -404,7 +416,7 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
               activeTab === 'payments' ? activeTheme.activeTab : activeTheme.inactiveTab
             }`}
           >
-            Payments
+            Ledger
           </button>
         </div>
 

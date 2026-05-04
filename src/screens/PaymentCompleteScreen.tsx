@@ -30,10 +30,8 @@ interface PollResult {
 // ─── Animated Spinner ─────────────────────────────────────────────────────────
 const PulsingLogo: React.FC = () => (
   <div className="relative flex items-center justify-center w-28 h-28">
-    {/* Outer ring */}
     <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-ping" />
     <div className="absolute inset-2 rounded-full border-4 border-primary/30" />
-    {/* Inner card */}
     <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-xl shadow-primary/30">
       <span className="material-symbols-outlined text-white text-3xl">payments</span>
     </div>
@@ -94,7 +92,6 @@ const PaymentCompleteScreen: React.FC = () => {
           localStorage.removeItem(STORAGE_KEY);
           setResult(data);
           setScreenState('paid');
-          // Auto-navigate after 3s
           setTimeout(async () => {
             const pending = await useRatingGateStore.getState().checkPendingRating();
             if (pending) {
@@ -122,7 +119,6 @@ const PaymentCompleteScreen: React.FC = () => {
           return;
         }
 
-        // Still PENDING — check if we've exhausted retries
         if (pollCountRef.current >= MAX_POLLS) {
           clearInterval_();
           setScreenState('timeout');
@@ -131,7 +127,6 @@ const PaymentCompleteScreen: React.FC = () => {
         clearInterval_();
         const msg = err?.message || 'Could not verify payment status.';
         if (err?.status === 401) {
-          // Auth expired mid-poll — bounce to login
           navigate('/login', { replace: true });
           return;
         }
@@ -140,18 +135,14 @@ const PaymentCompleteScreen: React.FC = () => {
       }
     };
 
-    // Run immediately, then on interval
     poll();
     intervalRef.current = setInterval(poll, POLL_INTERVAL_MS);
   };
 
-  // ── Effect: wait for session, then start polling ───────────────────────────
   useEffect(() => {
-    // Don't start until App.tsx has finished restoring session
     if (isInitializing) return;
 
     if (!isAuthenticated) {
-      // Preserve where they came from so login can redirect back
       navigate('/login', { replace: true });
       return;
     }
@@ -181,7 +172,6 @@ const PaymentCompleteScreen: React.FC = () => {
     startInitialization();
 
     const handleResume = () => {
-      // On app resume, restart the polling process from scratch to get fresh state
       clearInterval_();
       hasStartedRef.current = false;
       pollCountRef.current = 0;
@@ -195,12 +185,10 @@ const PaymentCompleteScreen: React.FC = () => {
       clearInterval_();
       window.removeEventListener('bica-app-resumed', handleResume);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitializing, isAuthenticated]);
 
-  // ─── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background-light dark:bg-background-dark px-6 py-12">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background-light dark:bg-background-dark px-6 py-12 font-display">
 
       {/* ── WAITING FOR SESSION ─────────────────────────────────────────── */}
       {(screenState === 'waiting_session') && (
@@ -208,7 +196,7 @@ const PaymentCompleteScreen: React.FC = () => {
           <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
             <span className="material-symbols-outlined text-slate-400 text-2xl animate-spin">progress_activity</span>
           </div>
-          <p className="text-sm font-black text-slate-500 uppercase tracking-widest">Restoring session…</p>
+          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Restoring session…</p>
         </div>
       )}
 
@@ -217,27 +205,33 @@ const PaymentCompleteScreen: React.FC = () => {
         <div className="flex flex-col items-center gap-6 animate-fade-in max-w-xs text-center">
           <PulsingLogo />
 
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+          <div className="space-y-1">
+             <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="bg-primary/10 text-primary text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-widest border border-primary/20">Step 1: Checkout Done</span>
+                <span className="material-symbols-outlined text-slate-300 text-xs">arrow_forward</span>
+                <span className="bg-slate-100 dark:bg-white/10 text-slate-500 text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-widest animate-pulse">Step 2: BICA Verification</span>
+             </div>
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight italic uppercase tracking-tighter">
               Verifying Payment
             </h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              We're confirming your payment with Monnify. This usually takes a few seconds.
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
+              You've completed checkout! We're now confirming the transaction with Monnify and your bank.
             </p>
           </div>
 
           <ProgressDots count={pollCount} max={MAX_POLLS} />
 
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest animate-pulse">
-            Please don't close this page…
-          </p>
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center leading-relaxed">
+               Please stay on this page.<br/>Confirmation usually takes 5-15 seconds.
+             </p>
+          </div>
         </div>
       )}
 
       {/* ── PAID ────────────────────────────────────────────────────────── */}
       {screenState === 'paid' && (
         <div className="flex flex-col items-center gap-6 animate-fade-in max-w-xs text-center">
-          {/* Success icon */}
           <div className="relative w-28 h-28 flex items-center justify-center">
             <div className="absolute inset-0 rounded-full bg-emerald-500/10 animate-ping" />
             <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-xl shadow-emerald-500/30">
@@ -246,23 +240,26 @@ const PaymentCompleteScreen: React.FC = () => {
           </div>
 
           <div>
-            <h1 className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
-              Payment Confirmed!
+            <h1 className="text-3xl font-black text-emerald-600 dark:text-emerald-400 tracking-tighter italic uppercase">
+              Settled!
             </h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              Your trip has been settled successfully. Thank you for riding with BICA.
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-bold">
+              Verification successful. Your trip is fully paid and your chauffeur has been notified.
             </p>
             {result?.amountPaid && (
-              <p className="mt-3 text-2xl font-black text-slate-900 dark:text-white">
-                ₦{result.amountPaid.toLocaleString()}
-              </p>
+              <div className="mt-4 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20">
+                <p className="text-[10px] font-black text-emerald-600/50 uppercase tracking-widest mb-1">Total Verified Amount</p>
+                <p className="text-3xl font-black text-slate-900 dark:text-white">
+                  ₦{result.amountPaid.toLocaleString()}
+                </p>
+              </div>
             )}
           </div>
 
           <div className="w-full p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 flex items-center gap-3">
-            <span className="material-symbols-outlined text-emerald-500 text-lg">schedule_send</span>
-            <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-left">
-              Redirecting to dashboard in 3 seconds…
+            <span className="material-symbols-outlined text-emerald-500 text-lg">auto_mode</span>
+            <p className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-wider text-left leading-tight">
+              Auto-redirecting to dashboard<br/>for your receipt...
             </p>
           </div>
 
@@ -275,9 +272,9 @@ const PaymentCompleteScreen: React.FC = () => {
                 navigate('/owner', { replace: true });
               }
             }}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 uppercase tracking-widest text-sm"
+            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 uppercase tracking-[0.2em] text-xs"
           >
-            Go to Dashboard Now
+            Dashboard
           </button>
         </div>
       )}
@@ -290,22 +287,22 @@ const PaymentCompleteScreen: React.FC = () => {
           </div>
 
           <div>
-            <h1 className="text-2xl font-black text-amber-600 dark:text-amber-400 tracking-tight">
-              Partial Payment
+            <h1 className="text-2xl font-black text-amber-600 dark:text-amber-400 tracking-tight italic uppercase">
+              Incomplete Payment
             </h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              We received part of your payment. Please settle the remaining balance to complete the trip.
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-bold">
+              We received a partial amount. The remaining balance must be settled to clear this trip.
             </p>
           </div>
 
           {result && (
             <div className="w-full space-y-3">
               <div className="flex justify-between items-center p-4 bg-slate-50 dark:bg-white/5 rounded-2xl">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Amount Paid</span>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Amount Paid</span>
                 <span className="text-lg font-black text-emerald-600">₦{(result.amountPaid ?? 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center p-4 bg-amber-500/5 rounded-2xl border border-amber-500/20">
-                <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">Balance Due</span>
+                <span className="text-[10px] font-black text-amber-600 uppercase tracking-wider">Balance Due</span>
                 <span className="text-lg font-black text-amber-600">₦{(result.amountRemaining ?? 0).toLocaleString()}</span>
               </div>
             </div>
@@ -313,9 +310,9 @@ const PaymentCompleteScreen: React.FC = () => {
 
           <button
             onClick={() => navigate('/owner', { replace: true })}
-            className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 uppercase tracking-widest text-sm"
+            className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 uppercase tracking-[0.2em] text-xs"
           >
-            Return to Dashboard
+            Review Balance
           </button>
         </div>
       )}
@@ -328,19 +325,19 @@ const PaymentCompleteScreen: React.FC = () => {
           </div>
 
           <div>
-            <h1 className="text-2xl font-black text-red-600 dark:text-red-400 tracking-tight">
-              Payment Failed
+            <h1 className="text-2xl font-black text-red-600 dark:text-red-400 tracking-tight italic uppercase">
+              Verification Failed
             </h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              Your payment could not be completed. Please try again from the trip summary.
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-bold">
+              Monnify could not confirm this payment. If you have been debited, please wait 5 minutes and refresh your dashboard.
             </p>
           </div>
 
           <button
             onClick={() => navigate('/owner', { replace: true })}
-            className="w-full bg-primary hover:bg-primary/90 text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/20 transition-all active:scale-95 uppercase tracking-widest text-sm"
+            className="w-full bg-primary hover:bg-primary/90 text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/20 transition-all active:scale-95 uppercase tracking-[0.2em] text-xs"
           >
-            Try Again
+            Retry from Summary
           </button>
         </div>
       )}
@@ -349,30 +346,38 @@ const PaymentCompleteScreen: React.FC = () => {
       {screenState === 'timeout' && (
         <div className="flex flex-col items-center gap-6 animate-fade-in max-w-xs text-center">
           <div className="w-20 h-20 rounded-full bg-blue-500/10 border-2 border-blue-500/20 flex items-center justify-center">
-            <span className="material-symbols-outlined text-blue-500 text-4xl">hourglass_bottom</span>
+            <span className="material-symbols-outlined text-blue-500 text-4xl">history</span>
           </div>
 
           <div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              Still Processing
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight italic uppercase">
+              Pending Sync
             </h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              Your payment is being processed by Monnify. It may take a couple more minutes to reflect. You can check your trip status from the dashboard.
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-bold">
+              Verification is taking longer than usual. Your payment is being processed in the background.
             </p>
           </div>
 
-          <div className="w-full p-4 rounded-2xl bg-blue-500/5 border border-blue-500/20 flex items-center gap-3">
-            <span className="material-symbols-outlined text-blue-400 text-lg">info</span>
-            <p className="text-xs font-bold text-blue-600 dark:text-blue-400 leading-relaxed text-left">
-              Your status will update automatically once Monnify confirms the transaction.
-            </p>
+          <div className="w-full p-5 rounded-3xl bg-blue-500/5 border border-blue-500/20 space-y-3">
+            <div className="flex items-start gap-3">
+               <span className="material-symbols-outlined text-blue-500 text-sm mt-0.5">info</span>
+               <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300 text-left leading-relaxed">
+                 BICA will continue to check your payment status automatically. You don't need to pay again.
+               </p>
+            </div>
+            <div className="flex items-start gap-3">
+               <span className="material-symbols-outlined text-blue-500 text-sm mt-0.5">check_circle</span>
+               <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300 text-left leading-relaxed">
+                 Check your "Activity" tab in 5-10 minutes to see the confirmed status.
+               </p>
+            </div>
           </div>
 
           <button
             onClick={() => navigate('/owner', { replace: true })}
-            className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black py-4 rounded-2xl transition-all active:scale-95 uppercase tracking-widest text-sm"
+            className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black py-4 rounded-2xl transition-all active:scale-95 uppercase tracking-[0.2em] text-xs"
           >
-            Check Later
+            Back to Dashboard
           </button>
         </div>
       )}
@@ -385,19 +390,19 @@ const PaymentCompleteScreen: React.FC = () => {
           </div>
 
           <div>
-            <h1 className="text-xl font-black text-slate-900 dark:text-white">
-              Nothing to Verify
+            <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">
+              Record Not Found
             </h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              We couldn't find a pending payment to check. Head back to the dashboard to view your trips.
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-bold">
+              We couldn't identify an active payment to verify.
             </p>
           </div>
 
           <button
             onClick={() => navigate('/owner', { replace: true })}
-            className="w-full bg-primary text-white font-black py-4 rounded-2xl transition-all active:scale-95 uppercase tracking-widest text-sm"
+            className="w-full bg-primary text-white font-black py-4 rounded-2xl transition-all active:scale-95 uppercase tracking-[0.2em] text-xs"
           >
-            Go to Dashboard
+            Dashboard
           </button>
         </div>
       )}
@@ -410,17 +415,16 @@ const PaymentCompleteScreen: React.FC = () => {
           </div>
 
           <div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white">
-              Connection Error
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">
+              Network Issue
             </h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              {errorMsg || 'Unable to reach the server. Please check your connection and try again.'}
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-bold">
+              {errorMsg || 'Unable to reach the BICA verification server. Please check your connection.'}
             </p>
           </div>
 
           <button
             onClick={() => {
-              // Reset and retry
               hasStartedRef.current = false;
               pollCountRef.current = 0;
               setPollCount(0);
@@ -432,26 +436,19 @@ const PaymentCompleteScreen: React.FC = () => {
                 setScreenState('no_trip');
               }
             }}
-            className="w-full bg-primary text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/20 transition-all active:scale-95 uppercase tracking-widest text-sm"
+            className="w-full bg-primary text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/20 transition-all active:scale-95 uppercase tracking-[0.2em] text-xs"
           >
-            Retry
-          </button>
-
-          <button
-            onClick={() => navigate('/owner', { replace: true })}
-            className="w-full bg-transparent border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-black py-3 rounded-2xl transition-all active:scale-95 uppercase tracking-widest text-xs"
-          >
-            Go to Dashboard
+            Retry Verification
           </button>
         </div>
       )}
 
       {/* ── Branding footer ─────────────────────────────────────────────── */}
-      <div className="absolute bottom-8 flex flex-col items-center gap-1">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">
-          Powered by
+      <div className="absolute bottom-8 flex flex-col items-center gap-1 opacity-40">
+        <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.4em]">
+          Secure Verification
         </p>
-        <span className="text-sm font-bold text-slate-600 dark:text-slate-300 italic tracking-tight">
+        <span className="text-xs font-black text-slate-600 dark:text-slate-300 italic tracking-tighter">
           BICA<span className="text-primary not-italic">DRIVE</span>
         </span>
       </div>
