@@ -1,5 +1,6 @@
 import React from 'react';
 import { IMAGES } from '../../constants';
+import { Skeleton } from '../Common/Skeleton';
 
 interface DriverPickerModalProps {
   onClose: () => void;
@@ -16,7 +17,7 @@ const DriverPickerModal: React.FC<DriverPickerModalProps> = ({
 }) => {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center p-4 animate-fade-in" onClick={onClose}>
-      <div className="w-full max-h-[70vh] bg-surface-light dark:bg-surface-dark rounded-[2rem] p-6 shadow-2xl animate-slide-up overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="w-full max-h-[70vh] bg-surface-light dark:bg-surface-dark rounded-[2.5rem] p-6 shadow-2xl animate-slide-up overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-xl font-bold text-slate-900 dark:text-white">Choose a Driver</h3>
@@ -26,17 +27,24 @@ const DriverPickerModal: React.FC<DriverPickerModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+            className="size-11 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
           >
             <span className="material-symbols-outlined">close</span>
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto no-scrollbar pb-4">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-4">
-              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-slate-500 font-bold animate-pulse">Finding nearby drivers...</p>
+          {isLoading && availableDrivers.length === 0 ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
+                  <Skeleton circle width={56} height={56} />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton width="60%" height={16} />
+                    <Skeleton width="40%" height={12} />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : availableDrivers.length === 0 ? (
             <div className="text-center py-12">

@@ -31,6 +31,7 @@ export const useOwnerLocationSearch = ({ onPickupChanged }: UseOwnerLocationSear
   const [isSearching, setIsSearching] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [routeError, setRouteError] = useState<string | null>(null);
   const pickupExistsRef = useRef(false);
   const searchRequestIdRef = useRef(0);
   const onPickupChangedRef = useRef(onPickupChanged);
@@ -69,6 +70,7 @@ export const useOwnerLocationSearch = ({ onPickupChanged }: UseOwnerLocationSear
 
     setIsFetchingRoute(true);
     try {
+      setRouteError(null);
       const route = await LocationService.getRoute(
         pickup.lat,
         pickup.lon,
@@ -83,7 +85,7 @@ export const useOwnerLocationSearch = ({ onPickupChanged }: UseOwnerLocationSear
       setEstimatedPrice(route.fareEstimate.low);
     } catch (error) {
       console.error('Failed to refresh route from backend:', error);
-      toast.error('Could not get a fare estimate right now. Please check your connection.');
+      setRouteError('Could not get a fare estimate right now. Please check your connection.');
       // Reset estimates on error
       setEstimatedDistance('');
       setEstimatedMins(0);
@@ -213,6 +215,7 @@ export const useOwnerLocationSearch = ({ onPickupChanged }: UseOwnerLocationSear
     setEstimatedMins(0);
     setCurrentTrafficMins(0);
     setFareRange(null);
+    setRouteError(null);
     setIsSearchingPickup(false);
     setIsSearchingDest(false);
   };
@@ -373,6 +376,7 @@ export const useOwnerLocationSearch = ({ onPickupChanged }: UseOwnerLocationSear
     isSearching,
     isLocating,
     searchError,
+    routeError,
     clearSearchState,
     setIsSearchingPickup,
     setIsSearchingDest,

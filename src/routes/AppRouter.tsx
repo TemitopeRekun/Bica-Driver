@@ -27,7 +27,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: UserRole[], 
   const { pendingRating } = useRatingGateStore();
   const location = useLocation();
 
-  if (isInitializing) return <LoadingScreen onComplete={() => {}} />;
+  if (isInitializing) return <LoadingScreen message="Restoring Secure Session..." />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (roles && currentUser && !roles.includes(currentUser.role)) {
     return <Navigate to="/" replace />;

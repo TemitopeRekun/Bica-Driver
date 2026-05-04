@@ -18,6 +18,8 @@ import DriverPickerModal from '@/components/RequestRide/DriverPickerModal';
 import VehicleDetailsModal from '@/components/RequestRide/VehicleDetailsModal';
 import TripPaymentSummary from '@/components/RequestRide/TripPaymentSummary';
 import DriverStatusCard from '@/components/RequestRide/DriverStatusCard';
+import { InlineError } from '@/components/Common/InlineError';
+import { Skeleton } from '@/components/Common/Skeleton';
 
 import { IMAGES } from '@/constants';
 import { UserRole, Trip } from '@/types';
@@ -64,7 +66,7 @@ const RequestRideScreen: React.FC = () => {
   const {
     pickup, destination, mapCenter, estimatedPrice, estimatedDistance,
     isSearchingPickup, isSearchingDest, searchQuery, isFetchingRoute,
-    searchResults, isSearching, isLocating, searchError, estimatedMins,
+    searchResults, isSearching, isLocating, searchError, routeError, estimatedMins,
     currentTrafficMins,
     setSearchQuery, setIsSearchingPickup, setIsSearchingDest,
     handleUseMyLocation, handleMarkerDragEnd, handleSelectLocation,
@@ -94,12 +96,11 @@ const RequestRideScreen: React.FC = () => {
   useEffect(() => {
     const initSync = async () => {
       // 🛡️ [SENIOR_FIX] Session Identity Validation
-      // Check if the persisted ride context belongs to the current user
       const { lastUserId, resetRide: clearStaleRide } = useRideStore.getState();
       if (lastUserId && currentUser?.id && lastUserId !== currentUser.id) {
         console.warn(`🕵️ Session mismatch detected (${lastUserId} !== ${currentUser.id}). Isolating accounts...`);
         clearStaleRide();
-        return; // Start fresh for the new user
+        return; 
       }
 
       try {
@@ -109,8 +110,7 @@ const RequestRideScreen: React.FC = () => {
       }
     };
     initSync();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only sync on mount
+  }, []); 
 
   // Sync refs for the Realtime hook
   useEffect(() => {
@@ -157,13 +157,11 @@ const RequestRideScreen: React.FC = () => {
        else if (m === 'assigned') setRideMilestone('assigned');
        else if (m === 'completed') {
           setRideMilestone('completed');
-          // Only sync if we haven't already transitioned to COMPLETED to avoid state flickering
           if (rideStateRef.current !== 'COMPLETED') {
             syncCurrentRide();
           }
        }
 
-       // Update driver info with new security fields if they arrive via socket
        if (payload.otp || payload.acceptanceImageUrl) {
          const { driverInfo: currentInfo, setDriverInfo: updateInfo } = useRideStore.getState();
          updateInfo({
@@ -178,8 +176,6 @@ const RequestRideScreen: React.FC = () => {
     }
   });
 
-  // 🚀 [PREMIUM_UX] Dedicated Trip Status Redirect
-  // If we have an active ride, move to the dedicated status screen for a better UX
   useEffect(() => {
     if (['SEARCHING', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED'].includes(rideState)) {
       navigate('/owner/status');
@@ -188,10 +184,7 @@ const RequestRideScreen: React.FC = () => {
 
   const handleCancelRide = async () => {
     if (currentTripId) {
-      console.log(`[ACTION] Owner initiating cancellation for trip: ${currentTripId}`);
-      // Send redundant socket signal for instant UI feedback across devices
       emitCancel(currentTripId);
-      // Canonical cancellation via API
       await cancelRide(currentTripId);
     } else {
       resetRide();
@@ -224,7 +217,6 @@ const RequestRideScreen: React.FC = () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
     
-    // The "Golden Rule": Generate a NEW key per unique action/intent
     const rideIntentId = generateUUID();
 
     try {
@@ -242,7 +234,6 @@ const RequestRideScreen: React.FC = () => {
       );
       setShowDriverPicker(false);
     } catch (error: any) {
-       // Handle 409 Conflict: Already being processed by backend
         if (error.status === 400) {
            addToast('Status mismatch. Refreshing...', 'info');
            await syncCurrentRide();
@@ -335,7 +326,6 @@ const RequestRideScreen: React.FC = () => {
 
       <header className="relative z-10 px-4 py-8 flex items-center justify-between pointer-events-none">
         <div className="flex-1 pointer-events-auto">
-           {/* Placeholder for left-side items if needed */}
         </div>
 
         <div className="flex flex-col items-center pointer-events-none">
@@ -419,32 +409,35 @@ const RequestRideScreen: React.FC = () => {
                  <div className="mt-6 p-4 bg-primary/5 rounded-2xl border border-primary/10 transition-all">
                     <div className="flex justify-between items-center">
                        <div className="flex-1">
-                         <div className="flex items-center gap-2 mb-1">
-                           <p className="text-[10px] font-bold text-primary uppercase tracking-widest">Estimated Fare</p>
-                           {isFetchingRoute && <div className="size-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
-                         </div>
-                         
-                         {isFetchingRoute ? (
-                           <div className="space-y-2">
-                             <div className="h-8 w-32 bg-primary/20 animate-pulse rounded-lg" />
-                             <div className="h-3 w-24 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-full" />
-                           </div>
-                         ) : (
-                           <>
-                             <p className="text-2xl font-black">₦{estimatedPrice}</p>
-                             <div className="flex items-center gap-2 mt-0.5">
-                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{estimatedDistance} km</p>
-                               <span className="text-[10px] text-slate-300">•</span>
-                               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                 {currentTrafficMins > estimatedMins ? `${currentTrafficMins} mins (Traffic)` : `${estimatedMins} mins`}
-                               </p>
-                             </div>
-                           </>
-                         )}
+                          <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-1">Estimated Fare</p>
+                          
+                          {routeError ? (
+                            <InlineError 
+                              message={routeError} 
+                              onRetry={refreshRoute}
+                              className="py-4 mt-2"
+                            />
+                          ) : isFetchingRoute ? (
+                            <div className="space-y-2 mt-2">
+                              <Skeleton width={120} height={32} />
+                              <Skeleton width={80} height={12} />
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-2xl font-black">₦{estimatedPrice}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{estimatedDistance} km</p>
+                                <span className="text-[10px] text-slate-300">•</span>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                  {currentTrafficMins > estimatedMins ? `${currentTrafficMins} mins (Traffic)` : `${estimatedMins} mins`}
+                                </p>
+                              </div>
+                            </>
+                          )}
                        </div>
                        <button 
                          onClick={() => setShowVehicleForm(true)} 
-                         disabled={isFetchingRoute}
+                         disabled={isFetchingRoute || !!routeError}
                          className="bg-primary hover:bg-primary-dark disabled:opacity-50 transition-colors text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-wider shadow-lg shadow-primary/20"
                        >
                          {bookingType === 'schedule' ? 'Schedule' : 'Request Now'}

@@ -20,6 +20,8 @@ import { CapacitorService } from '@/services/CapacitorService';
 import { IMAGES } from '@/constants';
 import { CameraSource, CameraDirection } from '@capacitor/camera';
 import { api } from '@/services/api.service';
+import { Skeleton, CardSkeleton } from '@/components/Common/Skeleton';
+import { InlineError } from '@/components/Common/InlineError';
 
 const DriverMainScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -37,6 +39,7 @@ const DriverMainScreen: React.FC = () => {
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
   const [pendingRide, setPendingRide] = useState<DriverRideRequest | null>(null);
   const [completedTripSummary, setCompletedTripSummary] = useState<any | null>(null);
+  const [requestsError, setRequestsError] = useState<string | null>(null);
 
   // Car Condition State (Refactored to Hook)
   const [showConditionModal, setShowConditionModal] = useState(false);
@@ -84,6 +87,7 @@ const DriverMainScreen: React.FC = () => {
     loadWalletSummary();
     const recoverSession = async () => {
       try {
+        setRequestsError(null);
         const trip = await syncCurrentRide();
         if (trip && !['COMPLETED', 'CANCELLED', 'REJECTED'].includes(trip.status)) {
            if (trip.driverId === currentUser?.id && trip.status !== 'PENDING_ACCEPTANCE') {
@@ -102,7 +106,9 @@ const DriverMainScreen: React.FC = () => {
              });
            }
         }
-      } catch (e) {}
+      } catch (e: any) {
+        setRequestsError('Failed to synchronize with server. Please try again.');
+      }
     };
     recoverSession();
   }, [syncCurrentRide, currentUser?.id, loadWalletSummary]);
@@ -255,8 +261,18 @@ const DriverMainScreen: React.FC = () => {
                    {isOnline && isSocketConnected && <span className="px-3 py-1 bg-primary/20 text-primary text-[10px] font-black rounded-full border border-primary/20 animate-pulse uppercase">Searching</span>}
                    {isOnline && !isSocketConnected && <span className="px-3 py-1 bg-amber-500/20 text-amber-500 text-[10px] font-black rounded-full border border-amber-500/20 animate-pulse uppercase">Reconnecting</span>}
                 </div>
-                {liveRideRequests.length > 0 ? (
+                {requestsError ? (
+                   <InlineError 
+                     message={requestsError} 
+                     onRetry={() => { setRequestsError(null); syncCurrentRide(); }} 
+                   />
+                ) : liveRideRequests.length > 0 ? (
                    liveRideRequests.map((req) => <RideRequestCard key={req.id} request={req} onAccept={handleAcceptRide} onDecline={(r) => declineRide(r.id)} />)
+                ) : (isOnline && isSocketConnected) ? (
+                   <div className="space-y-4 animate-pulse">
+                      <CardSkeleton />
+                      <CardSkeleton />
+                   </div>
                 ) : (
                    <div className="py-12 text-center text-slate-500">
                       <span className="material-symbols-outlined text-4xl mb-4 block">radar</span>

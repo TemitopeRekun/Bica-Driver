@@ -1,17 +1,25 @@
 import React, { useEffect } from 'react';
 
 interface LoadingScreenProps {
-  onComplete: () => void;
+  onComplete?: () => void;
+  message?: string;
+  autoCompleteMs?: number;
 }
 
-const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
+const LoadingScreen: React.FC<LoadingScreenProps> = ({ 
+  onComplete, 
+  message = 'Initializing BICA Secure Environment',
+  autoCompleteMs 
+}) => {
   useEffect(() => {
+    if (!onComplete || !autoCompleteMs) return;
+
     const timer = setTimeout(() => {
       onComplete();
-    }, 3000); // 3 seconds loading time
+    }, autoCompleteMs);
 
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, [onComplete, autoCompleteMs]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full bg-white dark:bg-[#032e02] relative overflow-hidden">
@@ -45,10 +53,15 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onComplete }) => {
         </div>
         
         {/* Loading Indicator */}
-        <div className="mt-12 flex space-x-2">
-           <div className="w-3 h-3 bg-[#f17606] rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-           <div className="w-3 h-3 bg-[#f17606] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-           <div className="w-3 h-3 bg-[#f17606] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+        <div className="mt-12 flex flex-col items-center gap-6">
+           <div className="flex space-x-2">
+              <div className="w-3 h-3 bg-[#f17606] rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+              <div className="w-3 h-3 bg-[#f17606] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div className="w-3 h-3 bg-[#f17606] rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+           </div>
+           <p className="text-[10px] font-black text-slate-500 dark:text-emerald-500/50 uppercase tracking-[0.3em] animate-pulse">
+             {message}
+           </p>
         </div>
       </div>
     </div>

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { mapTrip } from '@/mappers/appMappers';
 import { api, PaginatedResponse, PaginationMeta } from '@/services/api.service';
 import { OwnerActivityTab, PaymentHistoryRecord, Trip } from '@/types';
+import { Skeleton } from '@/components/Common/Skeleton';
+import { InlineError } from '@/components/Common/InlineError';
 
 interface OwnerActivityScreenProps {
   initialTab: OwnerActivityTab;
@@ -170,15 +172,15 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
     const isTripTab = tab === 'trips';
 
     return (
-      <div className={`relative overflow-hidden rounded-[1.75rem] border p-8 text-center ${theme.card}`}>
-        <div className={`absolute inset-x-0 top-0 h-24 bg-gradient-to-b ${theme.glow} pointer-events-none`} />
-        <div className={`mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full ${theme.iconSurface}`}>
-          <span className="material-symbols-outlined">{theme.icon}</span>
+      <div className={`relative overflow-hidden rounded-[2.5rem] border p-12 text-center ${theme.card}`}>
+        <div className={`absolute inset-x-0 top-0 h-32 bg-gradient-to-b ${theme.glow} pointer-events-none`} />
+        <div className={`mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl ${theme.iconSurface}`}>
+          <span className="material-symbols-outlined text-3xl">{theme.icon}</span>
         </div>
-        <h3 className="text-lg font-black text-slate-900 dark:text-white">
+        <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
           {isTripTab ? 'No trips yet' : 'No payments yet'}
         </h3>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-[240px] mx-auto font-medium">
           {isTripTab
             ? 'Your ride history will appear here once you start booking trips.'
             : 'Completed trip payments will be listed here when they are confirmed.'}
@@ -194,7 +196,6 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
 
     return (
       <div className="space-y-4">
-        {/* Pagination Controls */}
         {tripsMeta && tripsMeta.totalPages > 1 && (
           <div className="flex items-center justify-between mb-4 bg-white/40 dark:bg-white/5 p-2 rounded-2xl border border-emerald-100 dark:border-emerald-500/20">
             <button 
@@ -220,32 +221,32 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
         {trips.map((trip) => (
           <div
             key={trip.id}
-            className={`relative overflow-hidden rounded-[1.75rem] border p-4 ${ACTIVITY_THEME.trips.card}`}
+            className={`relative overflow-hidden rounded-[2rem] border p-5 ${ACTIVITY_THEME.trips.card}`}
           >
             <div className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-b ${ACTIVITY_THEME.trips.glow} pointer-events-none`} />
-            <div className="relative mb-4 flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${ACTIVITY_THEME.trips.iconSurface}`}>
+            <div className="relative mb-5 flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-4">
+                <div className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${ACTIVITY_THEME.trips.iconSurface}`}>
                   <span className="material-symbols-outlined">route</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-base font-black text-slate-900 dark:text-white">{getTripTitle(trip)}</p>
-                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">{formatDate(trip.createdAt || trip.date)}</p>
+                  <p className="truncate text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">{getTripTitle(trip)}</p>
+                  <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest">{formatDate(trip.createdAt || trip.date)}</p>
                 </div>
               </div>
-              <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${getStatusClassName(trip.status)}`}>
+              <span className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${getStatusClassName(trip.status)}`}>
                 {trip.status.replace(/_/g, ' ')}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className={`rounded-2xl border px-3 py-3 ${ACTIVITY_THEME.trips.metricSurface}`}>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Driver</p>
-                <p className="mt-1 font-semibold text-slate-800 dark:text-slate-100">{trip.driverName || 'Pending assignment'}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.trips.metricSurface}`}>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Driver</p>
+                <p className="mt-1 font-black text-sm text-slate-800 dark:text-slate-100 truncate">{trip.driverName || 'Pending'}</p>
               </div>
-              <div className={`rounded-2xl border px-3 py-3 ${ACTIVITY_THEME.trips.metricSurface}`}>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Fare</p>
-                <p className={`mt-1 font-black ${ACTIVITY_THEME.trips.accentText}`}>{formatCurrency(trip.amount || 0)}</p>
+              <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.trips.metricSurface}`}>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Fare</p>
+                <p className={`mt-1 font-black text-sm ${ACTIVITY_THEME.trips.accentText}`}>{formatCurrency(trip.amount || 0)}</p>
               </div>
             </div>
           </div>
@@ -261,7 +262,6 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
 
     return (
       <div className="space-y-4">
-        {/* Pagination Controls */}
         {paymentsMeta && paymentsMeta.totalPages > 1 && (
           <div className="flex items-center justify-between mb-4 bg-white/40 dark:bg-white/5 p-2 rounded-2xl border border-amber-100 dark:border-amber-500/20">
             <button 
@@ -287,45 +287,45 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
         {payments.map((payment) => (
           <div
             key={payment.id}
-            className={`relative overflow-hidden rounded-[1.75rem] border p-4 ${ACTIVITY_THEME.payments.card}`}
+            className={`relative overflow-hidden rounded-[2rem] border p-5 ${ACTIVITY_THEME.payments.card}`}
           >
             <div className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-b ${ACTIVITY_THEME.payments.glow} pointer-events-none`} />
-            <div className="relative mb-4 flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${ACTIVITY_THEME.payments.iconSurface}`}>
+            <div className="relative mb-5 flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-start gap-4">
+                <div className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${ACTIVITY_THEME.payments.iconSurface}`}>
                   <span className="material-symbols-outlined">receipt_long</span>
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-base font-black text-slate-900 dark:text-white">
-                    {payment.trip.pickupAddress.split(',')[0]} to {payment.trip.destAddress.split(',')[0]}
+                  <p className="truncate text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">
+                    {payment.trip.pickupAddress.split(',')[0]} → {payment.trip.destAddress.split(',')[0]}
                   </p>
-                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                  <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest">
                     {formatDate(payment.paidAt || payment.createdAt)}
                   </p>
                 </div>
               </div>
-              <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${getStatusClassName('PAID')}`}>
+              <span className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${getStatusClassName('PAID')}`}>
                 Paid
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className={`rounded-2xl border px-3 py-3 ${ACTIVITY_THEME.payments.metricSurface}`}>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Driver</p>
-                <p className="mt-1 font-semibold text-slate-800 dark:text-slate-100">{payment.trip.driver?.name || 'Driver pending'}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.payments.metricSurface}`}>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Driver</p>
+                <p className="mt-1 font-black text-sm text-slate-800 dark:text-slate-100 truncate">{payment.trip.driver?.name || 'Pending'}</p>
               </div>
-              <div className={`rounded-2xl border px-3 py-3 ${ACTIVITY_THEME.payments.metricSurface}`}>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Amount</p>
-                <p className={`mt-1 font-black ${ACTIVITY_THEME.payments.accentText}`}>{formatCurrency(payment.totalAmount)}</p>
+              <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.payments.metricSurface}`}>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Amount</p>
+                <p className={`mt-1 font-black text-sm ${ACTIVITY_THEME.payments.accentText}`}>{formatCurrency(payment.totalAmount)}</p>
               </div>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-              <span className={`rounded-full px-2.5 py-1 font-bold ${ACTIVITY_THEME.payments.badge}`}>
-                {payment.paymentMethod || 'Payment method not provided'}
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-[10px]">
+              <span className={`rounded-lg px-2.5 py-1.5 font-black uppercase tracking-widest ${ACTIVITY_THEME.payments.badge}`}>
+                {payment.paymentMethod || 'Monnify'}
               </span>
-              <span className="rounded-full bg-slate-900/5 px-2.5 py-1 font-medium text-slate-600 dark:bg-white/5 dark:text-slate-300">
-                {payment.monnifyTxRef || 'Reference unavailable'}
+              <span className="rounded-lg bg-slate-100 px-2.5 py-1.5 font-mono font-black text-slate-500 dark:bg-white/5 dark:text-slate-400">
+                REF: {payment.monnifyTxRef?.slice(-8) || 'N/A'}
               </span>
             </div>
           </div>
@@ -337,28 +337,24 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
   const activeTheme = ACTIVITY_THEME[activeTab];
 
   return (
-    <div className="relative min-h-screen bg-background-light text-slate-900 dark:bg-background-dark dark:text-white">
+    <div className="relative min-h-screen bg-background-light text-slate-900 dark:bg-background-dark dark:text-white font-display">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-emerald-500/10 via-amber-500/8 to-transparent" />
 
       <div className="sticky top-0 z-20 border-b border-slate-200 bg-background-light/88 backdrop-blur-md dark:border-slate-800 dark:bg-background-dark/88">
-        <div className="mx-auto flex max-w-md items-center gap-3 p-4">
+        <div className="mx-auto flex max-w-md items-center gap-4 p-4">
           <button
             onClick={onBack}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            className="flex size-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-all hover:bg-slate-200 active:scale-90 dark:bg-white/5 dark:text-slate-200"
           >
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-black">Activity</h1>
-            <p className="text-xs text-slate-500">Recent trips and payment history</p>
+            <h1 className="text-lg font-black italic uppercase tracking-tighter">Activity</h1>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">History & Payments</p>
           </div>
           <button
-            onClick={() => loadActivity().catch((loadError) => {
-              console.error('Failed to refresh owner activity:', loadError);
-              setError('Could not refresh activity right now.');
-              setIsLoading(false);
-            })}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            onClick={() => loadActivity()}
+            className="flex size-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-all hover:bg-slate-200 active:scale-90 dark:bg-white/5 dark:text-slate-200"
             title="Refresh activity"
           >
             <span className={`material-symbols-outlined ${isLoading ? 'animate-spin' : ''}`}>refresh</span>
@@ -366,80 +362,68 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
         </div>
       </div>
 
-      <div className="relative mx-auto flex max-w-md flex-col gap-4 px-4 pb-8 pt-5">
-        <div className={`relative overflow-hidden rounded-[2rem] border p-5 shadow-xl shadow-slate-900/5 ${activeTheme.hero}`}>
-          <div className={`absolute inset-x-0 top-0 h-24 bg-gradient-to-b ${activeTheme.glow} pointer-events-none`} />
-          <div className="relative flex items-start gap-4">
-            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${activeTheme.iconSurface}`}>
-              <span className="material-symbols-outlined">{activeTheme.icon}</span>
+      <div className="relative mx-auto flex max-w-md flex-col gap-5 px-4 pb-12 pt-6">
+        <div className={`relative overflow-hidden rounded-[2.5rem] p-6 shadow-2xl shadow-black/5 border ${activeTheme.hero}`}>
+          <div className={`absolute inset-x-0 top-0 h-32 bg-gradient-to-b ${activeTheme.glow} pointer-events-none`} />
+          <div className="relative flex items-start gap-5">
+            <div className={`flex size-14 shrink-0 items-center justify-center rounded-2xl shadow-lg ${activeTheme.iconSurface}`}>
+              <span className="material-symbols-outlined text-2xl">{activeTheme.icon}</span>
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.25em] text-slate-500">Owner activity</p>
-              <h2 className="mt-1 text-xl font-black text-slate-900 dark:text-white">
-                {activeTab === 'trips' ? 'Track every ride you have booked' : 'See every confirmed payment at a glance'}
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Your Records</p>
+              <h2 className="mt-1 text-xl font-black text-slate-900 dark:text-white leading-tight uppercase tracking-tight">
+                {activeTab === 'trips' ? 'Track your ride history' : 'Verify every payment'}
               </h2>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                {activeTab === 'trips'
-                  ? 'Manage your travel history and review your ride details in one place.'
-                  : 'Track your confirmed payments and maintain total budget transparency.'}
-              </p>
             </div>
           </div>
 
-          <div className="relative mt-4 grid grid-cols-2 gap-3">
-            <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.trips.metricSurface}`}>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Trips logged</p>
+          <div className="relative mt-6 grid grid-cols-2 gap-4">
+            <div className={`rounded-2xl border p-4 ${ACTIVITY_THEME.trips.metricSurface}`}>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Total Rides</p>
               <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">{trips.length}</p>
             </div>
-            <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.payments.metricSurface}`}>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Payments made</p>
+            <div className={`rounded-2xl border p-4 ${ACTIVITY_THEME.payments.metricSurface}`}>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Payments</p>
               <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">{payments.length}</p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 rounded-[1.25rem] border border-slate-200/80 bg-white/70 p-1.5 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/70">
+        <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-1.5 shadow-sm backdrop-blur-md dark:border-white/5 dark:bg-white/5">
           <button
             onClick={() => setActiveTab('trips')}
-            className={`rounded-[1rem] px-4 py-3 text-sm font-black transition-all ${
-              activeTab === 'trips' ? ACTIVITY_THEME.trips.activeTab : ACTIVITY_THEME.trips.inactiveTab
+            className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${
+              activeTab === 'trips' ? activeTheme.activeTab : activeTheme.inactiveTab
             }`}
           >
             Trips
           </button>
           <button
             onClick={() => setActiveTab('payments')}
-            className={`rounded-[1rem] px-4 py-3 text-sm font-black transition-all ${
-              activeTab === 'payments' ? ACTIVITY_THEME.payments.activeTab : ACTIVITY_THEME.payments.inactiveTab
+            className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${
+              activeTab === 'payments' ? activeTheme.activeTab : activeTheme.inactiveTab
             }`}
           >
             Payments
           </button>
         </div>
 
-        {error && (
-          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
-            {error}
-          </div>
-        )}
-
-        {isLoading ? (
+        {error ? (
+           <InlineError message={error} onRetry={loadActivity} />
+        ) : isLoading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((item) => (
-              <div
-                key={item}
-                className={`animate-pulse rounded-[1.75rem] border p-4 ${activeTheme.card}`}
-              >
-                <div className="mb-4 flex items-center gap-3">
-                  <div className={`h-11 w-11 rounded-2xl ${activeTheme.iconSurface}`} />
-                  <div className="flex-1">
-                    <div className="mb-2 h-5 w-2/3 rounded bg-slate-200/90 dark:bg-slate-700" />
-                    <div className="h-3 w-1/3 rounded bg-slate-200/80 dark:bg-slate-700" />
-                  </div>
+              <div key={item} className={`rounded-[2rem] border p-5 ${activeTheme.card} overflow-hidden`}>
+                <div className="flex items-center gap-4 mb-5">
+                   <Skeleton circle width={48} height={48} />
+                   <div className="flex-1 space-y-2">
+                      <Skeleton width="70%" height={16} />
+                      <Skeleton width="40%" height={12} />
+                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className={`h-16 rounded-2xl border ${activeTheme.metricSurface}`} />
-                  <div className={`h-16 rounded-2xl border ${activeTheme.metricSurface}`} />
+                <div className="grid grid-cols-2 gap-4">
+                   <Skeleton height={60} borderRadius={16} />
+                   <Skeleton height={60} borderRadius={16} />
                 </div>
               </div>
             ))}

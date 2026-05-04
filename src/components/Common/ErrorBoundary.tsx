@@ -10,6 +10,7 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  showDetails: boolean;
 }
 
 class ErrorBoundary extends Component<Props, State> {
@@ -18,12 +19,13 @@ class ErrorBoundary extends Component<Props, State> {
     this.state = {
       hasError: false,
       error: null,
-      errorInfo: null
+      errorInfo: null,
+      showDetails: false
     };
   }
 
   public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error, errorInfo: null };
+    return { hasError: true, error, errorInfo: null, showDetails: false };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -56,28 +58,35 @@ class ErrorBoundary extends Component<Props, State> {
              </p>
 
              <div className="space-y-4">
-               <button 
-                 onClick={this.handleRestart}
-                 className="w-full h-14 bg-white text-slate-950 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-white/5 active:scale-95 transition-all"
-               >
-                 Restart Application
-               </button>
-               
-               <button 
-                 onClick={() => this.setState({ hasError: false })}
-                 className="w-full h-12 bg-slate-900 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-white/5 hover:text-white transition-colors"
-               >
-                 Try to Resume
-               </button>
+                <button 
+                  onClick={this.handleRestart}
+                  className="w-full h-14 bg-white text-slate-950 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-white/5 active:scale-95 transition-all"
+                >
+                  Restart Application
+                </button>
+                
+                <button 
+                  onClick={() => this.setState({ hasError: false, showDetails: false })}
+                  className="w-full h-12 bg-slate-900 text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-white/5 hover:text-white transition-colors"
+                >
+                  Try to Resume
+                </button>
+
+                <button 
+                  onClick={() => this.setState(prev => ({ showDetails: !prev.showDetails }))}
+                  className="w-full py-2 text-[8px] font-black text-slate-600 uppercase tracking-widest hover:text-slate-400 transition-colors"
+                >
+                  {this.state.showDetails ? 'Hide' : 'Show'} Technical Details
+                </button>
              </div>
 
-             {process.env.NODE_ENV === 'development' && this.state.error && (
-               <div className="mt-12 p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-[10px] font-mono text-red-400/80 overflow-auto text-left max-h-40 no-scrollbar">
-                 <p className="font-bold mb-2">DEBUG INFO:</p>
-                 {this.state.error.toString()}
-                 <br />
-                 {this.state.errorInfo?.componentStack}
-               </div>
+             {this.state.showDetails && this.state.error && (
+                <div className="mt-8 p-4 bg-red-500/5 border border-red-500/10 rounded-2xl text-[10px] font-mono text-red-400/80 overflow-auto text-left max-h-40 no-scrollbar animate-in slide-in-from-top-2">
+                  <p className="font-bold mb-2">CRASH LOG:</p>
+                  {this.state.error.toString()}
+                  <br />
+                  {this.state.errorInfo?.componentStack}
+                </div>
              )}
            </div>
 
