@@ -4,6 +4,7 @@ import { IMAGES } from '@/constants';
 import { Config } from '@/services/Config';
 import { sounds } from '@/services/SoundService';
 import { useRatingGateStore } from '@/stores/ratingGateStore';
+import { useConnectivityStore } from '@/stores/connectivityStore';
 
 const API_URL = Config.apiUrl;
 
@@ -101,6 +102,7 @@ export const useOwnerRealtime = ({
     }, 0);
 
     ownerSocketRef.current.on('connect', () => {
+      useConnectivityStore.getState().setSocketStatus(true, false);
       ownerSocketRef.current?.emit('owner:register', { ownerId });
       if (
         driverInfoIdRef.current &&
@@ -109,6 +111,16 @@ export const useOwnerRealtime = ({
         trackedDriverIdRef.current = driverInfoIdRef.current;
         ownerSocketRef.current?.emit('trackdriver', { driverId: driverInfoIdRef.current });
       }
+    });
+
+    ownerSocketRef.current.on('disconnect', (reason) => {
+      // If reason is 'io server disconnect', it was intentional, otherwise it's a drop
+      const isTransient = reason !== 'io client disconnect' && reason !== 'io server disconnect';
+      useConnectivityStore.getState().setSocketStatus(false, isTransient);
+    });
+
+    ownerSocketRef.current.on('reconnect_attempt', () => {
+      useConnectivityStore.getState().setSocketStatus(false, true);
     });
 
     ownerSocketRef.current.on('ride:accepted', (data: any) => {

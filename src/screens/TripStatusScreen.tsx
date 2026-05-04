@@ -136,7 +136,15 @@ const TripStatusScreen: React.FC = () => {
            </div>
         </div>
 
-        <div className="w-12 h-12"></div> {/* Spacer */}
+        <button 
+          onClick={() => {
+            addToast('Refreshing ride status...', 'info');
+            syncCurrentRide();
+          }} 
+          className="pointer-events-auto w-12 h-12 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl flex items-center justify-center shadow-2xl border border-white/20 active:scale-95 transition-all"
+        >
+          <span className="material-symbols-outlined text-slate-900 dark:text-white">sync</span>
+        </button>
       </div>
 
       {/* Map Header Area */}

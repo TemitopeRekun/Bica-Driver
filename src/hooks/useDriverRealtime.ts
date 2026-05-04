@@ -7,6 +7,7 @@ import { IMAGES } from '@/constants';
 import { UserProfile } from '@/types';
 import { sounds } from '@/services/SoundService';
 import { Geolocation } from '@capacitor/geolocation';
+import { useConnectivityStore } from '@/stores/connectivityStore';
 
 const API_URL = Config.apiUrl;
 
@@ -185,7 +186,17 @@ export const useDriverRealtime = ({
     });
 
     socketRef.current.on('connect', () => {
+      useConnectivityStore.getState().setSocketStatus(true, false);
       registerDriverSocket();
+    });
+
+    socketRef.current.on('disconnect', (reason) => {
+      const isTransient = reason !== 'io client disconnect' && reason !== 'io server disconnect';
+      useConnectivityStore.getState().setSocketStatus(false, isTransient);
+    });
+
+    socketRef.current.on('reconnect_attempt', () => {
+      useConnectivityStore.getState().setSocketStatus(false, true);
     });
 
     const handleIncomingRequest = (trip: any) => {
@@ -306,6 +317,7 @@ export const useDriverRealtime = ({
         });
         setDriverPos([latitude, longitude]);
         setAvailabilityIssue(null);
+        useConnectivityStore.getState().setLocationStatus('available');
       } catch (error: any) {
         console.error('Initial location failed:', error);
 
@@ -334,6 +346,7 @@ export const useDriverRealtime = ({
           setAvailabilityIssue(
             'Location permission is disabled. Enable location permission and go online again.',
           );
+          useConnectivityStore.getState().setLocationStatus('denied');
           updateOnlineState(false);
         } else {
           // Transient issues (timeouts/network hiccups) should not force drivers offline.
@@ -345,6 +358,7 @@ export const useDriverRealtime = ({
           setAvailabilityIssue(
             'We could not refresh live location yet. You are still online and retries will continue automatically.',
           );
+          useConnectivityStore.getState().setLocationStatus('timeout');
         }
       } finally {
         setIsLocationRefreshing(false);
@@ -367,6 +381,7 @@ export const useDriverRealtime = ({
           });
           setDriverPos([latitude, longitude]);
           setAvailabilityIssue(null);
+          useConnectivityStore.getState().setLocationStatus('available');
         }
       } catch (error) {
         console.error('Location interval failed:', error);

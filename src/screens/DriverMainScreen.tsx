@@ -8,6 +8,7 @@ import { useUIStore } from '@/stores/uiStore';
 import { useDriverManager } from '@/hooks/useDriverManager';
 import { useDriverRealtime, DriverRideRequest } from '@/hooks/useDriverRealtime';
 import { useCarVerification } from '@/hooks/useCarVerification';
+import { useConnectivityStore } from '@/stores/connectivityStore';
 
 // Components
 import InteractiveMap from '@/components/InteractiveMap';
@@ -28,6 +29,8 @@ const DriverMainScreen: React.FC = () => {
   const { 
     walletSummary, loadWalletSummary, updateRideStatus, acceptRide, declineRide, syncCurrentRide 
   } = useDriverManager();
+
+  const { isReconnecting, isSocketConnected, isOnline: isNetworkOnline } = useConnectivityStore();
 
   const [activeRide, setActiveRide] = useState<DriverRideRequest | null>(null);
   const [showSelfieModal, setShowSelfieModal] = useState(false);
@@ -249,7 +252,8 @@ const DriverMainScreen: React.FC = () => {
              <div className="flex flex-col gap-6">
                 <div className="flex items-center justify-between">
                    <h3 className="text-xl font-bold text-white">Ride Requests</h3>
-                   {isOnline && <span className="px-3 py-1 bg-primary/20 text-primary text-[10px] font-black rounded-full border border-primary/20 animate-pulse uppercase">Searching</span>}
+                   {isOnline && isSocketConnected && <span className="px-3 py-1 bg-primary/20 text-primary text-[10px] font-black rounded-full border border-primary/20 animate-pulse uppercase">Searching</span>}
+                   {isOnline && !isSocketConnected && <span className="px-3 py-1 bg-amber-500/20 text-amber-500 text-[10px] font-black rounded-full border border-amber-500/20 animate-pulse uppercase">Reconnecting</span>}
                 </div>
                 {liveRideRequests.length > 0 ? (
                    liveRideRequests.map((req) => <RideRequestCard key={req.id} request={req} onAccept={handleAcceptRide} onDecline={(r) => declineRide(r.id)} />)

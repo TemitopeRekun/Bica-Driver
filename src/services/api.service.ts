@@ -65,6 +65,8 @@ export interface PaginatedResponse<T> {
   meta: PaginationMeta;
 }
 
+import { useConnectivityStore } from '@/stores/connectivityStore';
+
 // Core request function with retry logic
 async function request<T>(
   method: string,
@@ -76,6 +78,7 @@ async function request<T>(
   stableIdempotencyKey?: string
 ): Promise<T> {
   const baseUrl = requireApiUrl();
+  const connectivity = useConnectivityStore.getState();
 
   // Use provided key, or previous stable key from retry, or generate new one for mutations
   let currentIdempotencyKey = stableIdempotencyKey || options?.idempotencyKey;
@@ -120,6 +123,11 @@ async function request<T>(
       body: body ? JSON.stringify(body) : undefined,
       signal: options?.signal,
     });
+
+    // On any successful response (even 4xx/5xx), we know the server is reachable
+    if (!connectivity.isOnline) {
+      useConnectivityStore.getState().setOnline(true);
+    }
 
     // Handle centralized 401 Unauthorized
     if (response.status === 401 && requiresAuth) {
@@ -247,11 +255,20 @@ async function request<T>(
     const shouldRetry = (method === 'GET' || canRetryMutation);
 
     if (shouldRetry && error.message.includes('Failed to fetch') && retryCount < 3) {
+      // Mark offline if we definitely can't fetch
+      useConnectivityStore.getState().setOnline(false);
+      
       const backoffMs = Math.pow(2, retryCount) * 1000;
       console.warn(`[API] Connection lost during ${method} ${path}. Retrying with same key after ${backoffMs}ms...`);
       await sleep(backoffMs);
       return request<T>(method, path, body, requiresAuth, options, retryCount + 1, currentIdempotencyKey);
     }
+    
+    // If it's a persistent "Failed to fetch", ensure we are marked offline
+    if (error.message.includes('Failed to fetch')) {
+      useConnectivityStore.getState().setOnline(false);
+    }
+
     throw error;
   }
 }

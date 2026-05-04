@@ -20,6 +20,8 @@ import { ToastProvider as ToastContainer } from '@/components/Toast/ToastProvide
 import ErrorBoundary from '@/components/Common/ErrorBoundary';
 import VersionEnforcer from '@/components/Common/VersionEnforcer';
 import { telemetry } from '@/services/TelemetryService';
+import { useConnectivityStore } from './stores/connectivityStore';
+import ConnectivityBanner from '@/components/Common/ConnectivityBanner';
 
 const App: React.FC = () => {
   const { currentUser, setCurrentUser, logout, isAuthenticated, setInitializing, isInitializing } = useAuthStore();
@@ -39,6 +41,12 @@ const App: React.FC = () => {
     };
 
     window.addEventListener('unhandledrejection', handleRejection);
+
+    const handleOnline = () => useConnectivityStore.getState().setOnline(true);
+    const handleOffline = () => useConnectivityStore.getState().setOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     
     // Initialize notifications if already authenticated
     if (isAuthenticated) {
@@ -119,12 +127,15 @@ const App: React.FC = () => {
 
     return () => {
       window.removeEventListener('unhandledrejection', handleRejection);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
   return (
     <ErrorBoundary>
       <ToastContainer>
+        <ConnectivityBanner />
         <div className="flex justify-center items-start min-h-screen bg-slate-950">
           <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative">
             
