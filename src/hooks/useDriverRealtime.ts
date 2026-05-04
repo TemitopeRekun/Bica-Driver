@@ -373,8 +373,21 @@ export const useDriverRealtime = ({
       }
     }, 10000);
 
+    const handleResume = () => {
+      if (socketRef.current && !socketRef.current.connected) {
+        socketRef.current.connect();
+        registerDriverSocket();
+      }
+      if (isOnline) {
+        initLocation();
+      }
+    };
+
+    window.addEventListener('bica-app-resumed', handleResume);
+
     return () => {
       clearInterval(trackingInterval.current);
+      window.removeEventListener('bica-app-resumed', handleResume);
     };
   }, [isOnline, approvalStatus, user?.id]);
 

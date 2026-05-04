@@ -180,7 +180,21 @@ const PaymentCompleteScreen: React.FC = () => {
 
     startInitialization();
 
-    return () => clearInterval_();
+    const handleResume = () => {
+      // On app resume, restart the polling process from scratch to get fresh state
+      clearInterval_();
+      hasStartedRef.current = false;
+      pollCountRef.current = 0;
+      setPollCount(0);
+      startInitialization();
+    };
+
+    window.addEventListener('bica-app-resumed', handleResume);
+
+    return () => {
+      clearInterval_();
+      window.removeEventListener('bica-app-resumed', handleResume);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isInitializing, isAuthenticated]);
 

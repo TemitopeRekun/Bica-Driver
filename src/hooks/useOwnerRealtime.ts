@@ -204,10 +204,29 @@ export const useOwnerRealtime = ({
       }
     });
 
+    const handleResume = () => {
+      if (ownerSocketRef.current && !ownerSocketRef.current.connected) {
+        ownerSocketRef.current.connect();
+        ownerSocketRef.current.emit('owner:register', { ownerId });
+      }
+      
+      if (
+        ownerSocketRef.current?.connected &&
+        driverInfoIdRef.current &&
+        (rideStateValueRef.current === 'ASSIGNED' || rideStateValueRef.current === 'IN_PROGRESS')
+      ) {
+        trackedDriverIdRef.current = driverInfoIdRef.current;
+        ownerSocketRef.current.emit('trackdriver', { driverId: driverInfoIdRef.current });
+      }
+    };
+
+    window.addEventListener('bica-app-resumed', handleResume);
+
     return () => {
       clearTimeout(connectTimer);
       ownerSocketRef.current?.disconnect();
       ownerSocketRef.current = null;
+      window.removeEventListener('bica-app-resumed', handleResume);
     };
   }, [ownerId, pickupRef, refreshAvailableDriversRef, rideStateRef, showDriverPickerRef, trackedDriverIdRef]);
 

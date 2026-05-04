@@ -12,6 +12,7 @@ import { mapUser } from '@/mappers/appMappers';
 import { CapacitorService } from '@/services/CapacitorService';
 import { UserRole } from '@/types';
 import { useRatingGateStore } from './stores/ratingGateStore';
+import { useAppResume } from '@/hooks/useAppResume';
 
 // Components
 import SupportChatbot from '@/components/SupportChatbot';
@@ -25,6 +26,9 @@ const App: React.FC = () => {
   const { loadSettings } = useSettingsStore();
   const { addToast } = useUIStore();
   const { initStatusBar } = CapacitorService;
+
+  // Initialize global app resume orchestrator
+  useAppResume();
 
   useEffect(() => {
     initStatusBar();
