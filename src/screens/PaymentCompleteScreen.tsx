@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/services/api.service';
+import { useRatingGateStore } from '@/stores/ratingGateStore';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 2500;
@@ -94,7 +95,14 @@ const PaymentCompleteScreen: React.FC = () => {
           setResult(data);
           setScreenState('paid');
           // Auto-navigate after 3s
-          setTimeout(() => navigate('/owner', { replace: true }), 3000);
+          setTimeout(async () => {
+            const pending = await useRatingGateStore.getState().checkPendingRating();
+            if (pending) {
+              navigate(`/rate-driver/${pending.tripId}`, { replace: true });
+            } else {
+              navigate('/owner', { replace: true });
+            }
+          }, 3000);
           return;
         }
 
@@ -148,13 +156,29 @@ const PaymentCompleteScreen: React.FC = () => {
       return;
     }
 
-    const tripId = localStorage.getItem(STORAGE_KEY);
-    if (!tripId) {
-      setScreenState('no_trip');
-      return;
-    }
+    const startInitialization = async () => {
+      let tripId = localStorage.getItem(STORAGE_KEY);
+      
+      if (!tripId) {
+        try {
+          const currentRide = await api.get<any>('/rides/current');
+          if (currentRide && (currentRide.postTripAction === 'REQUIRE_PAYMENT' || currentRide.postTripAction === 'VERIFYING_PAYMENT' || currentRide.postTripAction === 'REQUIRE_RATING' || currentRide.paymentStatus !== 'PAID')) {
+            tripId = currentRide.id;
+          }
+        } catch (e) {
+          console.warn('Failed to fetch fallback tripId from /rides/current', e);
+        }
+      }
 
-    startPolling(tripId);
+      if (!tripId) {
+        setScreenState('no_trip');
+        return;
+      }
+
+      startPolling(tripId);
+    };
+
+    startInitialization();
 
     return () => clearInterval_();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -229,7 +253,14 @@ const PaymentCompleteScreen: React.FC = () => {
           </div>
 
           <button
-            onClick={() => navigate('/owner', { replace: true })}
+            onClick={async () => {
+              const pending = await useRatingGateStore.getState().checkPendingRating();
+              if (pending) {
+                navigate(`/rate-driver/${pending.tripId}`, { replace: true });
+              } else {
+                navigate('/owner', { replace: true });
+              }
+            }}
             className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-500/20 transition-all active:scale-95 uppercase tracking-widest text-sm"
           >
             Go to Dashboard Now

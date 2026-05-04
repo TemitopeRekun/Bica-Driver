@@ -27,6 +27,7 @@ export interface UserProfile {
   password?: string;       // only used locally during signup flow
   role: UserRole;
   rating: number;
+  ratingCount?: number;
   trips: number;           // maps to totalTrips from backend
   totalTrips?: number;     // backend field name
   isOnline?: boolean;
@@ -126,6 +127,7 @@ export interface Trip {
   carBackUrl?: string;
   carLeftUrl?: string;
   carRightUrl?: string;
+  postTripAction?: 'AWAITING_PAYMENT' | 'REQUIRE_PAYMENT' | 'REQUIRE_RATING' | 'CLEARED';
 }
 
 export interface Payout {
@@ -226,6 +228,21 @@ export interface PendingPaymentTrip extends Trip {
     id: string;
     name: string;
   } | null;
+}
+
+export interface PendingRatingTrip {
+  tripId: string;
+  driver: {
+    id: string;
+    name: string;
+    avatarUrl?: string | null;
+    rating?: number | null;
+    totalTrips?: number;
+  };
+  pickupAddress: string;
+  destAddress: string;
+  completedAt?: string | null;
+  paidAt?: string | null;
 }
 
 export type OwnerActivityTab = 'trips' | 'payments';

@@ -1,4 +1,5 @@
 import { requireApiUrl } from './Config';
+import { PendingRatingTrip } from '@/types';
 
 interface RequestOptions {
   signal?: AbortSignal;
@@ -268,4 +269,10 @@ export const api = {
 
   delete: <T>(path: string, requiresAuth = true, options?: RequestOptions) =>
     request<T>('DELETE', path, undefined, requiresAuth, options),
+
+  // Ratings
+  getPendingRating: () =>
+    request<PendingRatingTrip | null>('GET', '/rides/pending-rating', undefined, true),
+  rateTrip: (tripId: string, score: number) =>
+    request<{ message: string; driverRating: number; driverRatingCount: number }>('POST', `/rides/${tripId}/rate`, { score }, true),
 };

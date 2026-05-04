@@ -11,6 +11,7 @@ import { setOnUnauthorizedListener, api } from '@/services/api.service';
 import { mapUser } from '@/mappers/appMappers';
 import { CapacitorService } from '@/services/CapacitorService';
 import { UserRole } from '@/types';
+import { useRatingGateStore } from './stores/ratingGateStore';
 
 // Components
 import SupportChatbot from '@/components/SupportChatbot';
@@ -72,6 +73,32 @@ const App: React.FC = () => {
             setCurrentUser(mapped);
             await localforage.setItem('bicadriver_current_user', mapped);
             telemetry.info('Session restored successfully', { userId: mapped.id });
+
+            // Enforce post-trip payment/rating routing guards
+            try {
+               const activeRide = await api.get<any>('/rides/current');
+               if (activeRide && activeRide.postTripAction) {
+                  const { postTripAction, id } = activeRide;
+                  const currentPath = window.location.pathname;
+                  
+                  if (postTripAction === 'AWAITING_PAYMENT' && mapped.role === UserRole.DRIVER && !currentPath.includes('/driver/awaiting-payment/')) {
+                     window.location.replace(`/driver/awaiting-payment/${id}`);
+                  } else if (postTripAction === 'REQUIRE_PAYMENT' && mapped.role === UserRole.OWNER) {
+                     const { setRideState, setCompletedTripData, setCurrentTripId } = await import('@/stores/rideStore').then(m => m.useRideStore.getState());
+                     setCompletedTripData(activeRide);
+                     setCurrentTripId(activeRide.id);
+                     setRideState('COMPLETED');
+                     if (currentPath !== '/owner/status') window.location.replace('/owner/status');
+                  }
+               }
+            } catch (e) {
+               console.error('Failed to fetch active ride on boot', e);
+            }
+
+            // Check for pending ratings if OWNER
+            if (mapped.role === UserRole.OWNER) {
+              await useRatingGateStore.getState().checkPendingRating();
+            }
           } catch (e) {
             console.warn('Session restoration failed:', e);
             await logout();

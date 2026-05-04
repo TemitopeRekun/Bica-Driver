@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { IMAGES } from '@/constants';
 import { Config } from '@/services/Config';
 import { sounds } from '@/services/SoundService';
+import { useRatingGateStore } from '@/stores/ratingGateStore';
 
 const API_URL = Config.apiUrl;
 
@@ -146,9 +147,10 @@ export const useOwnerRealtime = ({
       onTripCompletedRef.current(data);
     });
 
-    ownerSocketRef.current.on('payment:updated', (data: any) => {
+    ownerSocketRef.current.on('payment:updated', async (data: any) => {
       if (data.paymentStatus === 'PAID' || data.message?.toLowerCase().includes('success')) {
         sounds.playSuccess();
+        await useRatingGateStore.getState().checkPendingRating();
       }
       onPaymentUpdatedRef.current(data);
     });

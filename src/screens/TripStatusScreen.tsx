@@ -111,6 +111,13 @@ const TripStatusScreen: React.FC = () => {
     }
   }, [rideState, navigate]);
 
+  // Driver Awaiting Payment Lock
+  useEffect(() => {
+    if (rideState === 'COMPLETED' && currentUser?.role === 'DRIVER' && currentTripId) {
+      navigate(`/driver/awaiting-payment/${currentTripId}`, { replace: true });
+    }
+  }, [rideState, currentUser?.role, currentTripId, navigate]);
+
   return (
     <div className="h-screen w-full flex flex-col bg-background-light dark:bg-background-dark overflow-hidden">
       {/* Dynamic Header */}
