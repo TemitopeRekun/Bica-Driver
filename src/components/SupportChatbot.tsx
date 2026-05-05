@@ -115,7 +115,7 @@ User: ${u.name} | Role: ${u.role} | Category: ${cat}`;
 
       chatRef.current = null; // Teardown previous
       chatRef.current = ai.chats.create({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash",
         config: {
           systemInstruction: systemInstruction,
         },
