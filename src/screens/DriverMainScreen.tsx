@@ -31,6 +31,19 @@ const DriverMainScreen: React.FC = () => {
   const { 
     walletSummary, loadWalletSummary, updateRideStatus, acceptRide, declineRide, syncCurrentRide 
   } = useDriverManager();
+  const { setSupportOpen, setSupportContext } = useUIStore();
+
+  const handleReportActiveTripIssue = () => {
+    if (!activeRide) return;
+    setSupportContext({
+      tripId: activeRide.id,
+      tripStatus: (rideMilestone === 'in_progress' ? 'IN_PROGRESS' : 'ASSIGNED'),
+      milestone: rideMilestone ?? undefined,
+      driverEarnings: activeRide.driverEarnings ?? undefined,
+      openedAt: new Date().toISOString(),
+    });
+    setSupportOpen(true);
+  };
 
   const { isReconnecting, isSocketConnected, isOnline: isNetworkOnline } = useConnectivityStore();
 
@@ -289,8 +302,17 @@ const DriverMainScreen: React.FC = () => {
                         <img src={activeRide.avatar} className="size-12 rounded-full border-2 border-primary" alt="" />
                         <h4 className="font-bold text-white text-lg">{activeRide.ownerName}</h4>
                       </div>
-                      <button className="size-12 rounded-2xl bg-primary/20 text-primary flex items-center justify-center" aria-label="Call Owner"><span className="material-symbols-outlined">call</span></button>
-                   </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={handleReportActiveTripIssue}
+                          className="size-12 rounded-2xl bg-white/10 text-slate-400 flex items-center justify-center border border-white/10" 
+                          aria-label="Report Issue"
+                        >
+                          <span className="material-symbols-outlined">flag</span>
+                        </button>
+                        <button className="size-12 rounded-2xl bg-primary/20 text-primary flex items-center justify-center" aria-label="Call Owner"><span className="material-symbols-outlined">call</span></button>
+                      </div>
+                    </div>
                     {rideMilestone === 'assigned' && <button onClick={() => handleUpdateStatus('ARRIVED')} className="w-full bg-primary py-5 rounded-2xl text-white font-black text-lg">I Have Arrived</button>}
                     {rideMilestone === 'arrived' && <button onClick={() => setShowConditionModal(true)} className="w-full bg-accent py-5 rounded-2xl text-white font-black text-lg">Upload Car Photos</button>}
                     {rideMilestone === 'in_progress' && <button onClick={() => handleUpdateStatus('COMPLETED')} className="w-full bg-red-500 py-5 rounded-2xl text-white font-black text-lg">Complete Trip</button>}

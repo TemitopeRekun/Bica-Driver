@@ -145,9 +145,7 @@ const App: React.FC = () => {
             </VersionEnforcer>
 
             {/* Global Overlays */}
-            {currentUser && (
-              <SupportChatbot user={currentUser} />
-            )}
+            {currentUser && <SupportChatbot user={currentUser} />}
             
           </div>
         </div>

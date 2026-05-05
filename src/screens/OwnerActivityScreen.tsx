@@ -58,6 +58,16 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
   const [paymentsMeta, setPaymentsMeta] = useState<PaginationMeta | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const { setSupportOpen, setSupportContext } = useUIStore();
+
+  const handleReportPaymentIssue = (payment: PaymentHistoryRecord) => {
+    setSupportContext({
+      tripId: payment.tripId,
+      paymentStatus: 'PAID',
+      openedAt: new Date().toISOString()
+    });
+    setSupportOpen(true);
+  };
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -337,6 +347,13 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
               <span className="rounded-lg bg-slate-100 px-2.5 py-1.5 font-mono font-black text-slate-500 dark:bg-white/5 dark:text-slate-400">
                 REF: {payment.monnifyTxRef?.slice(-12) || 'N/A'}
               </span>
+              <button 
+                 onClick={() => handleReportPaymentIssue(payment)}
+                 className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-orange-500 transition-colors ml-auto"
+              >
+                 <span className="material-symbols-outlined text-sm">flag</span>
+                 Report Issue
+              </button>
             </div>
           </div>
         ))}
@@ -441,9 +458,45 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
             ))}
           </div>
         ) : activeTab === 'trips' ? (
-          renderTripList()
+           <>
+             {renderTripList()}
+             <button 
+                onClick={() => {
+                  setSupportContext({ openedAt: new Date().toISOString() });
+                  setSupportOpen(true);
+                }}
+                className="mt-4 w-full flex items-center justify-center gap-3 p-5 rounded-3xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 group shadow-sm active:scale-[0.98] transition-all"
+             >
+                <div className="size-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                   <span className="material-symbols-outlined">live_help</span>
+                </div>
+                <div className="flex-1 text-left">
+                   <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Help & Support</p>
+                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Need help with rides?</p>
+                </div>
+                <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+             </button>
+           </>
         ) : (
-          renderPaymentList()
+           <>
+             {renderPaymentList()}
+             <button 
+                onClick={() => {
+                  setSupportContext({ openedAt: new Date().toISOString() });
+                  setSupportOpen(true);
+                }}
+                className="mt-4 w-full flex items-center justify-center gap-3 p-5 rounded-3xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 group shadow-sm active:scale-[0.98] transition-all"
+             >
+                <div className="size-10 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-all">
+                   <span className="material-symbols-outlined">payments</span>
+                </div>
+                <div className="flex-1 text-left">
+                   <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Help & Support</p>
+                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Billing inquiries?</p>
+                </div>
+                <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+             </button>
+           </>
         )}
       </div>
     </div>

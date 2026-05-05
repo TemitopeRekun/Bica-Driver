@@ -250,7 +250,7 @@ export type DriverActivityTab = 'trips' | 'settlements';
 
 // Admin-specific types
 export type DriverFilter = 'All' | 'Pending' | 'Active' | 'Blocked';
-export type AdminSection = 'overview' | 'drivers' | 'owners' | 'trips' | 'finance' | 'settings';
+export type AdminSection = 'overview' | 'drivers' | 'owners' | 'trips' | 'finance' | 'tickets' | 'settings';
 
 
 export interface SystemSettings {
@@ -371,4 +371,39 @@ export type SettlementStatusFilter = 'ALL' | 'PAID' | 'FAILED';
 export interface DateRangeFilter {
   from: string | null; // ISO date string YYYY-MM-DD
   to: string | null;
+}
+export type SupportCategory =
+  | 'PAYMENT_ISSUE'
+  | 'TRIP_PROBLEM'
+  | 'DRIVER_OWNER_COMPLAINT'
+  | 'TECHNICAL_ISSUE'
+  | 'OTHER';
+
+export interface SupportContext {
+  tripId?: string;
+  tripStatus?: string;
+  paymentStatus?: string;
+  driverEarnings?: number;
+  totalFare?: number;
+  monnifyTxRef?: string;
+  walletBalance?: number;
+  subAccountActive?: boolean;
+  recentFailureContext?: string;
+  milestone?: string;
+  openedAt: string; // set when support surface opens, not when message sends
+}
+
+export interface SupportTicket {
+  id: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  category: SupportCategory;
+  tripId?: string | null;
+  paymentStatus?: string | null;
+  firstMessage: string;
+  recentFailureContext?: string | null;
+  openedAt: string;
+  createdAt: string;
+  user: { name: string; email: string; phone: string };
 }

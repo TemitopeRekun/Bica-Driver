@@ -9,6 +9,7 @@ import DriversSection from '@/components/Admin/DriversSection';
 import OwnersSection from '@/components/Admin/OwnersSection';
 import TripsSection from '@/components/Admin/TripsSection';
 import FinanceSection from '@/components/Admin/FinanceSection';
+import SupportSection from '@/components/Admin/TicketsSection';
 import SettingsSection from '@/components/Admin/SettingsSection';
 import UserDossierModal from '@/components/Admin/UserDossierModal';
 
@@ -38,7 +39,7 @@ interface AdminDashboardScreenProps {
   onRetry: () => Promise<void> | void;
   onBack: () => void;
   onSimulate: (role: UserRole) => void;
-  onPageChange: (section: 'users' | 'trips' | 'pending' | 'history', page: number) => void;
+  onPageChange: (section: 'users' | 'trips' | 'pending' | 'history' | 'tickets', page: number) => void;
   adminSummary?: AdminPaymentsSummaryResponse | null;
   adminSummaryPeriod?: SummaryPeriod;
   setAdminSummaryPeriod?: (period: SummaryPeriod) => void;
@@ -47,6 +48,9 @@ interface AdminDashboardScreenProps {
   setHistoryStatusFilter: (status: 'ALL' | 'PAID' | 'FAILED') => void;
   historyDateRange: DateRangeFilter;
   setHistoryDateRange: (range: DateRangeFilter) => void;
+  tickets: import('@/types').SupportTicket[];
+  ticketsMeta: import('@/services/api.service').PaginationMeta | null;
+  ticketsLoading?: boolean;
 }
 
 
@@ -59,7 +63,8 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   onRetry, onBack, onSimulate, onPageChange,
   adminSummary, adminSummaryPeriod, setAdminSummaryPeriod, adminSummaryLoading,
   historyStatusFilter, setHistoryStatusFilter, historyDateRange, setHistoryDateRange,
-  onResetWalletBalance
+  onResetWalletBalance,
+  tickets, ticketsMeta, ticketsLoading
 }) => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<AdminSection>('overview');
@@ -220,6 +225,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
             { id: 'owners', icon: 'groups', label: 'Owners' },
             { id: 'trips', icon: 'route', label: 'Trips' },
             { id: 'finance', icon: 'account_balance', label: 'Finance' },
+            { id: 'tickets', icon: 'support_agent', label: 'Support' },
             { id: 'settings', icon: 'settings', label: 'Settings' },
           ].map((item) => (
             <button
@@ -316,6 +322,15 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                 setHistoryStatusFilter={setHistoryStatusFilter}
                 historyDateRange={historyDateRange}
                 setHistoryDateRange={setHistoryDateRange}
+              />
+            )}
+
+            {activeSection === 'tickets' && (
+              <SupportSection 
+                tickets={tickets} 
+                ticketsMeta={ticketsMeta} 
+                onPageChange={(p) => onPageChange('tickets', p)}
+                isLoading={ticketsLoading}
               />
             )}
 

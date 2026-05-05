@@ -303,4 +303,18 @@ export const api = {
   // Admin — Ledger Operations
   resetWalletBalance: (driverId: string): Promise<{ message: string }> =>
     request<{ message: string }>('POST', `/payments/wallet/reset`, { driverId }, true),
+
+  // Support
+  createSupportTicket: (payload: {
+    category: import('@/types').SupportCategory;
+    firstMessage: string;
+    openedAt: string;
+    tripId?: string;
+    paymentStatus?: string;
+    recentFailureContext?: string;
+  }): Promise<{ id: string; createdAt: string }> =>
+    request<{ id: string; createdAt: string }>('POST', '/support/tickets', payload, true),
+
+  getSupportTickets: (page = 0, limit = 20): Promise<PaginatedResponse<import('@/types').SupportTicket>> =>
+    request<PaginatedResponse<import('@/types').SupportTicket>>('GET', `/support/tickets?page=${page}&limit=${limit}`, undefined, true),
 };

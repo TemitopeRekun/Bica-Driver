@@ -20,6 +20,9 @@ const AdminDashboardPage: React.FC = () => {
     loadAdminDashboard, loadUsersPage, loadTripsPage,
     loadPendingPaymentsPage, loadPaymentHistoryPage
   } = useAdminDashboard();
+  const [tickets, setTickets] = React.useState<import('@/types').SupportTicket[]>([]);
+  const [ticketsMeta, setTicketsMeta] = React.useState<import('@/services/api.service').PaginationMeta | null>(null);
+  const [ticketsLoading, setTicketsLoading] = React.useState(false);
   const { currentUser } = useAuthStore();
 
   const [adminSummaryPeriod, setAdminSummaryPeriod] = React.useState<SummaryPeriod>('monthly');
@@ -59,12 +62,26 @@ const AdminDashboardPage: React.FC = () => {
     onTripCompleted: handleNewRegistration,
   });
 
+  const loadTicketsPage = React.useCallback(async (page = 0) => {
+    setTicketsLoading(true);
+    try {
+      const response = await api.getSupportTickets(page);
+      setTickets(response.items);
+      setTicketsMeta(response.meta);
+    } catch (e) {
+      // Non-fatal
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadAdminDashboard().catch(err => {
       console.error("Critical Admin Init Failed", err);
       toast.error("Failed to synchronize administrative records.");
     });
-  }, [loadAdminDashboard]);
+    loadTicketsPage();
+  }, [loadAdminDashboard, loadTicketsPage]);
 
   const handlePageChange = (section: 'users' | 'trips' | 'pending' | 'history', page: number) => {
     switch (section) {
@@ -72,6 +89,7 @@ const AdminDashboardPage: React.FC = () => {
       case 'trips': loadTripsPage(page); break;
       case 'pending': loadPendingPaymentsPage(page); break;
       case 'history': loadPaymentHistoryPage(page, 20, historyStatusFilter, historyDateRange.from ?? undefined, historyDateRange.to ?? undefined); break;
+      case 'tickets': loadTicketsPage(page); break;
     }
   };
 
@@ -166,6 +184,9 @@ const AdminDashboardPage: React.FC = () => {
       setHistoryStatusFilter={setHistoryStatusFilter}
       historyDateRange={historyDateRange}
       setHistoryDateRange={setHistoryDateRange}
+      tickets={tickets}
+      ticketsMeta={ticketsMeta}
+      ticketsLoading={ticketsLoading}
     />
   );
 };

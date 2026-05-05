@@ -69,6 +69,30 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   const [settlementStatusFilter, setSettlementStatusFilter] = useState<SettlementStatusFilter>('ALL');
   const [settlementDateRange, setSettlementDateRange] = useState<DateRangeFilter>({ from: null, to: null });
   const [expandedSettlementId, setExpandedSettlementId] = useState<string | null>(null);
+  const { setSupportOpen, setSupportContext } = useUIStore();
+
+  const handleReportTripIssue = (trip: Trip) => {
+    setSupportContext({
+      tripId: trip.id,
+      tripStatus: trip.status,
+      paymentStatus: trip.paymentStatus ?? undefined,
+      totalFare: trip.finalFare ?? trip.amount,
+      openedAt: new Date().toISOString(),
+    });
+    setSupportOpen(true);
+  };
+
+  const handleReportSettlementIssue = (settlement: PaymentHistoryRecord) => {
+    setSupportContext({
+      tripId: settlement.tripId,
+      paymentStatus: settlement.trip?.status,
+      driverEarnings: settlement.driverAmount,
+      totalFare: settlement.totalAmount,
+      monnifyTxRef: settlement.monnifyTxRef,
+      openedAt: new Date().toISOString(),
+    });
+    setSupportOpen(true);
+  };
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -303,6 +327,16 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
                 <p className={`mt-1 font-black text-sm ${ACTIVITY_THEME.trips.accentText}`}>{formatCurrency(trip.driverEarnings ?? trip.amount ?? 0)}</p>
               </div>
             </div>
+            <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-200 dark:border-slate-800 pt-4">
+               <button 
+                 onClick={() => handleReportTripIssue(trip)}
+                 className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-primary transition-colors"
+               >
+                 <span className="material-symbols-outlined text-sm">flag</span>
+                 Report Issue
+               </button>
+               <span className="text-[10px] font-mono text-slate-400">ID: {trip.id.slice(0, 8)}</span>
+            </div>
           </div>
         ))}
       </div>
@@ -408,6 +442,13 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
                     <span className="text-xs font-mono font-bold text-slate-500 truncate ml-4">{settlement.monnifyTxRef || '—'}</span>
                   </div>
                 </div>
+                <button 
+                  onClick={() => handleReportSettlementIssue(settlement)}
+                  className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 text-[10px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:border-primary transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">help_outline</span>
+                  Dispute Settlement
+                </button>
               </div>
             )}
           </div>
@@ -618,9 +659,42 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
             ))}
           </div>
         ) : activeTab === 'trips' ? (
-          renderTripList()
+          <>
+            {renderTripList()}
+            <button 
+               onClick={() => {
+                 setSupportContext({ openedAt: new Date().toISOString() });
+                 setSupportOpen(true);
+               }}
+               className="mt-4 w-full flex items-center justify-center gap-3 p-5 rounded-3xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 group shadow-sm active:scale-[0.98] transition-all"
+            >
+               <div className="size-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                  <span className="material-symbols-outlined">live_help</span>
+               </div>
+               <div className="flex-1 text-left">
+                  <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Help & Support</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Need help with trips?</p>
+               </div>
+               <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+            </button>
+          </>
         ) : (
-          renderSettlementList()
+          <>
+            {renderSettlementList()}
+            <button 
+               onClick={() => openSupport()}
+               className="mt-4 w-full flex items-center justify-center gap-3 p-5 rounded-3xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 group shadow-sm active:scale-[0.98] transition-all"
+            >
+               <div className="size-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                  <span className="material-symbols-outlined">payments</span>
+               </div>
+               <div className="flex-1 text-left">
+                  <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Help & Support</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Issues with earnings?</p>
+               </div>
+               <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+            </button>
+          </>
         )}
       </div>
     </div>
