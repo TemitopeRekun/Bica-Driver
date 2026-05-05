@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // Stores & Hooks
@@ -82,7 +82,7 @@ const RequestRideScreen: React.FC = () => {
     }
   }, [pickup, destination, rideState, getRoute]);
 
-  const handlePayNow = async () => {
+  const handlePayNow = useCallback(async () => {
     if (!completedTripData?.id && !currentTripId) return;
     try {
       setIsInitiatingPayment(true);
@@ -90,7 +90,7 @@ const RequestRideScreen: React.FC = () => {
     } catch (e) {
       setIsInitiatingPayment(false);
     }
-  };
+  }, [completedTripData?.id, currentTripId, initiatePayment]);
 
   // Auto-Sync on Mount to recover any active ride
   useEffect(() => {
@@ -182,16 +182,16 @@ const RequestRideScreen: React.FC = () => {
     }
   }, [rideState, navigate]);
 
-  const handleCancelRide = async () => {
+  const handleCancelRide = useCallback(async () => {
     if (currentTripId) {
       emitCancel(currentTripId);
       await cancelRide(currentTripId);
     } else {
       resetRide();
     }
-  };
+  }, [currentTripId, emitCancel, cancelRide, resetRide]);
 
-  const handleConfirmRequest = async (e?: React.FormEvent) => {
+  const handleConfirmRequest = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!pickup) {
        addToast('Please select a pickup location.', 'warning');
@@ -199,7 +199,7 @@ const RequestRideScreen: React.FC = () => {
        return;
     }
     setShowVehicleForm(false);
-    
+
     if (bookingType === 'schedule') {
       if (!scheduledAt) {
         addToast('Please select a time for your scheduled ride.', 'warning');
@@ -211,12 +211,12 @@ const RequestRideScreen: React.FC = () => {
       setShowDriverPicker(true);
       await fetchAvailableDrivers(pickup, vehicleData.transmission);
     }
-  };
+  }, [pickup, bookingType, scheduledAt, addToast, fetchAvailableDrivers, vehicleData.transmission]);
 
-  const handleSelectDriver = async (driver: any) => {
+  const handleSelectDriver = useCallback(async (driver: any) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
-    
+
     const rideIntentId = generateUUID();
 
     try {
@@ -225,10 +225,10 @@ const RequestRideScreen: React.FC = () => {
          return;
       }
       await initiateRideRequest(
-        pickup, 
-        destination, 
-        driver, 
-        vehicleData, 
+        pickup,
+        destination,
+        driver,
+        vehicleData,
         bookingType === 'schedule' ? new Date(scheduledAt).toISOString() : null,
         rideIntentId
       );
@@ -248,19 +248,22 @@ const RequestRideScreen: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [isSubmitting, pickup, destination, vehicleData, bookingType, scheduledAt, addToast, initiateRideRequest, syncCurrentRide]);
 
-  const markers: any[] = [];
-  if (pickup) markers.push({ id: 'pickup', position: [pickup.lat, pickup.lon], title: 'Pickup', icon: 'pickup', draggable: true });
-  if (destination) markers.push({ id: 'dest', position: [destination.lat, destination.lon], title: 'Destination', icon: 'destination' });
-  if (driverInfo && (rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS')) {
-    markers.push({ 
-      id: 'driver', 
-      position: trackedDriverPos || (pickup ? [pickup.lat, pickup.lon] : mapCenter), 
-      title: driverInfo.name, 
-      icon: 'taxi' 
-    });
-  }
+  const markers = useMemo(() => {
+    const pts: any[] = [];
+    if (pickup) pts.push({ id: 'pickup', position: [pickup.lat, pickup.lon], title: 'Pickup', icon: 'pickup', draggable: true });
+    if (destination) pts.push({ id: 'dest', position: [destination.lat, destination.lon], title: 'Destination', icon: 'destination' });
+    if (driverInfo && (rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS')) {
+      pts.push({
+        id: 'driver',
+        position: trackedDriverPos || (pickup ? [pickup.lat, pickup.lon] : mapCenter),
+        title: driverInfo.name,
+        icon: 'taxi'
+      });
+    }
+    return pts;
+  }, [pickup, destination, driverInfo, rideState, trackedDriverPos, mapCenter]);
 
   return (
     <div className="h-screen w-full flex flex-col relative bg-background-light dark:bg-background-dark overflow-hidden">

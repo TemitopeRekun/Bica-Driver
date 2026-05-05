@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { UserProfile, UserRole, ApprovalStatus, Trip, TripStatus, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminDashboardStats, AdminSection, DriverFilter, AdminPaymentsSummaryResponse, SummaryPeriod, DateRangeFilter } from '@/types';
 import { mapUser } from '@/mappers/appMappers';
 import { useToast } from '@/hooks/useToast';
@@ -59,6 +59,32 @@ interface AdminDashboardScreenProps {
 
 
 
+const getTripStatusClass = (status: TripStatus) => {
+  switch (status) {
+    case 'COMPLETED': return 'bg-green-500/10 text-green-500';
+    case 'CANCELLED':
+    case 'DECLINED': return 'bg-red-500/10 text-red-500';
+    case 'IN_PROGRESS':
+    case 'ASSIGNED': return 'bg-blue-500/10 text-blue-500';
+    default: return 'bg-orange-500/10 text-orange-500';
+  }
+};
+
+const formatCurrency = (amount: number) =>
+  new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 })
+    .format(amount)
+    .replace('NGN', '₦');
+
+const formatShortDate = (value?: string | null) => {
+  if (!value) return 'Just now';
+  return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+};
+
+const formatJoinedDate = (value?: string | null) => {
+  if (!value) return 'Unknown';
+  return new Date(value).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+};
+
 const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({ 
   users, usersMeta, trips, tripsMeta, pendingDrivers, stats,
   pendingPayments, pendingPaymentsMeta, paymentHistory, paymentHistoryMeta,
@@ -85,10 +111,17 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
     if (onRetry) await onRetry();
   });
 
-  const handleViewTrip = (tripId: string) => {
+  const jumpToSection = useCallback((section: AdminSection, filter?: any) => {
+    setActiveSection(section);
+    if (filter && section === 'drivers') setDriverFilter(filter);
+    const main = document.querySelector('main');
+    if (main) main.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const handleViewTrip = useCallback((tripId: string) => {
     setSearchTerm(tripId);
     jumpToSection('trips');
-  };
+  }, [jumpToSection]);
 
   // Relative Time Logic
   useEffect(() => {
@@ -106,34 +139,26 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
     return () => clearInterval(interval);
   }, [lastUpdated]);
 
-  // Helper to jump to a section with a specific filter
-  const jumpToSection = (section: AdminSection, filter?: any) => {
-    setActiveSection(section);
-    if (filter && section === 'drivers') setDriverFilter(filter);
-    // Scroll main area to top
-    const main = document.querySelector('main');
-    if (main) main.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const modalUser = selectedUserDetails && selectedUserDetails.id === selectedUser?.id
-      ? selectedUserDetails
-      : selectedUser;
-
-  // Statistics & Derived Data - UNIFY DATA SOURCES
   // Merge pendingDrivers (dedicated list) with paginated users to ensure 100% sync
-  const driversMap = new Map<string, UserProfile>();
-  users.filter(u => u.role === UserRole.DRIVER).forEach(u => driversMap.set(u.id, u));
-  pendingDrivers.forEach(u => driversMap.set(u.id, u));
-  
-  const allKnownDrivers = Array.from(driversMap.values());
-  const allKnownOwners = users.filter(u => u.role === UserRole.OWNER);
+  const drivers = useMemo(() => {
+    const map = new Map<string, UserProfile>();
+    users.filter(u => u.role === UserRole.DRIVER).forEach(u => map.set(u.id, u));
+    pendingDrivers.forEach(u => map.set(u.id, u));
+    return Array.from(map.values());
+  }, [users, pendingDrivers]);
 
-  const drivers = allKnownDrivers;
-  const owners = allKnownOwners;
-  
-  // Use server stats strictly
-  const totalRevenue = stats?.totalEarnings || 0; // Accumulated revenue for the business
-  const platformFees = stats?.totalEarnings || 0; // Platform Total Commission
+  const owners = useMemo(
+    () => users.filter(u => u.role === UserRole.OWNER),
+    [users]
+  );
+
+  const modalUser = useMemo(
+    () => selectedUserDetails?.id === selectedUser?.id ? selectedUserDetails : selectedUser,
+    [selectedUserDetails, selectedUser]
+  );
+
+  const totalRevenue = stats?.totalEarnings || 0;
+  const platformFees = stats?.totalEarnings || 0;
 
   // Profile Detail Sync
   useEffect(() => {
@@ -161,37 +186,12 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
     return () => { cancelled = true; };
   }, [selectedUser]);
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = useCallback(() => {
     onUpdateSettings(localSettings);
     toast.success("System Settings Updated Successfully!");
-  };
+  }, [onUpdateSettings, localSettings, toast]);
 
-  const getTripStatusClass = (status: TripStatus) => {
-    switch (status) {
-      case 'COMPLETED': return 'bg-green-500/10 text-green-500';
-      case 'CANCELLED':
-      case 'DECLINED': return 'bg-red-500/10 text-red-500';
-      case 'IN_PROGRESS':
-      case 'ASSIGNED': return 'bg-blue-500/10 text-blue-500';
-      default: return 'bg-orange-500/10 text-orange-500';
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', minimumFractionDigits: 0 }).format(amount).replace('NGN', '₦');
-  };
-
-  const formatShortDate = (value?: string | null) => {
-    if (!value) return 'Just now';
-    return new Date(value).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-  };
-
-  const formatJoinedDate = (value?: string | null) => {
-    if (!value) return 'Unknown';
-    return new Date(value).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
-  };
-
-  const handleRetrySubAccountWrap = async (userId: string) => {
+  const handleRetrySubAccountWrap = useCallback(async (userId: string) => {
     setRetryingSubAccountIds(prev => new Set(prev).add(userId));
     try {
       const result: any = await onRetrySubAccount(userId);
@@ -211,7 +211,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
         return next;
       });
     }
-  };
+  }, [onRetrySubAccount]);
 
   return (
     <div className="flex h-screen w-full flex-col bg-background-light dark:bg-background-dark text-slate-900 dark:text-white overflow-hidden">

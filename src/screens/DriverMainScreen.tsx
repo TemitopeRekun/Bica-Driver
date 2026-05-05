@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // Stores & Hooks
@@ -30,25 +30,13 @@ const DriverMainScreen: React.FC = () => {
   const { currentUser, logout } = useAuthStore();
   const { addToast } = useUIStore();
   const { rideMilestone, setRideState, setRideMilestone } = useRideStore();
-  const { 
-    walletSummary, loadWalletSummary, updateRideStatus, acceptRide, declineRide, syncCurrentRide, regenerateOtp 
+  const {
+    walletSummary, loadWalletSummary, updateRideStatus, acceptRide, declineRide, syncCurrentRide, regenerateOtp
   } = useDriverManager();
   const { setSupportOpen, setSupportContext } = useUIStore();
-
-  const handleReportActiveTripIssue = () => {
-    if (!activeRide) return;
-    setSupportContext({
-      tripId: activeRide.id,
-      tripStatus: (rideMilestone === 'in_progress' ? 'IN_PROGRESS' : 'ASSIGNED'),
-      milestone: rideMilestone ?? undefined,
-      driverEarnings: activeRide.driverEarnings ?? undefined,
-      openedAt: new Date().toISOString(),
-    });
-    setSupportOpen(true);
-  };
-
   const { isReconnecting, isSocketConnected, isOnline: isNetworkOnline } = useConnectivityStore();
 
+  // ── State ────────────────────────────────────────────────────────────────
   const [activeRide, setActiveRide] = useState<DriverRideRequest | null>(null);
   const [showSelfieModal, setShowSelfieModal] = useState(false);
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
@@ -57,20 +45,60 @@ const DriverMainScreen: React.FC = () => {
   const [requestsError, setRequestsError] = useState<string | null>(null);
   const [showEmergencyHelp, setShowEmergencyHelp] = useState(false);
 
-  // Car Condition State (Refactored to Hook)
   const [showConditionModal, setShowConditionModal] = useState(false);
   const {
     conditionStep, setConditionStep, carPhotos, isCapturing, handleSnap, reset: resetCondition, isComplete: isConditionComplete, sides
   } = useCarVerification(activeRide?.id || '');
 
-  // OTP Verification State
   const [showOtpModal, setShowOtpModal] = useState(false);
   const [otpValue, setOtpValue] = useState('');
   const [otpAttempts, setOtpAttempts] = useState(0);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [isUploading, setIsUploading] = useState(false); // For selfie
+  const [isUploading, setIsUploading] = useState(false);
   const [isLockedOut, setIsLockedOut] = useState(false);
   const [regenCooldown, setRegenCooldown] = useState(0);
+
+  // ── Stable realtime callbacks (prevent socket re-subscription on every render) ──
+  const onForcedLogout = useCallback((msg?: string) => {
+    addToast(msg || 'Session expired.', 'error');
+    logout();
+  }, [addToast, logout]);
+
+  const onRideProgress = useCallback((payload: any) => {
+    const m = payload.milestone?.toLowerCase();
+    if (m === 'inprogress' || m === 'in_progress' || m === 'trip') setRideMilestone('in_progress');
+    else if (m === 'arrived') setRideMilestone('arrived');
+    else if (m === 'assigned') setRideMilestone('assigned');
+    else if (m === 'completed') setRideMilestone('completed');
+  }, [setRideMilestone]);
+
+  const onRideCancelled = useCallback((payload: any) => {
+    if (payload.tripId === activeRide?.id) {
+      addToast(payload.message || 'Ride was cancelled by the owner.', 'info');
+      setActiveRide(null);
+      setRideMilestone('requested');
+    }
+  }, [activeRide?.id, addToast, setRideMilestone]);
+
+  const onPaymentUpdated = useCallback((payload: any) => {
+    if (payload.paymentStatus === 'PAID') {
+      addToast('Payment received! Fare settled.', 'success');
+      setCompletedTripSummary((prev: any) => {
+        if (prev) return { ...prev, paymentStatus: 'PAID' };
+
+        // Reconstruct summary if it was dismissed, using persisted store data
+        const storedTrip = useRideStore.getState().completedTripData;
+        if (!storedTrip) return null;
+
+        return {
+          ...storedTrip,
+          paymentStatus: 'PAID',
+          driverEarnings: payload.driverEarnings ?? storedTrip.driverEarnings,
+          paidAt: payload.paidAt ?? new Date().toISOString(),
+        };
+      });
+    }
+  }, [addToast]);
 
   const {
     isOnline, driverPos, liveRideRequests, enableOnline, disableOnline, removeRideRequest
@@ -78,43 +106,14 @@ const DriverMainScreen: React.FC = () => {
     user: currentUser,
     approvalStatus: currentUser?.approvalStatus || 'PENDING',
     onOnlineStatusChange: () => {},
-    onForcedLogout: (msg) => { addToast(msg || 'Session expired.', 'error'); logout(); },
-    onRideProgress: (payload) => {
-       const m = payload.milestone?.toLowerCase();
-       if (m === 'inprogress' || m === 'in_progress' || m === 'trip') setRideMilestone('in_progress');
-       else if (m === 'arrived') setRideMilestone('arrived');
-       else if (m === 'assigned') setRideMilestone('assigned');
-       else if (m === 'completed') setRideMilestone('completed');
-    },
-    onRideCancelled: (payload) => {
-       if (payload.tripId === activeRide?.id) {
-         addToast(payload.message || 'Ride was cancelled by the owner.', 'info');
-         setActiveRide(null);
-         setRideMilestone('requested');
-       }
-    },
-    onPaymentUpdated: (payload) => {
-       if (payload.paymentStatus === 'PAID') {
-          addToast('Payment received! Fare settled.', 'success');
-          setCompletedTripSummary((prev: any) => {
-            if (prev) return { ...prev, paymentStatus: 'PAID' };
-            
-            // Reconstruct summary if it was dismissed, using persisted store data
-            const storedTrip = useRideStore.getState().completedTripData;
-            if (!storedTrip) return null;
-            
-            return {
-              ...storedTrip,
-              paymentStatus: 'PAID',
-              driverEarnings: payload.driverEarnings ?? storedTrip.driverEarnings,
-              paidAt: payload.paidAt ?? new Date().toISOString(),
-            };
-          });
-        }
-    }
+    onForcedLogout,
+    onRideProgress,
+    onRideCancelled,
+    onPaymentUpdated,
   });
 
-  const emergencyContext: EmergencyHelpContext = {
+  // ── Derived memoized values ──────────────────────────────────────────────
+  const emergencyContext = useMemo<EmergencyHelpContext>(() => ({
     tripId: activeRide?.id,
     tripStatus: activeRide?.status,
     pickupAddress: activeRide?.pickupAddress,
@@ -125,8 +124,21 @@ const DriverMainScreen: React.FC = () => {
     driverPhone: currentUser?.phone || '',
     locationLat: driverPos?.[0],
     locationLng: driverPos?.[1],
-  };
+  }), [activeRide, driverPos, currentUser?.name, currentUser?.phone]);
 
+  const mapMarkers = useMemo(() => {
+    const markers: any[] = [{ id: 'driver-me', position: driverPos, title: 'You', icon: 'taxi' }];
+    if (activeRide) {
+      if (rideMilestone === 'assigned' || rideMilestone === 'arrived') {
+        markers.push({ id: 'pickup', position: activeRide.coords, title: 'Pickup', icon: 'pickup' });
+      } else if (rideMilestone === 'in_progress') {
+        markers.push({ id: 'dest', position: activeRide.destCoords, title: 'Destination', icon: 'destination' });
+      }
+    }
+    return markers;
+  }, [driverPos, activeRide, rideMilestone]);
+
+  // ── Effects ──────────────────────────────────────────────────────────────
   useEffect(() => {
     loadWalletSummary();
     const recoverSession = async () => {
@@ -162,22 +174,43 @@ const DriverMainScreen: React.FC = () => {
     recoverSession();
   }, [syncCurrentRide, currentUser?.id, loadWalletSummary]);
 
-  const handleToggleOnline = () => {
+  useEffect(() => {
+    if (regenCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setRegenCooldown(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [regenCooldown]);
+
+  // ── Event handlers ───────────────────────────────────────────────────────
+  const handleReportActiveTripIssue = useCallback(() => {
+    if (!activeRide) return;
+    setSupportContext({
+      tripId: activeRide.id,
+      tripStatus: (rideMilestone === 'in_progress' ? 'IN_PROGRESS' : 'ASSIGNED'),
+      milestone: rideMilestone ?? undefined,
+      driverEarnings: activeRide.driverEarnings ?? undefined,
+      openedAt: new Date().toISOString(),
+    });
+    setSupportOpen(true);
+  }, [activeRide, rideMilestone, setSupportContext, setSupportOpen]);
+
+  const handleToggleOnline = useCallback(() => {
     CapacitorService.triggerHaptic();
     if (isOnline) disableOnline();
     else enableOnline();
-  };
+  }, [isOnline, disableOnline, enableOnline]);
 
-  const handleAcceptRide = (ride: DriverRideRequest) => {
+  const handleAcceptRide = useCallback((ride: DriverRideRequest) => {
     setPendingRide(ride);
     setShowSelfieModal(true);
-  };
+  }, []);
 
-  const handleCaptureSelfie = () => {
+  const handleCaptureSelfie = useCallback(() => {
     if (isUploading) return;
-    
+
     console.log('Attempting to trigger camera...');
-    
+
     // 🛡️ IMPORTANT: Call takePhoto immediately to preserve User Gesture context for Web browsers
     CapacitorService.takePhoto(CameraSource.Camera, CameraDirection.Front)
       .then(async (base64) => {
@@ -189,9 +222,9 @@ const DriverMainScreen: React.FC = () => {
         console.log('Photo captured, starting upload...');
         setIsUploading(true);
         try {
-          const { url } = await api.post<{ url: string }>('/rides/upload-photo', { 
-            image: base64, 
-            folder: 'selfies' 
+          const { url } = await api.post<{ url: string }>('/rides/upload-photo', {
+            image: base64,
+            folder: 'selfies'
           });
           setSelfieImage(url);
           addToast('Selfie verified!', 'success');
@@ -206,9 +239,9 @@ const DriverMainScreen: React.FC = () => {
         console.error('Camera trigger failed:', error);
         addToast('Could not open camera.', 'error');
       });
-  };
+  }, [isUploading, addToast]);
 
-  const confirmSelfieAndRide = async () => {
+  const confirmSelfieAndRide = useCallback(async () => {
     if (!pendingRide || !selfieImage) return;
     try {
       setIsUploading(true);
@@ -220,18 +253,18 @@ const DriverMainScreen: React.FC = () => {
     } catch (e: any) {
       addToast(e.message || 'Verification failed.', 'error');
     } finally { setIsUploading(false); }
-  };
+  }, [pendingRide, selfieImage, acceptRide, addToast, removeRideRequest]);
 
-  const confirmConditionAndNext = () => {
+  const confirmConditionAndNext = useCallback(() => {
     if (!isConditionComplete) {
       addToast('Please take all 4 photos before starting.', 'warning');
       return;
     }
     setShowConditionModal(false);
     setShowOtpModal(true);
-  };
+  }, [isConditionComplete, addToast]);
 
-  const verifyOtpAndStart = async () => {
+  const verifyOtpAndStart = useCallback(async () => {
     if (!activeRide || !otpValue || isLockedOut) return;
     try {
       setIsVerifyingOtp(true);
@@ -254,11 +287,11 @@ const DriverMainScreen: React.FC = () => {
       }
       setOtpAttempts(prev => prev + 1);
     } finally { setIsVerifyingOtp(false); }
-  };
+  }, [activeRide, otpValue, isLockedOut, updateRideStatus, carPhotos, addToast]);
 
-  const handleRegenerateOtp = async () => {
+  const handleRegenerateOtp = useCallback(async () => {
     if (!activeRide || regenCooldown > 0) return;
-    
+
     const res = await regenerateOtp(activeRide.id);
     if (res.success || res.cooldown) {
       setRegenCooldown(60);
@@ -268,17 +301,9 @@ const DriverMainScreen: React.FC = () => {
         setOtpAttempts(0);
       }
     }
-  };
+  }, [activeRide, regenCooldown, regenerateOtp]);
 
-  useEffect(() => {
-    if (regenCooldown <= 0) return;
-    const timer = setInterval(() => {
-      setRegenCooldown(prev => prev - 1);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [regenCooldown]);
-
-  const handleUpdateStatus = async (status: 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED') => {
+  const handleUpdateStatus = useCallback(async (status: 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED') => {
     if (!activeRide) return;
     try {
       const result = await updateRideStatus(activeRide.id, status);
@@ -293,16 +318,7 @@ const DriverMainScreen: React.FC = () => {
         if (!trip) setActiveRide(null);
       }
     }
-  };
-
-  const mapMarkers: any[] = [{ id: 'driver-me', position: driverPos, title: 'You', icon: 'taxi' }];
-  if (activeRide) {
-    if (rideMilestone === 'assigned' || rideMilestone === 'arrived') {
-      mapMarkers.push({ id: 'pickup', position: activeRide.coords, title: 'Pickup', icon: 'pickup' });
-    } else if (rideMilestone === 'in_progress') {
-      mapMarkers.push({ id: 'dest', position: activeRide.destCoords, title: 'Destination', icon: 'destination' });
-    }
-  }
+  }, [activeRide, updateRideStatus, resetCondition, syncCurrentRide]);
 
   return (
     <div className="h-screen w-full overflow-hidden flex flex-col relative bg-background-dark font-display">
@@ -318,9 +334,9 @@ const DriverMainScreen: React.FC = () => {
              <button onClick={handleToggleOnline} className={`flex-1 rounded-full text-[10px] font-black uppercase transition-all ${!isOnline ? 'bg-slate-600 text-white' : 'text-slate-400'}`}>Offline</button>
              <button onClick={handleToggleOnline} className={`flex-1 rounded-full text-[10px] font-black uppercase transition-all ${isOnline ? 'bg-primary text-white' : 'text-slate-400'}`}>Online</button>
           </div>
-          <button 
-            onClick={() => !activeRide && !completedTripSummary && navigate('/driver/activity')} 
-            className={`size-11 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 text-white ${activeRide || completedTripSummary ? 'opacity-50 cursor-not-allowed' : ''}`} 
+          <button
+            onClick={() => !activeRide && !completedTripSummary && navigate('/driver/activity')}
+            className={`size-11 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 text-white ${activeRide || completedTripSummary ? 'opacity-50 cursor-not-allowed' : ''}`}
             aria-label="Activity"
           >
              <span className="material-symbols-outlined">receipt_long</span>
@@ -338,9 +354,9 @@ const DriverMainScreen: React.FC = () => {
                    {isOnline && !isSocketConnected && <span className="px-3 py-1 bg-amber-500/20 text-amber-500 text-[10px] font-black rounded-full border border-amber-500/20 animate-pulse uppercase">Reconnecting</span>}
                 </div>
                 {requestsError ? (
-                   <InlineError 
-                     message={requestsError} 
-                     onRetry={() => { setRequestsError(null); syncCurrentRide(); }} 
+                   <InlineError
+                     message={requestsError}
+                     onRetry={() => { setRequestsError(null); syncCurrentRide(); }}
                    />
                 ) : liveRideRequests.length > 0 ? (
                    liveRideRequests.map((req) => <RideRequestCard key={req.id} request={req} onAccept={handleAcceptRide} onDecline={(r) => declineRide(r.id)} />)
@@ -377,9 +393,9 @@ const DriverMainScreen: React.FC = () => {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <button 
+                        <button
                           onClick={handleReportActiveTripIssue}
-                          className="size-12 rounded-2xl bg-white/10 text-slate-400 flex items-center justify-center border border-white/10" 
+                          className="size-12 rounded-2xl bg-white/10 text-slate-400 flex items-center justify-center border border-white/10"
                           aria-label="Report Issue"
                         >
                           <span className="material-symbols-outlined">flag</span>
@@ -396,7 +412,7 @@ const DriverMainScreen: React.FC = () => {
         </div>
 
         {showConditionModal && (
-          <CarConditionModal 
+          <CarConditionModal
             conditionStep={conditionStep} carPhotos={carPhotos} isCapturing={isCapturing}
             onSnap={handleSnap} onBack={() => {}} onConfirm={confirmConditionAndNext}
             onCancel={() => setShowConditionModal(false)} setConditionStep={setConditionStep} sides={sides}
@@ -414,7 +430,7 @@ const DriverMainScreen: React.FC = () => {
                 <p className="text-slate-400 text-sm">Ask the owner for their 4-digit verification PIN</p>
               </div>
               <div className="space-y-4">
-                <input 
+                <input
                   type="number" value={otpValue} onChange={(e) => setOtpValue(e.target.value.slice(0, 4))}
                   disabled={isLockedOut}
                   placeholder="0000" className={`w-full bg-white/5 border-2 ${isLockedOut ? 'border-red-500/30' : 'border-white/10'} rounded-2xl py-6 text-center text-4xl font-black text-white tracking-[1rem] focus:border-primary outline-none transition-colors`}
@@ -430,15 +446,15 @@ const DriverMainScreen: React.FC = () => {
                 )}
               </div>
               <div className="space-y-3">
-                <button 
-                  onClick={verifyOtpAndStart} 
-                  disabled={otpValue.length < 4 || isVerifyingOtp || isLockedOut} 
+                <button
+                  onClick={verifyOtpAndStart}
+                  disabled={otpValue.length < 4 || isVerifyingOtp || isLockedOut}
                   className="w-full bg-primary disabled:bg-slate-700 py-5 rounded-2xl text-white font-black text-xl flex items-center justify-center gap-3 transition-all"
                 >
                   {isVerifyingOtp ? <div className="size-6 border-3 border-white/30 border-t-white rounded-full animate-spin" /> : 'Start Trip'}
                 </button>
-                
-                <button 
+
+                <button
                   onClick={handleRegenerateOtp}
                   disabled={regenCooldown > 0}
                   className="w-full py-4 bg-white/5 hover:bg-white/10 disabled:bg-transparent rounded-2xl text-slate-300 disabled:text-slate-600 font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
@@ -458,8 +474,8 @@ const DriverMainScreen: React.FC = () => {
              <div className="w-full max-w-sm bg-surface-dark rounded-[2rem] p-8 flex flex-col items-center gap-6">
                 <h3 className="text-xl font-bold text-white">Security Check</h3>
                 <p className="text-sm text-slate-400 text-center">Take a quick selfie to confirm identity.</p>
-                <div 
-                   onClick={handleCaptureSelfie} 
+                <div
+                   onClick={handleCaptureSelfie}
                    className={`group relative size-48 rounded-full bg-white/5 border-2 border-dashed border-primary/40 flex items-center justify-center overflow-hidden transition-all active:scale-95 cursor-pointer hover:bg-primary/5 hover:border-primary`}
                 >
                    {selfieImage ? (
@@ -485,7 +501,7 @@ const DriverMainScreen: React.FC = () => {
        )}
 
        {completedTripSummary && (
-          <TripPaymentSummary 
+          <TripPaymentSummary
             role="DRIVER" pickup={completedTripSummary.pickup} destination={completedTripSummary.destination}
             fareBreakdown={{
               distanceKm: completedTripSummary.distanceKm || 0,
@@ -498,7 +514,6 @@ const DriverMainScreen: React.FC = () => {
             onClose={() => { setCompletedTripSummary(null); setRideState('IDLE'); }}
           />
        )}
-      {/* Emergency Help Overlay */}
       {showEmergencyHelp && (
         <EmergencyHelpSheet
           context={emergencyContext}

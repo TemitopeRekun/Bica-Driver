@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { mapTrip } from '@/mappers/appMappers';
 import { api, PaginatedResponse, PaginationMeta } from '@/services/api.service';
 import { OwnerActivityTab, PaymentHistoryRecord, Trip } from '@/types';
@@ -14,6 +14,42 @@ interface OwnerActivityScreenProps {
   initialTab: OwnerActivityTab;
   onBack: () => void;
 }
+
+const formatCurrency = (value: number) => `NGN ${value.toLocaleString('en-NG')}`;
+
+const formatDate = (value?: string | null) => {
+  if (!value) return 'Just now';
+  return new Date(value).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+const getTripTitle = (trip: Trip) =>
+  trip.location ||
+  `${trip.pickupAddress?.split(',')[0] || 'Unknown'} -> ${trip.destAddress?.split(',')[0] || 'Unknown'}`;
+
+const getStatusClassName = (status?: string) => {
+  switch (status) {
+    case 'COMPLETED':
+    case 'PAID':
+      return 'bg-green-500/12 text-green-700 dark:text-green-300';
+    case 'IN_PROGRESS':
+    case 'ASSIGNED':
+    case 'PENDING':
+    case 'PENDING_ACCEPTANCE':
+      return 'bg-amber-500/12 text-amber-700 dark:text-amber-300';
+    case 'FAILED':
+    case 'CANCELLED':
+    case 'DECLINED':
+      return 'bg-red-500/12 text-red-700 dark:text-red-300';
+    default:
+      return 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300';
+  }
+};
 
 const ACTIVITY_THEME = {
   trips: {
@@ -65,24 +101,16 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
   const [error, setError] = useState('');
   const { setSupportOpen, setSupportContext } = useUIStore();
 
-  const { isRefreshing, pullHandlers } = usePullToRefresh(async () => {
-    await loadActivity();
-  });
-
-  const handleReportPaymentIssue = (payment: PaymentHistoryRecord) => {
+  const handleReportPaymentIssue = useCallback((payment: PaymentHistoryRecord) => {
     setSupportContext({
       tripId: payment.tripId,
       paymentStatus: 'PAID',
       openedAt: new Date().toISOString()
     });
     setSupportOpen(true);
-  };
+  }, [setSupportContext, setSupportOpen]);
 
-  useEffect(() => {
-    setActiveTab(initialTab);
-  }, [initialTab]);
-
-  const loadActivity = async () => {
+  const loadActivity = useCallback(async () => {
     setIsLoading(true);
     setError('');
 
@@ -122,9 +150,17 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const loadTripsPage = async (page: number) => {
+  const { isRefreshing, pullHandlers } = usePullToRefresh(async () => {
+    await loadActivity();
+  });
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
+
+  const loadTripsPage = useCallback(async (page: number) => {
     setIsLoading(true);
     try {
       const result = await api.get<PaginatedResponse<any>>(`/rides/history?page=${page}&limit=20`);
@@ -135,9 +171,9 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const loadPaymentsPage = async (page: number) => {
+  const loadPaymentsPage = useCallback(async (page: number) => {
     setIsLoading(true);
     try {
       const result = await api.get<PaginatedResponse<any>>(`/payments/history?page=${page}&limit=20`);
@@ -148,43 +184,7 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const formatCurrency = (value: number) => `NGN ${value.toLocaleString('en-NG')}`;
-
-  const formatDate = (value?: string | null) => {
-    if (!value) return 'Just now';
-    return new Date(value).toLocaleString([], {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
-
-  const getTripTitle = (trip: Trip) =>
-    trip.location ||
-    `${trip.pickupAddress?.split(',')[0] || 'Unknown'} -> ${trip.destAddress?.split(',')[0] || 'Unknown'}`;
-
-  const getStatusClassName = (status?: string) => {
-    switch (status) {
-      case 'COMPLETED':
-      case 'PAID':
-        return 'bg-green-500/12 text-green-700 dark:text-green-300';
-      case 'IN_PROGRESS':
-      case 'ASSIGNED':
-      case 'PENDING':
-      case 'PENDING_ACCEPTANCE':
-        return 'bg-amber-500/12 text-amber-700 dark:text-amber-300';
-      case 'FAILED':
-      case 'CANCELLED':
-      case 'DECLINED':
-        return 'bg-red-500/12 text-red-700 dark:text-red-300';
-      default:
-        return 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300';
-    }
-  };
+  }, []);
 
   const renderEmptyState = (tab: OwnerActivityTab) => {
     const theme = ACTIVITY_THEME[tab];
@@ -389,6 +389,11 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
     );
   };
 
+  const totalSpent = useMemo(
+    () => payments.reduce((acc, curr) => acc + curr.totalAmount, 0),
+    [payments]
+  );
+
   const activeTheme = ACTIVITY_THEME[activeTab];
 
   return (
@@ -446,7 +451,7 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
               <div className={`rounded-2xl border p-4 ${ACTIVITY_THEME.payments.metricSurface}`}>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Total Spent</p>
                 <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic">
-                   ₦{payments.reduce((acc, curr) => acc + curr.totalAmount, 0).toLocaleString()}
+                   ₦{totalSpent.toLocaleString()}
                 </p>
               </div>
             </div>
