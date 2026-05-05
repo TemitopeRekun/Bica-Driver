@@ -22,6 +22,8 @@ import { CameraSource, CameraDirection } from '@capacitor/camera';
 import { api } from '@/services/api.service';
 import { Skeleton, CardSkeleton } from '@/components/Common/Skeleton';
 import { InlineError } from '@/components/Common/InlineError';
+import EmergencyHelpSheet from '@/components/EmergencyHelpSheet';
+import { EmergencyHelpContext } from '@/types';
 
 const DriverMainScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -53,6 +55,7 @@ const DriverMainScreen: React.FC = () => {
   const [pendingRide, setPendingRide] = useState<DriverRideRequest | null>(null);
   const [completedTripSummary, setCompletedTripSummary] = useState<any | null>(null);
   const [requestsError, setRequestsError] = useState<string | null>(null);
+  const [showEmergencyHelp, setShowEmergencyHelp] = useState(false);
 
   // Car Condition State (Refactored to Hook)
   const [showConditionModal, setShowConditionModal] = useState(false);
@@ -92,9 +95,22 @@ const DriverMainScreen: React.FC = () => {
        if (payload.paymentStatus === 'PAID') {
           addToast('Payment received! Fare settled.', 'success');
           setCompletedTripSummary((prev: any) => prev ? { ...prev, paymentStatus: 'PAID' } : null);
-       }
+        }
     }
   });
+
+  const emergencyContext: EmergencyHelpContext = {
+    tripId: activeRide?.id,
+    tripStatus: activeRide?.status,
+    pickupAddress: activeRide?.pickupAddress,
+    destAddress: activeRide?.destAddress,
+    ownerName: activeRide?.ownerName,
+    ownerPhone: activeRide?.ownerPhone,
+    driverName: currentUser?.name || 'Driver',
+    driverPhone: currentUser?.phone || '',
+    locationLat: driverPos?.[0],
+    locationLng: driverPos?.[1],
+  };
 
   useEffect(() => {
     loadWalletSummary();
@@ -116,6 +132,11 @@ const DriverMainScreen: React.FC = () => {
                avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
                coords: [trip.pickupLat, trip.pickupLng],
                destCoords: [trip.destLat, trip.destLng],
+               status: trip.status,
+               pickupAddress: trip.pickupAddress,
+               destAddress: trip.destAddress,
+               ownerPhone: trip.owner?.phone,
+               driverEarnings: trip.driverEarnings,
              });
            }
         }
@@ -297,10 +318,21 @@ const DriverMainScreen: React.FC = () => {
              <div className="flex flex-col gap-6 animate-slide-up">
                 <TripProgressTimeline milestone={rideMilestone as any} />
                 <div className="bg-white/5 p-5 rounded-3xl space-y-4">
-                   <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <img src={activeRide.avatar} className="size-12 rounded-full border-2 border-primary" alt="" />
-                        <h4 className="font-bold text-white text-lg">{activeRide.ownerName}</h4>
+                   <div className="flex items-center justify-between mb-6">
+                      <div className="flex flex-col items-start gap-2">
+                        <div className="flex items-center gap-3">
+                          <img src={activeRide.avatar} className="size-12 rounded-full border-2 border-primary" alt="" />
+                          <h4 className="font-bold text-white text-lg">{activeRide.ownerName}</h4>
+                        </div>
+                        {(['ASSIGNED', 'INPROGRESS'].includes(activeRide?.status as any) || rideMilestone === 'arrived') && (
+                          <button
+                            onClick={() => setShowEmergencyHelp(true)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all"
+                          >
+                            <span className="material-symbols-outlined text-sm">emergency</span>
+                            Get Help
+                          </button>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
@@ -312,12 +344,12 @@ const DriverMainScreen: React.FC = () => {
                         </button>
                         <button className="size-12 rounded-2xl bg-primary/20 text-primary flex items-center justify-center" aria-label="Call Owner"><span className="material-symbols-outlined">call</span></button>
                       </div>
-                    </div>
-                    {rideMilestone === 'assigned' && <button onClick={() => handleUpdateStatus('ARRIVED')} className="w-full bg-primary py-5 rounded-2xl text-white font-black text-lg">I Have Arrived</button>}
-                    {rideMilestone === 'arrived' && <button onClick={() => setShowConditionModal(true)} className="w-full bg-accent py-5 rounded-2xl text-white font-black text-lg">Upload Car Photos</button>}
-                    {rideMilestone === 'in_progress' && <button onClick={() => handleUpdateStatus('COMPLETED')} className="w-full bg-red-500 py-5 rounded-2xl text-white font-black text-lg">Complete Trip</button>}
-                 </div>
-              </div>
+                   </div>
+                   {rideMilestone === 'assigned' && <button onClick={() => handleUpdateStatus('ARRIVED')} className="w-full bg-primary py-5 rounded-2xl text-white font-black text-lg">I Have Arrived</button>}
+                   {rideMilestone === 'arrived' && <button onClick={() => setShowConditionModal(true)} className="w-full bg-accent py-5 rounded-2xl text-white font-black text-lg">Upload Car Photos</button>}
+                   {rideMilestone === 'in_progress' && <button onClick={() => handleUpdateStatus('COMPLETED')} className="w-full bg-red-500 py-5 rounded-2xl text-white font-black text-lg">Complete Trip</button>}
+                </div>
+             </div>
            )}
         </div>
 
@@ -401,6 +433,13 @@ const DriverMainScreen: React.FC = () => {
             onClose={() => { setCompletedTripSummary(null); setRideState('IDLE'); }}
           />
        )}
+      {/* Emergency Help Overlay */}
+      {showEmergencyHelp && (
+        <EmergencyHelpSheet
+          context={emergencyContext}
+          onClose={() => setShowEmergencyHelp(false)}
+        />
+      )}
     </div>
   );
 };

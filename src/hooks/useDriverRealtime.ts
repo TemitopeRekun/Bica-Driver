@@ -24,6 +24,11 @@ export interface DriverRideRequest {
   coords: [number, number];
   destCoords: [number, number];
   acceptanceImageUrl?: string;
+  status: string;
+  pickupAddress: string;
+  destAddress: string;
+  ownerPhone?: string;
+  driverEarnings?: number;
 }
 
 interface UseDriverRealtimeOptions {
@@ -213,6 +218,11 @@ export const useDriverRealtime = ({
         avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
         coords: [trip.pickupLat, trip.pickupLng],
         destCoords: [trip.destLat, trip.destLng],
+        status: trip.status,
+        pickupAddress: trip.pickupAddress,
+        destAddress: trip.destAddress,
+        ownerPhone: trip.owner?.phone,
+        driverEarnings: trip.driverEarnings,
       };
 
       setLiveRideRequests((prev) => {

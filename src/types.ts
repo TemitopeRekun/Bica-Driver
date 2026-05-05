@@ -407,3 +407,16 @@ export interface SupportTicket {
   createdAt: string;
   user: { name: string; email: string; phone: string };
 }
+
+export interface EmergencyHelpContext {
+  tripId?: string;
+  tripStatus?: string;
+  pickupAddress?: string;
+  destAddress?: string;
+  ownerName?: string;
+  ownerPhone?: string;
+  driverName: string;
+  driverPhone: string;
+  locationLat?: number;
+  locationLng?: number;
+}
