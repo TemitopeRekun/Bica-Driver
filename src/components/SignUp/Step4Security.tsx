@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 
+const TERMS_URL = 'https://sammy001-ship.github.io/Bica-Driver-Web/terms.html';
+const PRIVACY_URL = 'https://sammy001-ship.github.io/Bica-Driver-Web/privacy.html';
+
 interface StepProps {
   formData: any;
   errors: Record<string, string>;
@@ -12,6 +15,12 @@ interface StepProps {
 const Step4Security: React.FC<StepProps> = ({ formData, errors, updateField, onSubmit, isLoading, isDriver }) => {
   const [showPassword, setShowPassword] = useState(false);
 
+  const termsAccepted = !!formData.backgroundCheckAccepted;
+
+  const handleLinkOpen = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
       <div className="mb-2">
@@ -19,6 +28,7 @@ const Step4Security: React.FC<StepProps> = ({ formData, errors, updateField, onS
         <p className="text-sm text-slate-500 font-medium">Protect your earnings and data.</p>
       </div>
 
+      {/* Password field */}
       <div className="flex flex-col gap-1.5">
         <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Create Password</label>
         <div className={`flex items-center bg-white dark:bg-surface-dark border rounded-2xl px-4 h-14 transition-all ${errors.password ? 'border-red-500 bg-red-500/5' : 'border-slate-100 dark:border-white/5'}`}>
@@ -36,36 +46,102 @@ const Step4Security: React.FC<StepProps> = ({ formData, errors, updateField, onS
         </div>
         {errors.password && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.password}</p>}
       </div>
-      
-      <div className="p-5 bg-primary/5 rounded-[1.5rem] border border-primary/10 flex gap-4">
-        <input 
-          type="checkbox" 
-          id="terms_consent"
-          className="size-5 mt-1 rounded bg-transparent border-primary/40 text-primary"
-          checked={formData.backgroundCheckAccepted || false}
-          onChange={e => updateField('backgroundCheckAccepted', e.target.checked)}
-        />
-        <label htmlFor="terms_consent" className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400 font-medium">
-          {isDriver ? (
-            <>I verify that all information provided is accurate and truthful. I agree to <b>BICA's Background Check Policy</b> for professional chauffeurs.</>
-          ) : (
-            <>I agree to <b>BICA's Terms of Service</b> and verify that I am the legal owner of the vehicle registered.</>
+
+      {/* Terms & Conditions Consent */}
+      <div
+        onClick={() => updateField('backgroundCheckAccepted', !termsAccepted)}
+        className={`cursor-pointer p-5 rounded-[1.5rem] border-2 transition-all flex gap-4 items-start ${
+          termsAccepted
+            ? 'bg-primary/5 border-primary/30'
+            : errors.backgroundCheckAccepted
+            ? 'bg-red-500/5 border-red-400'
+            : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10'
+        }`}
+      >
+        {/* Custom checkbox */}
+        <div className={`mt-0.5 size-5 shrink-0 rounded-md border-2 flex items-center justify-center transition-all ${
+          termsAccepted
+            ? 'bg-primary border-primary'
+            : 'border-slate-300 dark:border-white/20 bg-white dark:bg-transparent'
+        }`}>
+          {termsAccepted && (
+            <span className="material-symbols-outlined text-white text-sm" style={{ fontSize: '14px' }}>check</span>
           )}
-        </label>
+        </div>
+
+        {/* Consent text — stop propagation on links so click doesn't toggle checkbox */}
+        <div className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400 font-medium" onClick={e => e.stopPropagation()}>
+          {isDriver ? (
+            <>
+              I have read and agree to BICA's{' '}
+              <button
+                type="button"
+                onClick={() => handleLinkOpen(TERMS_URL)}
+                className="font-black text-primary underline underline-offset-2"
+              >
+                Terms of Service
+              </button>{' '}
+              and{' '}
+              <button
+                type="button"
+                onClick={() => handleLinkOpen(PRIVACY_URL)}
+                className="font-black text-primary underline underline-offset-2"
+              >
+                Privacy Policy
+              </button>
+              . I verify that all information provided is accurate and truthful, and I consent to BICA's <span className="font-black text-slate-700 dark:text-slate-200">Background Check Policy</span> for professional chauffeurs.
+            </>
+          ) : (
+            <>
+              I have read and agree to BICA's{' '}
+              <button
+                type="button"
+                onClick={() => handleLinkOpen(TERMS_URL)}
+                className="font-black text-primary underline underline-offset-2"
+              >
+                Terms of Service
+              </button>{' '}
+              and{' '}
+              <button
+                type="button"
+                onClick={() => handleLinkOpen(PRIVACY_URL)}
+                className="font-black text-primary underline underline-offset-2"
+              >
+                Privacy Policy
+              </button>
+              . I verify that I am the legal owner of the vehicle registered on this account.
+            </>
+          )}
+        </div>
       </div>
-      {errors.backgroundCheckAccepted && <p className="text-[10px] text-red-500 font-bold ml-1">{errors.backgroundCheckAccepted}</p>}
+      {errors.backgroundCheckAccepted && (
+        <p className="text-[10px] text-red-500 font-bold ml-1 -mt-3 animate-fade-in">
+          You must read and agree to the Terms & Conditions to continue.
+        </p>
+      )}
 
       <button 
         onClick={onSubmit}
-        disabled={isLoading}
-        className="w-full bg-primary py-5 rounded-2xl text-white font-black text-lg shadow-xl shadow-primary/20 active:scale-[0.98] transition-all mt-4 disabled:opacity-50 flex items-center justify-center gap-2"
+        disabled={isLoading || !termsAccepted}
+        className={`w-full py-5 rounded-2xl text-white font-black text-lg shadow-xl active:scale-[0.98] transition-all mt-4 flex items-center justify-center gap-2 ${
+          termsAccepted && !isLoading
+            ? 'bg-primary shadow-primary/20 cursor-pointer'
+            : 'bg-slate-300 dark:bg-slate-700 shadow-none cursor-not-allowed opacity-60'
+        }`}
       >
         {isLoading ? (
           <>
             <div className="size-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             Creating Account...
           </>
-        ) : 'Complete Registration'}
+        ) : !termsAccepted ? (
+          <>
+            <span className="material-symbols-outlined text-lg">lock</span>
+            Agree to Terms to Continue
+          </>
+        ) : (
+          'Complete Registration'
+        )}
       </button>
     </div>
   );

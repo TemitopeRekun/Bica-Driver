@@ -27,7 +27,7 @@ export const DriverSignUpSchema = z.object({
   accountNumber: z.string().length(10, 'Account number must be 10 digits'),
   accountName: z.string().min(2, 'Account name is required'),
   backgroundCheckAccepted: z.literal(true, {
-    message: 'You must accept the background check',
+    message: 'You must read and agree to the Terms & Conditions to continue.',
   }),
 });
 
@@ -43,7 +43,7 @@ export const OwnerSignUpSchema = z.object({
   }, { message: 'Invalid vehicle year' }),
   transmission: z.enum(['Manual', 'Automatic'], { message: 'Select a transmission' }),
   backgroundCheckAccepted: z.literal(true, {
-    message: "You must agree to the Terms of Service",
+    message: 'You must read and agree to the Terms & Conditions to continue.',
   }),
 });
 
