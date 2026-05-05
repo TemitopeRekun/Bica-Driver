@@ -118,8 +118,6 @@ export const useDriverRealtime = ({
 
   const enableOnline = useCallback(async () => {
     setAvailabilityIssue(null);
-    // Get GPS position immediately when driver taps "Go Online"
-    // and send it together with the online status in one request
     try {
       const pos = await CapacitorService.getCurrentLocation();
       if (pos?.coords) {
@@ -130,14 +128,33 @@ export const useDriverRealtime = ({
           lng: longitude,
         });
         setDriverPos([latitude, longitude]);
+        updateOnlineState(true);
       } else {
+        // Should rarely happen if getCurrentLocation returns successfully, but as a safety:
         await api.patch('/users/online', { isOnline: true });
+        setAvailabilityIssue(
+          'You are online but your location could not be detected. ' +
+          'Ride requests may not reach you until location is refreshed. ' +
+          'Tap "Refresh Location" to fix this.'
+        );
+        updateOnlineState(true);
       }
     } catch {
-      // If GPS fails, still go online — the tracking interval will fix location
-      await api.patch('/users/online', { isOnline: true }).catch(() => {});
+      // If GPS fails, still try to go online
+      try {
+        await api.patch('/users/online', { isOnline: true });
+        setAvailabilityIssue(
+          'You are online but your location could not be detected. ' +
+          'Ride requests may not reach you until location is refreshed. ' +
+          'Tap "Refresh Location" to fix this.'
+        );
+        updateOnlineState(true);
+      } catch {
+        // Full failure (network down)
+        updateOnlineState(false);
+        setAvailabilityIssue("We couldn't connect to the server. Please check your connection and try again.");
+      }
     }
-    updateOnlineState(true);
   }, [updateOnlineState]);
 
   const disableOnline = useCallback(async () => {

@@ -169,6 +169,8 @@ export const useRideManager = () => {
       return trip;
     } catch (error: any) {
       addToast(error.message || 'We couldn\'t process your request right now. Please try again or check your connection.', 'error');
+      setCurrentTripId(null);
+      setDriverInfo(null);
       setRideState('IDLE');
       throw error;
     }
