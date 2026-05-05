@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type PaymentContextStatus = 'unpaid' | 'initiated' | 'verifying' | 'confirmed' | 'failed' | 'partial';
+export type PaymentContextStatus = 'unpaid' | 'initiated' | 'verifying' | 'confirmed' | 'failed' | 'partial' | 'cancelled';
 
 interface PaymentStatusBannerProps {
   status: PaymentContextStatus;
@@ -57,6 +57,13 @@ export const PaymentStatusBanner: React.FC<PaymentStatusBannerProps> = ({
       text: 'text-orange-600 dark:text-orange-400',
       icon: 'warning',
       label: 'Partially Paid',
+    },
+    cancelled: {
+      bg: 'bg-slate-100 dark:bg-white/5',
+      border: 'border-slate-200 dark:border-white/10',
+      text: 'text-slate-500',
+      icon: 'cancel',
+      label: 'Payment Cancelled',
     },
   };
 

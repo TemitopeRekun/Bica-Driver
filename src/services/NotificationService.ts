@@ -2,6 +2,7 @@
 import { PushNotifications, Token, ActionPerformed, PushNotificationSchema } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 import { api } from './api.service';
+import { useAuthStore } from '@/stores/authStore';
 
 export interface NotificationPayload {
   type: 'ride_assigned' | 'new_ride_request' | 'dispatch_failed' | string;
@@ -67,6 +68,37 @@ class NotificationService {
         console.log('Push action performed: ' + JSON.stringify(notification));
         const payload = this.parseNotification(notification.notification);
         this.notifyListeners(payload);
+
+        // Routing Logic with Timing Guard
+        setTimeout(() => {
+          const { currentUser } = useAuthStore.getState();
+          const tripId = payload.tripId || payload.id;
+
+          switch (payload.type) {
+            case 'rideaccepted':
+            case 'otpregenerated':
+              window.location.replace('/owner/status');
+              break;
+            case 'dispatchfailed':
+              window.location.replace('/owner');
+              break;
+            case 'paymentreceived':
+              if (tripId) {
+                window.location.replace(`/driver/awaiting-payment/${tripId}`);
+              }
+              break;
+            case 'ridecancelled':
+              if (currentUser?.role === 'DRIVER') {
+                window.location.replace('/driver');
+              } else {
+                window.location.replace('/owner');
+              }
+              break;
+            default:
+              console.log('[PushRouting] Unknown notification type, no auto-navigation');
+              break;
+          }
+        }, 300);
       }
     );
   }

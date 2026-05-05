@@ -14,6 +14,55 @@ import { getLocationShortText } from '@/services/LocationService';
 import { api } from '@/services/api.service';
 import { notificationService } from '@/services/NotificationService';
 
+const ScheduledHoldingCard: React.FC<{
+  scheduledAt?: string;
+  onCancel: () => void;
+}> = ({ scheduledAt, onCancel }) => {
+  const formatLagosTime = (iso?: string) => {
+    if (!iso) return 'Pending Assignment';
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Lagos',
+      day: 'numeric',
+      month: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }).format(new Date(iso));
+  };
+
+  return (
+    <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-slide-up">
+      <div className="flex flex-col items-center text-center py-4">
+        <div className="size-20 rounded-[2rem] bg-amber-500/10 flex items-center justify-center text-amber-500 mb-6">
+          <span className="material-symbols-outlined text-4xl">calendar_month</span>
+        </div>
+        
+        <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight italic uppercase mb-2">
+          Your ride is scheduled
+        </h3>
+        
+        <div className="bg-slate-100 dark:bg-white/5 px-4 py-2 rounded-xl mb-4 border border-slate-200 dark:border-white/10">
+          <p className="text-lg font-black text-amber-600 dark:text-amber-500 tracking-tighter">
+            {formatLagosTime(scheduledAt)}
+          </p>
+        </div>
+
+        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest max-w-[240px] leading-relaxed">
+          Your driver will be assigned automatically before your trip
+        </p>
+      </div>
+
+      <button
+        onClick={onCancel}
+        className="mt-6 w-full py-4 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 font-black text-sm uppercase tracking-wider hover:bg-red-500/10 hover:text-red-500 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+      >
+        <span className="material-symbols-outlined text-lg">close</span>
+        Cancel Ride
+      </button>
+    </div>
+  );
+};
+
 const TripStatusScreen: React.FC = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuthStore();
@@ -229,8 +278,19 @@ const TripStatusScreen: React.FC = () => {
                finalFare: completedTripData?.amount || 0,
              }}
              paymentStatus={completedTripData?.paymentStatus || 'UNPAID'}
-             onPayNow={() => !isPolling && currentTripId && initiatePayment(currentTripId)}
+             onPayNow={() => {
+                const bannerStatus = (completedTripData?.paymentStatus === 'PAID' || completedTripData?.paymentStatus === 'SUCCESS') ? 'confirmed'
+                  : completedTripData?.paymentStatus === 'FAILED' ? 'failed'
+                  : completedTripData?.paymentStatus === 'CANCELLED' ? 'cancelled'
+                  : 'unpaid';
+                if (!isPolling && currentTripId) initiatePayment(currentTripId);
+              }}
            />
+        ) : rideState === 'SCHEDULED' ? (
+          <ScheduledHoldingCard 
+            scheduledAt={completedTripData?.scheduledAt}
+            onCancel={handleCancel}
+          />
         ) : (
           <DriverStatusCard
             rideState={rideState}

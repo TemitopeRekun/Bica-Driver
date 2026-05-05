@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { UserProfile, UserRole, ApprovalStatus, Trip, TripStatus, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminDashboardStats, AdminSection, DriverFilter, AdminPaymentsSummaryResponse, SummaryPeriod, DateRangeFilter } from '@/types';
 import { mapUser } from '@/mappers/appMappers';
 import { useToast } from '@/hooks/useToast';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { InlineError } from '@/components/Common/InlineError';
 
 // Sub-components
 import OverviewSection from '@/components/Admin/OverviewSection';
@@ -75,6 +77,27 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   const [driverFilter, setDriverFilter] = useState<DriverFilter>('All');
   const [retryingSubAccountIds, setRetryingSubAccountIds] = useState<Set<string>>(new Set());
   const [localSettings, setLocalSettings] = useState<SystemSettings>(settings);
+  const [relativeTime, setRelativeTime] = useState<string>('just now');
+
+  const { isRefreshing, pullHandlers } = usePullToRefresh(async () => {
+    if (onRetry) await onRetry();
+  });
+
+  // Relative Time Logic
+  useEffect(() => {
+    if (!lastUpdated) return;
+
+    const updateRelative = () => {
+      const diff = Math.floor((new Date().getTime() - lastUpdated.getTime()) / 60000);
+      if (diff < 1) setRelativeTime('just now');
+      else if (diff === 1) setRelativeTime('1 min ago');
+      else setRelativeTime(`${diff} mins ago`);
+    };
+
+    updateRelative();
+    const interval = setInterval(updateRelative, 60000);
+    return () => clearInterval(interval);
+  }, [lastUpdated]);
 
   // Helper to jump to a section with a specific filter
   const jumpToSection = (section: AdminSection, filter?: any) => {
@@ -197,7 +220,17 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
         )}
         <div className="flex-1">
           <h1 className="font-black text-lg uppercase tracking-tight">Admin Console</h1>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Bicadriver v1.1.0</p>
+          <div className="flex items-center gap-2">
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Bicadriver v1.1.0</p>
+            {lastUpdated && (
+              <>
+                <span className="text-[10px] text-slate-300">•</span>
+                <p className="text-[10px] text-primary/70 font-black uppercase tracking-widest italic animate-pulse">
+                  Last updated {relativeTime}
+                </p>
+              </>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {activeSection === 'overview' && (
@@ -243,8 +276,36 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto no-scrollbar p-4 relative">
-        {isLoading && users.length === 0 ? (
+      <main 
+        {...pullHandlers}
+        className="flex-1 overflow-y-auto no-scrollbar p-4 relative"
+      >
+        {/* Pull-to-refresh spinner overlay */}
+        <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-50 flex items-center justify-center overflow-hidden">
+          <div className={`transition-all duration-300 transform ${isRefreshing ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+            <div className="size-10 rounded-full bg-primary shadow-xl flex items-center justify-center border-4 border-white/20">
+              <span className="material-symbols-outlined text-white animate-spin">refresh</span>
+            </div>
+          </div>
+        </div>
+
+        {error ? (
+          <div className="h-full flex flex-col items-center justify-center p-8 text-center animate-fade-in">
+            <div className="size-20 rounded-[2.5rem] bg-red-500/10 flex items-center justify-center text-red-500 mb-6">
+              <span className="material-symbols-outlined text-4xl">error</span>
+            </div>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase mb-2">Sync Interrupted</h3>
+            <p className="text-sm text-slate-500 font-bold uppercase tracking-widest max-w-[240px] leading-relaxed mb-8">
+              {error}
+            </p>
+            <button 
+              onClick={onRetry}
+              className="px-10 py-4 rounded-2xl bg-primary text-white font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-primary/20 active:scale-95 transition-all"
+            >
+              Force Retry
+            </button>
+          </div>
+        ) : isLoading && users.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center opacity-50">
             <span className="material-symbols-outlined animate-spin text-4xl mb-2">refresh</span>
             <p className="font-black uppercase tracking-widest text-xs">Synchronizing Records...</p>

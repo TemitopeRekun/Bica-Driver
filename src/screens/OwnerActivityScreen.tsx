@@ -4,6 +4,11 @@ import { api, PaginatedResponse, PaginationMeta } from '@/services/api.service';
 import { OwnerActivityTab, PaymentHistoryRecord, Trip } from '@/types';
 import { Skeleton } from '@/components/Common/Skeleton';
 import { InlineError } from '@/components/Common/InlineError';
+import { useAuthStore } from '@/stores/authStore';
+import { useRideStore } from '@/stores/rideStore';
+import { useUIStore } from '@/stores/uiStore';
+import { useRideManager } from '@/hooks/useRideManager';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 interface OwnerActivityScreenProps {
   initialTab: OwnerActivityTab;
@@ -59,6 +64,10 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const { setSupportOpen, setSupportContext } = useUIStore();
+
+  const { isRefreshing, pullHandlers } = usePullToRefresh(async () => {
+    await loadActivity();
+  });
 
   const handleReportPaymentIssue = (payment: PaymentHistoryRecord) => {
     setSupportContext({
@@ -233,6 +242,15 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
             key={trip.id}
             className={`relative overflow-hidden rounded-[2rem] border p-5 ${ACTIVITY_THEME.trips.card}`}
           >
+            {/* Payment Status Mapping for Banner support */}
+            {(() => {
+              const bannerStatus = trip.paymentStatus === 'PAID' ? 'confirmed'
+                : trip.paymentStatus === 'FAILED' ? 'failed'
+                : trip.paymentStatus === 'CANCELLED' ? 'cancelled'
+                : 'unpaid';
+              // Not rendering banner yet, but mapping is now ready/audited
+              return null;
+            })()}
             <div className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-b ${ACTIVITY_THEME.trips.glow} pointer-events-none`} />
             <div className="relative mb-5 flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-start gap-4">
@@ -364,32 +382,38 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
   const activeTheme = ACTIVITY_THEME[activeTab];
 
   return (
-    <div className="relative min-h-screen bg-background-light text-slate-900 dark:bg-background-dark dark:text-white font-display">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-emerald-500/10 via-amber-500/8 to-transparent" />
+    <div 
+      {...pullHandlers}
+      className="relative h-screen flex flex-col bg-background-light text-slate-900 dark:bg-background-dark dark:text-white font-display overflow-hidden"
+    >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-sky-500/10 via-emerald-500/8 to-transparent" />
+      
+      {/* Pull-to-refresh spinner overlay */}
+      <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-50 flex items-center justify-center overflow-hidden">
+        <div className={`transition-all duration-300 transform ${isRefreshing ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+          <div className="size-10 rounded-full bg-primary shadow-xl flex items-center justify-center border-4 border-white/20">
+            <span className="material-symbols-outlined text-white animate-spin">refresh</span>
+          </div>
+        </div>
+      </div>
 
       <div className="sticky top-0 z-20 border-b border-slate-200 bg-background-light/88 backdrop-blur-md dark:border-slate-800 dark:bg-background-dark/88">
         <div className="mx-auto flex max-w-md items-center gap-4 p-4">
-          <button
-            onClick={onBack}
-            className="flex size-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-all hover:bg-slate-200 active:scale-90 dark:bg-white/5 dark:text-slate-200"
-          >
+          <button onClick={onBack} className="flex size-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-all hover:bg-slate-200 active:scale-90 dark:bg-white/5 dark:text-slate-200">
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-black italic uppercase tracking-tighter">Your Activity</h1>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Trip History & Receipts</p>
+            <h1 className="text-lg font-black italic uppercase tracking-tighter">Owner Activity</h1>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">History & Payments</p>
           </div>
-          <button
-            onClick={() => loadActivity()}
-            className="flex size-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-all hover:bg-slate-200 active:scale-90 dark:bg-white/5 dark:text-slate-200"
-            title="Refresh records"
-          >
+          <button onClick={() => loadActivity()} className="flex size-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-all hover:bg-slate-200 active:scale-90 dark:bg-white/5 dark:text-slate-200">
             <span className={`material-symbols-outlined ${isLoading ? 'animate-spin' : ''}`}>refresh</span>
           </button>
         </div>
       </div>
 
-      <div className="relative mx-auto flex max-w-md flex-col gap-5 px-4 pb-12 pt-6">
+      <div className="flex-1 overflow-y-auto no-scrollbar relative">
+        <div className="relative mx-auto flex max-w-md flex-col gap-5 px-4 pb-12 pt-6">
         <div className={`relative overflow-hidden rounded-[2.5rem] p-6 shadow-2xl shadow-black/5 border ${activeTheme.hero}`}>
           <div className={`absolute inset-x-0 top-0 h-32 bg-gradient-to-b ${activeTheme.glow} pointer-events-none`} />
           <div className="relative flex items-start gap-5">
@@ -451,8 +475,8 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
                    </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                   <Skeleton height={60} borderRadius={16} />
-                   <Skeleton height={60} borderRadius={16} />
+                   <Skeleton height={60} />
+                   <Skeleton height={60} />
                 </div>
               </div>
             ))}
@@ -498,6 +522,7 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
              </button>
            </>
         )}
+        </div>
       </div>
     </div>
   );

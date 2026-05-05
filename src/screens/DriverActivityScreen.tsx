@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { mapTrip } from '@/mappers/appMappers';
+import { mapTrip, mapPaymentHistory } from '@/mappers/appMappers';
 import { api, PaginatedResponse, PaginationMeta } from '@/services/api.service';
 import { DriverActivityTab, PaymentHistoryRecord, Trip, WalletSummary, SummaryPeriod, DriverPaymentsSummaryResponse, SettlementStatusFilter, DateRangeFilter } from '@/types';
 import { Skeleton } from '@/components/Common/Skeleton';
 import { InlineError } from '@/components/Common/InlineError';
+import { useUIStore } from '@/stores/uiStore';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 interface DriverActivityScreenProps {
   initialTab: DriverActivityTab;
@@ -16,35 +18,33 @@ const ACTIVITY_THEME = {
     label: 'Trips',
     icon: 'route',
     activeTab:
-      'bg-gradient-to-r from-sky-500 via-cyan-500 to-blue-600 text-white shadow-lg shadow-sky-500/25',
+      'bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-500 text-white shadow-lg shadow-sky-500/25',
     inactiveTab:
       'text-slate-500 hover:bg-white/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-white',
     hero:
-      'border-sky-200/70 bg-gradient-to-br from-white via-sky-50/90 to-cyan-50/80 dark:border-sky-500/20 dark:bg-gradient-to-br dark:from-slate-900 dark:via-sky-950/30 dark:to-cyan-950/20',
+      'border-sky-200/70 bg-gradient-to-br from-white via-sky-50/90 to-indigo-50/80 dark:border-sky-500/20 dark:bg-gradient-to-br dark:from-slate-900 dark:via-sky-950/30 dark:to-indigo-950/20',
     card:
-      'border-sky-200/70 bg-gradient-to-br from-white via-sky-50/90 to-cyan-50/80 shadow-lg shadow-sky-900/5 dark:border-sky-500/20 dark:bg-gradient-to-br dark:from-slate-900 dark:via-sky-950/30 dark:to-cyan-950/20',
+      'border-sky-200/70 bg-gradient-to-br from-white via-sky-50/90 to-indigo-50/80 shadow-lg shadow-sky-900/5 dark:border-sky-500/20 dark:bg-gradient-to-br dark:from-slate-900 dark:via-sky-950/30 dark:to-indigo-950/20',
     iconSurface: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
     metricSurface: 'border-white/70 bg-white/75 dark:border-white/5 dark:bg-black/20',
-    accentText: 'text-sky-700 dark:text-sky-300',
-    badge: 'bg-sky-500/12 text-sky-700 dark:text-sky-300',
-    glow: 'from-sky-500/20 via-cyan-500/12 to-transparent',
+    accentText: 'text-sky-600 dark:text-sky-400',
+    glow: 'from-sky-400/25 via-blue-500/12 to-transparent',
   },
   settlements: {
     label: 'Settlements',
     icon: 'account_balance_wallet',
     activeTab:
-      'bg-gradient-to-r from-emerald-500 via-emerald-600 to-lime-500 text-white shadow-lg shadow-emerald-500/25',
+      'bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-500 text-white shadow-lg shadow-emerald-500/25',
     inactiveTab:
       'text-slate-500 hover:bg-white/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-white',
     hero:
-      'border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/90 to-lime-50/80 dark:border-emerald-500/20 dark:bg-gradient-to-br dark:from-slate-900 dark:via-emerald-950/30 dark:to-lime-950/20',
+      'border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/90 to-teal-50/80 dark:border-emerald-500/20 dark:bg-gradient-to-br dark:from-slate-900 dark:via-emerald-950/30 dark:to-teal-950/20',
     card:
-      'border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/90 to-lime-50/80 shadow-lg shadow-emerald-900/5 dark:border-emerald-500/20 dark:bg-gradient-to-br dark:from-slate-900 dark:via-emerald-950/30 dark:to-lime-950/20',
+      'border-emerald-200/70 bg-gradient-to-br from-white via-emerald-50/90 to-teal-50/80 shadow-lg shadow-emerald-900/5 dark:border-emerald-500/20 dark:bg-gradient-to-br dark:from-slate-900 dark:via-emerald-950/30 dark:to-teal-950/20',
     iconSurface: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
     metricSurface: 'border-white/70 bg-white/75 dark:border-white/5 dark:bg-black/20',
-    accentText: 'text-emerald-700 dark:text-emerald-300',
-    badge: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
-    glow: 'from-emerald-500/20 via-lime-500/10 to-transparent',
+    accentText: 'text-emerald-600 dark:text-emerald-400',
+    glow: 'from-emerald-400/25 via-teal-500/12 to-transparent',
   },
 } as const;
 
@@ -67,7 +67,8 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   const [summaryLoading, setSummaryLoading] = useState(false);
 
   const [settlementStatusFilter, setSettlementStatusFilter] = useState<SettlementStatusFilter>('ALL');
-  const [settlementDateRange, setSettlementDateRange] = useState<DateRangeFilter>({ from: null, to: null });
+  const [pendingDateRange, setPendingDateRange] = useState<{ from: string; to: string }>({ from: '', to: '' });
+  const [settlementDateRange, setSettlementDateRange] = useState<{ from: string; to: string } | null>(null);
   const [expandedSettlementId, setExpandedSettlementId] = useState<string | null>(null);
   const { setSupportOpen, setSupportContext } = useUIStore();
 
@@ -76,8 +77,7 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
       tripId: trip.id,
       tripStatus: trip.status,
       paymentStatus: trip.paymentStatus ?? undefined,
-      totalFare: trip.finalFare ?? trip.amount,
-      openedAt: new Date().toISOString(),
+      openedAt: new Date().toISOString()
     });
     setSupportOpen(true);
   };
@@ -85,11 +85,8 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   const handleReportSettlementIssue = (settlement: PaymentHistoryRecord) => {
     setSupportContext({
       tripId: settlement.tripId,
-      paymentStatus: settlement.trip?.status,
-      driverEarnings: settlement.driverAmount,
-      totalFare: settlement.totalAmount,
-      monnifyTxRef: settlement.monnifyTxRef,
-      openedAt: new Date().toISOString(),
+      paymentStatus: 'PAID',
+      openedAt: new Date().toISOString()
     });
     setSupportOpen(true);
   };
@@ -98,20 +95,29 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
     setActiveTab(initialTab);
   }, [initialTab]);
 
+  const loadWalletSummary = async () => {
+    try {
+      const summary = await api.get<WalletSummary>('/wallet/summary');
+      setWalletSummary(summary);
+      return summary;
+    } catch (e) {
+      console.warn('Failed to load wallet summary', e);
+      throw e;
+    }
+  };
+
   const loadActivity = async () => {
     setIsLoading(true);
     setError('');
-
     try {
       const [tripsResult, settlementsResult, walletResult] = await Promise.allSettled([
         api.get<PaginatedResponse<any>>('/rides/history?limit=20'),
-        api.get<PaginatedResponse<PaymentHistoryRecord>>('/payments/history?limit=20'),
-        api.get<WalletSummary>('/payments/wallet'),
+        api.getPaginatedResponse<PaymentHistoryRecord>('/payments/history?limit=20'),
+        loadWalletSummary(),
       ]);
 
       if (tripsResult.status === 'fulfilled') {
-        const items = tripsResult.value?.items || [];
-        setTrips(items.map(mapTrip));
+        setTrips(tripsResult.value?.items?.map(mapTrip) || []);
         setTripsMeta(tripsResult.value?.meta || null);
       } else {
         setTrips([]);
@@ -158,7 +164,7 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   const loadTripsPage = async (page: number) => {
     setIsLoading(true);
     try {
-      const result = await api.get<PaginatedResponse<any>>(`/rides/history?page=${page}&limit=20`);
+      const result = await api.get<PaginatedResponse<any>>('/rides/history?page=${page}&limit=20');
       setTrips(result?.items?.map(mapTrip) || []);
       setTripsMeta(result?.meta || null);
     } catch (e: any) {
@@ -173,12 +179,14 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
     try {
       const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (settlementStatusFilter !== 'ALL') params.set('status', settlementStatusFilter);
-      if (settlementDateRange.from) params.set('from', settlementDateRange.from);
-      if (settlementDateRange.to) params.set('to', settlementDateRange.to);
+      if (settlementDateRange) {
+        if (settlementDateRange.from) params.set('from', settlementDateRange.from);
+        if (settlementDateRange.to) params.set('to', settlementDateRange.to);
+      }
       const result = await api.getPaginatedResponse<PaymentHistoryRecord>(
         `payments/history?${params}`
       );
-      setSettlements(result?.items || []);
+      setSettlements(result?.items.map(mapPaymentHistory) || []);
       setSettlementsMeta(result?.meta || null);
     } catch (e: any) {
       setError(e.message || 'Failed to load page');
@@ -188,6 +196,7 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   };
 
   useEffect(() => {
+    // Only auto-load on page change or status filter change. Date range requires explicit "Apply".
     loadSettlementsPage(0);
   }, [settlementStatusFilter, settlementDateRange]);
 
@@ -213,6 +222,10 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
     fetchSummary();
     return () => { cancelled = true; };
   }, [period]);
+
+  const { isRefreshing, pullHandlers } = usePullToRefresh(async () => {
+    await loadActivity();
+  });
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-NG', {
@@ -460,8 +473,21 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   const activeTheme = ACTIVITY_THEME[activeTab];
 
   return (
-    <div className="relative min-h-screen bg-background-light text-slate-900 dark:bg-background-dark dark:text-white font-display">
+    <div 
+      {...pullHandlers}
+      className="relative h-screen flex flex-col bg-background-light text-slate-900 dark:bg-background-dark dark:text-white font-display overflow-hidden"
+    >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-sky-500/10 via-emerald-500/8 to-transparent" />
+      
+      {/* Pull-to-refresh spinner overlay */}
+      <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-50 flex items-center justify-center overflow-hidden">
+        <div className={`transition-all duration-300 transform ${isRefreshing ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+          <div className="size-10 rounded-full bg-primary shadow-xl flex items-center justify-center border-4 border-white/20">
+            <span className="material-symbols-outlined text-white animate-spin">refresh</span>
+          </div>
+        </div>
+      </div>
+
       <div className="sticky top-0 z-20 border-b border-slate-200 bg-background-light/88 backdrop-blur-md dark:border-slate-800 dark:bg-background-dark/88">
         <div className="mx-auto flex max-w-md items-center gap-4 p-4">
           <button onClick={onBack} className="flex size-11 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition-all hover:bg-slate-200 active:scale-90 dark:bg-white/5 dark:text-slate-200">
@@ -476,226 +502,231 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
           </button>
         </div>
       </div>
-      <div className="relative mx-auto flex max-w-md flex-col gap-5 px-4 pb-12 pt-6">
-        <div className={`relative overflow-hidden rounded-[2.5rem] p-6 shadow-2xl shadow-black/5 border ${activeTheme.hero}`}>
-          <div className={`absolute inset-x-0 top-0 h-32 bg-gradient-to-b ${activeTheme.glow} pointer-events-none`} />
-          <div className="relative flex items-start gap-5">
-            <div className={`flex size-14 shrink-0 items-center justify-center rounded-2xl shadow-lg ${activeTheme.iconSurface}`}>
-              <span className="material-symbols-outlined text-2xl">{activeTheme.icon}</span>
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Financial Overview</p>
-              <h2 className="mt-1 text-xl font-black text-slate-900 dark:text-white leading-tight uppercase tracking-tight">
-                {activeTab === 'trips' ? 'Performance history' : 'Earnings Dashboard'}
-              </h2>
-            </div>
-          </div>
-          <div className="relative mt-6 grid grid-cols-3 gap-3">
-            <div className={`rounded-2xl border p-3 ${ACTIVITY_THEME.trips.metricSurface}`}>
-              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Total Rides</p>
-              <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">{walletSummary?.totalTrips ?? 0}</p>
-            </div>
-            <div className={`rounded-2xl border p-3 ${ACTIVITY_THEME.settlements.metricSurface}`}>
-              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Lifetime</p>
-              <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">{formatCurrency(walletSummary?.totalEarned ?? 0)}</p>
-            </div>
-            <div className={`rounded-2xl border p-3 ${ACTIVITY_THEME.settlements.metricSurface}`}>
-              <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Current</p>
-              <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">{formatCurrency(walletSummary?.currentBalance ?? 0)}</p>
-            </div>
-          </div>
-        </div>
 
-        {activeTab === 'settlements' && (
-          <div className="flex flex-col gap-3 animate-fade-in">
-            <div className="flex gap-2 p-1 bg-white/40 dark:bg-white/5 rounded-2xl w-fit border border-emerald-100 dark:border-emerald-500/10">
-              {(['daily', 'weekly', 'monthly'] as SummaryPeriod[]).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setPeriod(p)}
-                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                    period === p
-                      ? 'bg-emerald-500 text-white shadow'
-                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mt-3">
-              <div className={`rounded-2xl border px-3 py-3.5 ${ACTIVITY_THEME.settlements.metricSurface}`}>
-                <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Period Earnings</p>
-                {summaryLoading ? (
-                  <div className="mt-1 h-7 w-24 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
-                ) : (
-                  <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">
-                    {formatCurrency(driverSummary?.totals.driverEarnings ?? 0)}
-                  </p>
-                )}
+      <div className="flex-1 overflow-y-auto no-scrollbar relative">
+        <div className="mx-auto flex max-w-md flex-col gap-5 px-4 pb-12 pt-6">
+          <div className={`relative overflow-hidden rounded-[2.5rem] p-6 shadow-2xl shadow-black/5 border ${activeTheme.hero}`}>
+            <div className={`absolute inset-x-0 top-0 h-32 bg-gradient-to-b ${activeTheme.glow} pointer-events-none`} />
+            <div className="relative flex items-start gap-5">
+              <div className={`flex size-14 shrink-0 items-center justify-center rounded-2xl shadow-lg ${activeTheme.iconSurface}`}>
+                <span className="material-symbols-outlined text-2xl">{activeTheme.icon}</span>
               </div>
-              <div className={`rounded-2xl border px-3 py-3.5 ${ACTIVITY_THEME.settlements.metricSurface}`}>
-                <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Cleared Trips</p>
-                {summaryLoading ? (
-                  <div className="mt-1 h-7 w-16 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
-                ) : (
-                  <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">
-                    {driverSummary?.totals.clearedTrips ?? 0}
-                  </p>
-                )}
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Financial Overview</p>
+                <h2 className="mt-1 text-xl font-black text-slate-900 dark:text-white leading-tight uppercase tracking-tight">
+                  {activeTab === 'trips' ? 'Performance history' : 'Earnings Dashboard'}
+                </h2>
               </div>
             </div>
-
-            {driverSummary?.buckets && driverSummary.buckets.length > 0 && (
-              <div className="mt-3 rounded-2xl border border-white/70 bg-white/75 dark:border-white/5 dark:bg-black/20 overflow-hidden">
-                {driverSummary.buckets.map((bucket) => (
-                  <div
-                    key={bucket.label}
-                    className="flex items-center justify-between px-4 py-3 border-b border-slate-100/80 dark:border-slate-800 last:border-none"
-                  >
-                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                      {bucket.label}
-                    </span>
-                    <div className="flex items-center gap-4 text-right">
-                      <span className="text-[10px] text-slate-400 font-bold">{bucket.clearedTrips} trips</span>
-                      <span className="text-sm font-black text-slate-900 dark:text-white">
-                        {formatCurrency(bucket.driverEarnings)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+            <div className="relative mt-6 grid grid-cols-3 gap-3">
+              <div className={`rounded-2xl border p-3 ${ACTIVITY_THEME.trips.metricSurface}`}>
+                <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Total Rides</p>
+                <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">{walletSummary?.totalTrips ?? 0}</p>
               </div>
-            )}
+              <div className={`rounded-2xl border p-3 ${ACTIVITY_THEME.settlements.metricSurface}`}>
+                <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Lifetime</p>
+                <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">{formatCurrency(walletSummary?.totalEarned ?? 0)}</p>
+              </div>
+              <div className={`rounded-2xl border p-3 ${ACTIVITY_THEME.settlements.metricSurface}`}>
+                <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Current</p>
+                <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">{formatCurrency(walletSummary?.currentBalance ?? 0)}</p>
+              </div>
+            </div>
           </div>
-        )}
 
-        {/* New Wallet Clarity Card */}
-        <div className="bg-primary/5 border border-primary/10 rounded-3xl p-5 flex gap-4 items-start animate-fade-in shadow-sm shadow-primary/5">
-           <div className="size-10 shrink-0 bg-primary/20 rounded-2xl flex items-center justify-center text-primary">
-              <span className="material-symbols-outlined text-xl">account_balance</span>
-           </div>
-           <div>
-              <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest mb-1">Autonomous Settlement Policy</h4>
-              <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
-                Your current balance tracks cleared earnings for the active period. BICA settles funds <strong>directly to your bank account</strong> via Monnify split-payments. No manual withdrawal is required.
-              </p>
-           </div>
-        </div>
-        {activeTab === 'settlements' && (
-          <div className="flex flex-col gap-4 p-5 rounded-[2rem] bg-white/40 dark:bg-white/5 border border-emerald-100 dark:border-emerald-500/10 animate-fade-in">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex gap-1.5 p-1 bg-slate-100 dark:bg-black/20 rounded-xl">
-                {(['ALL', 'PAID', 'FAILED'] as SettlementStatusFilter[]).map((status) => (
+          {activeTab === 'settlements' && (
+            <div className="flex flex-col gap-3 animate-fade-in">
+              <div className="flex gap-2 p-1 bg-white/40 dark:bg-white/5 rounded-2xl w-fit border border-emerald-100 dark:border-emerald-500/10">
+                {(['daily', 'weekly', 'monthly'] as SummaryPeriod[]).map((p) => (
                   <button
-                    key={status}
-                    onClick={() => setSettlementStatusFilter(status)}
-                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-                      settlementStatusFilter === status
-                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                    key={p}
+                    onClick={() => setPeriod(p)}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                      period === p
+                        ? 'bg-emerald-500 text-white shadow'
                         : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
                     }`}
                   >
-                    {status}
+                    {p}
                   </button>
                 ))}
               </div>
-              <button
-                onClick={() => {
-                  setSettlementStatusFilter('ALL');
-                  setSettlementDateRange({ from: null, to: null });
-                }}
-                className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest hover:underline"
+
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div className={`rounded-2xl border px-3 py-3.5 ${ACTIVITY_THEME.settlements.metricSurface}`}>
+                  <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Period Earnings</p>
+                  {summaryLoading ? (
+                    <div className="mt-1 h-7 w-24 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
+                  ) : (
+                    <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">
+                      {formatCurrency(driverSummary?.totals.driverEarnings ?? 0)}
+                    </p>
+                  )}
+                </div>
+                <div className={`rounded-2xl border px-3 py-3.5 ${ACTIVITY_THEME.settlements.metricSurface}`}>
+                  <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Cleared Trips</p>
+                  {summaryLoading ? (
+                    <div className="mt-1 h-7 w-16 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
+                  ) : (
+                    <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">
+                      {driverSummary?.totals.clearedTrips ?? 0}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {driverSummary?.buckets && driverSummary.buckets.length > 0 && (
+                <div className="mt-3 rounded-2xl border border-white/70 bg-white/75 dark:border-white/5 dark:bg-black/20 overflow-hidden">
+                  {driverSummary.buckets.map((bucket) => (
+                    <div
+                      key={bucket.label}
+                      className="flex items-center justify-between px-4 py-3 border-b border-slate-100/80 dark:border-slate-800 last:border-none"
+                    >
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        {bucket.label}
+                      </span>
+                      <div className="flex items-center gap-4 text-right">
+                        <span className="text-[10px] text-slate-400 font-bold">{bucket.clearedTrips} trips</span>
+                        <span className="text-sm font-black text-slate-900 dark:text-white">
+                          {formatCurrency(bucket.driverEarnings)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* New Wallet Clarity Card */}
+          <div className="bg-primary/5 border border-primary/10 rounded-3xl p-5 flex gap-4 items-start animate-fade-in shadow-sm shadow-primary/5">
+             <div className="size-10 shrink-0 bg-primary/20 rounded-2xl flex items-center justify-center text-primary">
+                <span className="material-symbols-outlined text-xl">account_balance</span>
+             </div>
+             <div>
+                <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest mb-1">Autonomous Settlement Policy</h4>
+                <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
+                  Your current balance tracks cleared earnings for the active period. BICA settles funds <strong>directly to your bank account</strong> via Monnify split-payments. No manual withdrawal is required.
+                </p>
+             </div>
+          </div>
+
+          {activeTab === 'settlements' && (
+            <div className="flex flex-col gap-4 p-5 rounded-[2rem] bg-white/40 dark:bg-white/5 border border-emerald-100 dark:border-emerald-500/10 animate-fade-in">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex gap-1.5 p-1 bg-slate-100 dark:bg-black/20 rounded-xl">
+                  {(['ALL', 'PAID', 'FAILED'] as SettlementStatusFilter[]).map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => setSettlementStatusFilter(status)}
+                      className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
+                        settlementStatusFilter === status
+                          ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                          : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => {
+                    setSettlementStatusFilter('ALL');
+                    setPendingDateRange({ from: '', to: '' });
+                    setSettlementDateRange(null);
+                    // Reset back to walletSummary.recentPayments
+                    if (walletSummary?.recentPayments) {
+                      setSettlements(walletSummary.recentPayments.map(mapPaymentHistory));
+                    } else {
+                      loadSettlementsPage(0);
+                    }
+                  }}
+                  className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest hover:underline"
+                >
+                  Clear Filters
+                </button>
+              </div>
+
+              <div className="flex items-end gap-3">
+                <div className="flex-1 grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">From</p>
+                    <input
+                      type="date"
+                      value={pendingDateRange.from}
+                      onChange={(e) => setPendingDateRange({ ...pendingDateRange, from: e.target.value })}
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-black text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">To</p>
+                    <input
+                      type="date"
+                      value={pendingDateRange.to}
+                      onChange={(e) => setPendingDateRange({ ...pendingDateRange, to: e.target.value })}
+                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-black text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                    />
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSettlementDateRange({ ...pendingDateRange })}
+                  className="px-4 h-9 rounded-xl bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-1.5 shadow-sm backdrop-blur-md dark:border-white/5 dark:bg-white/5">
+            <button onClick={() => setActiveTab('trips')} className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'trips' ? ACTIVITY_THEME.trips.activeTab : ACTIVITY_THEME.trips.inactiveTab}`}>History</button>
+            <button onClick={() => setActiveTab('settlements')} className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'settlements' ? ACTIVITY_THEME.settlements.activeTab : ACTIVITY_THEME.settlements.inactiveTab}`}>Ledger</button>
+          </div>
+
+          {error ? (
+             <InlineError message={error} onRetry={loadActivity} />
+          ) : isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((item) => (
+                <div key={item} className={`rounded-[2rem] border p-5 ${activeTheme.card} overflow-hidden`}>
+                  <div className="flex items-center gap-4 mb-5">
+                     <Skeleton circle width={48} height={48} />
+                     <div className="flex-1 space-y-2">
+                        <Skeleton width="70%" height={16} />
+                        <Skeleton width="40%" height={12} />
+                     </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                     <Skeleton height={60} />
+                     <Skeleton height={60} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : activeTab === 'trips' ? (
+            <>
+              {renderTripList()}
+              <button 
+                 onClick={() => {
+                   setSupportContext({ openedAt: new Date().toISOString() });
+                   setSupportOpen(true);
+                 }}
+                 className="mt-4 w-full flex items-center justify-center gap-3 p-5 rounded-3xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 group shadow-sm active:scale-[0.98] transition-all"
               >
-                Clear Filters
+                 <div className="size-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                    <span className="material-symbols-outlined">live_help</span>
+                 </div>
+                 <div className="flex-1 text-left">
+                    <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Help & Support</p>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Need help with trips?</p>
+                 </div>
+                 <span className="material-symbols-outlined text-slate-400">chevron_right</span>
               </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">From</p>
-                <input
-                  type="date"
-                  value={settlementDateRange.from || ''}
-                  onChange={(e) => setSettlementDateRange({ ...settlementDateRange, from: e.target.value })}
-                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-black text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">To</p>
-                <input
-                  type="date"
-                  value={settlementDateRange.to || ''}
-                  onChange={(e) => setSettlementDateRange({ ...settlementDateRange, to: e.target.value })}
-                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-black text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-1.5 shadow-sm backdrop-blur-md dark:border-white/5 dark:bg-white/5">
-          <button onClick={() => setActiveTab('trips')} className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'trips' ? ACTIVITY_THEME.trips.activeTab : ACTIVITY_THEME.trips.inactiveTab}`}>History</button>
-          <button onClick={() => setActiveTab('settlements')} className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'settlements' ? ACTIVITY_THEME.settlements.activeTab : ACTIVITY_THEME.settlements.inactiveTab}`}>Ledger</button>
+            </>
+          ) : (
+            renderSettlementList()
+          )}
         </div>
-        {error ? (
-           <InlineError message={error} onRetry={loadActivity} />
-        ) : isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((item) => (
-              <div key={item} className={`rounded-[2rem] border p-5 ${activeTheme.card} overflow-hidden`}>
-                <div className="flex items-center gap-4 mb-5">
-                   <Skeleton circle width={48} height={48} />
-                   <div className="flex-1 space-y-2">
-                      <Skeleton width="70%" height={16} />
-                      <Skeleton width="40%" height={12} />
-                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                   <Skeleton height={60} borderRadius={16} />
-                   <Skeleton height={60} borderRadius={16} />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : activeTab === 'trips' ? (
-          <>
-            {renderTripList()}
-            <button 
-               onClick={() => {
-                 setSupportContext({ openedAt: new Date().toISOString() });
-                 setSupportOpen(true);
-               }}
-               className="mt-4 w-full flex items-center justify-center gap-3 p-5 rounded-3xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 group shadow-sm active:scale-[0.98] transition-all"
-            >
-               <div className="size-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
-                  <span className="material-symbols-outlined">live_help</span>
-               </div>
-               <div className="flex-1 text-left">
-                  <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Help & Support</p>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Need help with trips?</p>
-               </div>
-               <span className="material-symbols-outlined text-slate-400">chevron_right</span>
-            </button>
-          </>
-        ) : (
-          <>
-            {renderSettlementList()}
-            <button 
-               onClick={() => openSupport()}
-               className="mt-4 w-full flex items-center justify-center gap-3 p-5 rounded-3xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 group shadow-sm active:scale-[0.98] transition-all"
-            >
-               <div className="size-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                  <span className="material-symbols-outlined">payments</span>
-               </div>
-               <div className="flex-1 text-left">
-                  <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Help & Support</p>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Issues with earnings?</p>
-               </div>
-               <span className="material-symbols-outlined text-slate-400">chevron_right</span>
-            </button>
-          </>
-        )}
       </div>
     </div>
   );

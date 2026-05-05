@@ -19,8 +19,12 @@ const EmergencyHelpSheet: React.FC<EmergencyHelpSheetProps> = ({ context, onClos
     }
   };
 
+  const locationUrl = (context.locationLat !== undefined && context.locationLng !== undefined)
+    ? `https://maps.google.com/?q=${context.locationLat},${context.locationLng}`
+    : 'Location unavailable';
+
   const whatsappMsg = encodeURIComponent(
-    `EMERGENCY HELP REQUEST\nDriver: ${context.driverName} (${context.driverPhone})\nTrip ID: ${context.tripId ?? 'N/A'}\nLocation: https://maps.google.com/?q=${context.locationLat},${context.locationLng}\nStatus: ${context.tripStatus ?? 'N/A'}`
+    `EMERGENCY HELP REQUEST\nDriver: ${context.driverName} (${context.driverPhone})\nTrip ID: ${context.tripId ?? 'N/A'}\nLocation: ${locationUrl}\nStatus: ${context.tripStatus ?? 'N/A'}`
   );
 
   return (
@@ -113,15 +117,25 @@ const EmergencyHelpSheet: React.FC<EmergencyHelpSheetProps> = ({ context, onClos
             <span className="font-black uppercase tracking-widest italic">Call BicaDrive Support</span>
           </a>
 
-          <a 
-            href={`https://wa.me/2349038987333?text=${whatsappMsg}`}
-            target="_blank"
-            rel="noreferrer"
-            className="w-full py-5 rounded-2xl bg-green-700 text-white flex items-center justify-center gap-3 shadow-lg shadow-green-900/40 active:scale-95 transition-all"
-          >
-            <span className="material-symbols-outlined">chat</span>
-            <span className="font-black uppercase tracking-widest italic">WhatsApp BicaDrive</span>
-          </a>
+          {(context.locationLat !== undefined && context.locationLng !== undefined) ? (
+            <a 
+              href={`https://wa.me/2349038987333?text=${whatsappMsg}`}
+              target="_blank"
+              rel="noreferrer"
+              className="w-full py-5 rounded-2xl bg-green-700 text-white flex items-center justify-center gap-3 shadow-lg shadow-green-900/40 active:scale-95 transition-all"
+            >
+              <span className="material-symbols-outlined">chat</span>
+              <span className="font-black uppercase tracking-widest italic">WhatsApp BicaDrive</span>
+            </a>
+          ) : (
+            <button 
+              disabled
+              className="w-full py-5 rounded-2xl bg-green-700/50 text-white/50 flex items-center justify-center gap-3 border border-white/10 cursor-not-allowed"
+            >
+              <span className="material-symbols-outlined">chat</span>
+              <span className="font-black uppercase tracking-widest italic">WhatsApp (Location Unavailable)</span>
+            </button>
+          )}
 
           {context.ownerPhone && (
             <a 
