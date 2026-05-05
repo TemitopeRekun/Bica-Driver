@@ -44,6 +44,7 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
   setHistoryDateRange
 }) => {
   const [expandedHistoryId, setExpandedHistoryId] = React.useState<string | null>(null);
+  const [filterOpen, setFilterOpen] = React.useState(false);
   const displayPlatformRevenue = adminSummary?.totals.platformRevenue ?? platformFees;
   const displayGrossThroughput = adminSummary?.totals.grossThroughput ?? totalRevenue;
   const displayDriverPayouts = adminSummary?.totals.driverPayouts;
@@ -248,81 +249,159 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
 
        {/* Archive History */}
        <section className="space-y-4">
-           <div className="flex flex-col gap-4 px-2">
-             <div className="flex items-center justify-between">
-               <h3 className="font-black text-[11px] uppercase tracking-[0.2em] text-slate-500">Confirmed Settlement Ledger</h3>
-               <button
-                 onClick={() => {
-                   setHistoryStatusFilter('ALL');
-                   setHistoryDateRange({ from: null, to: null });
-                 }}
-                 className="text-[9px] font-black text-primary uppercase tracking-widest hover:underline"
-               >
-                 Clear Filters
-               </button>
+           {/* ── Section Header ─────────────────────────────────────── */}
+           <div className="flex items-center justify-between px-1">
+             <div className="flex items-center gap-2">
+               <span className="material-symbols-outlined text-emerald-500 text-base">receipt_long</span>
+               <h3 className="font-black text-[11px] uppercase tracking-[0.2em] text-slate-500">
+                 Settlement Ledger
+               </h3>
+               {/* Active filter badge */}
+               {(historyStatusFilter !== 'ALL' || historyDateRange.from || historyDateRange.to) && (
+                 <span className="size-5 rounded-full bg-primary text-white text-[9px] font-black flex items-center justify-center">
+                   {[historyStatusFilter !== 'ALL', !!historyDateRange.from || !!historyDateRange.to].filter(Boolean).length}
+                 </span>
+               )}
              </div>
 
-             <div className="flex flex-col md:flex-row items-start md:items-end gap-4 bg-slate-50 dark:bg-white/5 p-4 rounded-3xl border border-slate-100 dark:border-slate-800">
-               <div className="flex gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
-                 {(['ALL', 'PAID', 'FAILED'] as const).map((status) => (
+             <div className="flex items-center gap-2">
+               {/* Pagination */}
+               {paymentHistoryMeta && paymentHistoryMeta.totalPages > 1 && (
+                 <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-white/5 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800">
                    <button
-                     key={status}
-                     onClick={() => setHistoryStatusFilter(status)}
-                     className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-                       historyStatusFilter === status
-                         ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm'
-                         : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
-                     }`}
+                     disabled={paymentHistoryMeta.page === 0}
+                     onClick={() => onPageChange('history', paymentHistoryMeta.page - 1)}
+                     className="size-7 flex items-center justify-center rounded-md text-slate-600 disabled:opacity-30 hover:bg-slate-200 transition-all"
                    >
-                     {status}
+                     <span className="material-symbols-outlined text-sm">chevron_left</span>
                    </button>
-                 ))}
-               </div>
-               <div className="flex gap-3 flex-1">
-                 <div className="space-y-1 flex-1">
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">From</p>
-                   <input
-                     type="date"
-                     value={historyDateRange.from || ''}
-                     onChange={(e) => setHistoryDateRange({ ...historyDateRange, from: e.target.value })}
-                     className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-black text-slate-900 dark:text-white outline-none"
-                   />
+                   <span className="text-[9px] font-black text-slate-700 dark:text-white px-1">
+                     {paymentHistoryMeta.page + 1}/{paymentHistoryMeta.totalPages}
+                   </span>
+                   <button
+                     disabled={paymentHistoryMeta.page >= paymentHistoryMeta.totalPages - 1}
+                     onClick={() => onPageChange('history', paymentHistoryMeta.page + 1)}
+                     className="size-7 flex items-center justify-center rounded-md text-slate-600 disabled:opacity-30 hover:bg-slate-200 transition-all"
+                   >
+                     <span className="material-symbols-outlined text-sm">chevron_right</span>
+                   </button>
                  </div>
-                 <div className="space-y-1 flex-1">
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">To</p>
-                   <input
-                     type="date"
-                     value={historyDateRange.to || ''}
-                     onChange={(e) => setHistoryDateRange({ ...historyDateRange, to: e.target.value })}
-                     className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-black text-slate-900 dark:text-white outline-none"
-                   />
-                 </div>
-               </div>
+               )}
+
+               {/* Filter toggle button */}
+               <button
+                 onClick={() => setFilterOpen(f => !f)}
+                 className={`size-8 flex items-center justify-center rounded-xl border transition-all ${
+                   filterOpen
+                     ? 'bg-primary text-white border-primary shadow-sm shadow-primary/30'
+                     : 'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-slate-800 hover:bg-slate-200'
+                 }`}
+               >
+                 <span className="material-symbols-outlined text-sm">
+                   {filterOpen ? 'filter_list_off' : 'filter_list'}
+                 </span>
+               </button>
              </div>
            </div>
-            
-            {/* Pagination Controls */}
-            {paymentHistoryMeta && paymentHistoryMeta.totalPages > 1 && (
-              <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
-                <button 
-                  disabled={paymentHistoryMeta.page === 0}
-                  onClick={() => onPageChange('history', paymentHistoryMeta.page - 1)}
-                  className="size-7 flex items-center justify-center rounded-lg text-slate-600 disabled:opacity-30 hover:bg-slate-200 transition-all"
-                >
-                  <span className="material-symbols-outlined text-sm">chevron_left</span>
-                </button>
-                <span className="text-[9px] font-black text-slate-900 dark:text-white px-1 uppercase tracking-tighter">
-                  {paymentHistoryMeta.page + 1} / {paymentHistoryMeta.totalPages}
-                </span>
-                <button 
-                  disabled={paymentHistoryMeta.page >= paymentHistoryMeta.totalPages - 1}
-                  onClick={() => onPageChange('history', paymentHistoryMeta.page + 1)}
-                  className="size-7 flex items-center justify-center rounded-lg text-slate-600 disabled:opacity-30 hover:bg-slate-200 transition-all"
-                >
-                  <span className="material-symbols-outlined text-sm">chevron_right</span>
-                </button>
-              </div>
-            )}
+
+           {/* ── Active filter summary chip (collapsed state) ────────── */}
+           {!filterOpen && (historyStatusFilter !== 'ALL' || historyDateRange.from || historyDateRange.to) && (
+             <div className="flex items-center gap-2 px-1 flex-wrap">
+               {historyStatusFilter !== 'ALL' && (
+                 <span className={`flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                   historyStatusFilter === 'PAID'
+                     ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                     : 'bg-red-500/10 text-red-500 border-red-500/20'
+                 }`}>
+                   <span className="material-symbols-outlined text-xs">circle</span>
+                   {historyStatusFilter}
+                 </span>
+               )}
+               {(historyDateRange.from || historyDateRange.to) && (
+                 <span className="flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-white/10">
+                   <span className="material-symbols-outlined text-xs">date_range</span>
+                   {historyDateRange.from || '…'} → {historyDateRange.to || '…'}
+                 </span>
+               )}
+               <button
+                 onClick={() => { setHistoryStatusFilter('ALL'); setHistoryDateRange({ from: null, to: null }); }}
+                 className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black text-red-500 bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 transition-all"
+               >
+                 <span className="material-symbols-outlined text-xs">close</span>
+                 Clear
+               </button>
+             </div>
+           )}
+
+           {/* ── Collapsible filter panel ────────────────────────────── */}
+           {filterOpen && (
+             <div className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm animate-fade-in">
+               {/* Status row */}
+               <div className="p-3 border-b border-slate-100 dark:border-slate-800">
+                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Status</p>
+                 <div className="flex gap-2">
+                   {(['ALL', 'PAID', 'FAILED'] as const).map((status) => (
+                     <button
+                       key={status}
+                       onClick={() => setHistoryStatusFilter(status)}
+                       className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                         historyStatusFilter === status
+                           ? status === 'PAID'
+                             ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30'
+                             : status === 'FAILED'
+                             ? 'bg-red-500 text-white shadow-sm shadow-red-500/30'
+                             : 'bg-slate-800 dark:bg-white text-white dark:text-slate-900 shadow-sm'
+                           : 'bg-slate-50 dark:bg-white/5 text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                       }`}
+                     >
+                       {status}
+                     </button>
+                   ))}
+                 </div>
+               </div>
+
+               {/* Date range row — 2-column grid, each input full-width in its cell */}
+               <div className="p-3 border-b border-slate-100 dark:border-slate-800">
+                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Date Range</p>
+                 <div className="grid grid-cols-2 gap-2">
+                   <div className="space-y-1">
+                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">From</p>
+                     <input
+                       type="date"
+                       value={historyDateRange.from || ''}
+                       onChange={(e) => setHistoryDateRange({ ...historyDateRange, from: e.target.value })}
+                       className="w-full px-3 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[11px] font-black text-slate-900 dark:text-white outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+                     />
+                   </div>
+                   <div className="space-y-1">
+                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">To</p>
+                     <input
+                       type="date"
+                       value={historyDateRange.to || ''}
+                       onChange={(e) => setHistoryDateRange({ ...historyDateRange, to: e.target.value })}
+                       className="w-full px-3 py-2.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-[11px] font-black text-slate-900 dark:text-white outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all"
+                     />
+                   </div>
+                 </div>
+               </div>
+
+               {/* Action row */}
+               <div className="p-3 flex items-center justify-between gap-2">
+                 <button
+                   onClick={() => { setHistoryStatusFilter('ALL'); setHistoryDateRange({ from: null, to: null }); }}
+                   className="flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-50 dark:bg-white/5 text-slate-500 hover:bg-slate-100 transition-all border border-slate-200 dark:border-white/10"
+                 >
+                   Clear All
+                 </button>
+                 <button
+                   onClick={() => setFilterOpen(false)}
+                   className="flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-primary text-white hover:bg-primary/90 transition-all shadow-sm shadow-primary/20"
+                 >
+                   Apply
+                 </button>
+               </div>
+             </div>
+           )}
 
 
           <div className="bg-white dark:bg-surface-dark rounded-[2.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl shadow-black/5">

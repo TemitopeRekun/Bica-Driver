@@ -13,12 +13,14 @@ const AdminDashboardPage: React.FC = () => {
   const { toast } = useToast();
   const { logout } = useAuthStore();
   const {
-    adminUsers, usersMeta, adminTrips, tripsMeta, adminPendingDrivers, adminStats,
+    adminUsers, setAdminUsers, usersMeta, adminTrips, tripsMeta,
+    adminPendingDrivers, setAdminPendingDrivers,
+    adminStats,
     adminPendingPayments, pendingPaymentsMeta,
     adminPaymentHistory, paymentHistoryMeta,
     adminTickets, ticketsMeta,
     adminSettings, adminDashboardLoading, adminDashboardError, lastUpdated,
-    loadAdminDashboard, loadUsersPage, loadTripsPage,
+    loadAdminDashboard, loadUsersPage, loadTripsPage, loadPendingDrivers,
     loadPendingPaymentsPage, loadPaymentHistoryPage, loadTicketsPage
   } = useAdminDashboard();
   const { currentUser } = useAuthStore();
@@ -109,9 +111,20 @@ const AdminDashboardPage: React.FC = () => {
       // Backend requires key 'approvalStatus' not 'status'
       await api.patch(`/users/${userId}/approval`, { approvalStatus });
       toast.success(`Driver ${approvalStatus === 'APPROVED' ? 'approved' : 'rejected'} successfully`);
-      Promise.allSettled([loadPendingDrivers(), loadUsersPage(0)]).then(results => {
-        results.forEach(res => { if (res.status === 'rejected') console.warn('Background refresh failed:', res.reason); });
-      });
+
+      // ── Optimistic update ─────────────────────────────────────────────
+      // 1. Immediately remove from pendingDrivers so the Pending tab clears
+      setAdminPendingDrivers(prev => prev.filter(d => d.id !== userId));
+      // 2. Update the approval status of this driver in the paginated users list
+      setAdminUsers(prev =>
+        prev.map(u =>
+          u.id === userId ? { ...u, approvalStatus } : u
+        )
+      );
+      // ─────────────────────────────────────────────────────────────────
+
+      // Await both refreshes so the list is fully synced with the server
+      await Promise.allSettled([loadPendingDrivers(), loadUsersPage(0)]);
     } catch (e: any) {
       toast.error(e.message || 'Failed to update approval status');
     }

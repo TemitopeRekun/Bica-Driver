@@ -139,11 +139,15 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
     return () => clearInterval(interval);
   }, [lastUpdated]);
 
-  // Merge pendingDrivers (dedicated list) with paginated users to ensure 100% sync
+  // Merge pendingDrivers (dedicated list) with paginated users.
+  // users is always authoritative — it overwrites pendingDrivers so a freshly
+  // approved driver's status from the API is never replaced by a stale pending entry.
   const drivers = useMemo(() => {
     const map = new Map<string, UserProfile>();
-    users.filter(u => u.role === UserRole.DRIVER).forEach(u => map.set(u.id, u));
+    // Seed with pending first (lower priority)
     pendingDrivers.forEach(u => map.set(u.id, u));
+    // Users overwrites — APPROVED status from loadUsersPage wins
+    users.filter(u => u.role === UserRole.DRIVER).forEach(u => map.set(u.id, u));
     return Array.from(map.values());
   }, [users, pendingDrivers]);
 

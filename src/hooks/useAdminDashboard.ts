@@ -197,10 +197,12 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
 
   return {
     adminUsers,
+    setAdminUsers,
     usersMeta,
     adminTrips,
     tripsMeta,
     adminPendingDrivers,
+    setAdminPendingDrivers,
     adminStats,
     adminPendingPayments,
     pendingPaymentsMeta,
