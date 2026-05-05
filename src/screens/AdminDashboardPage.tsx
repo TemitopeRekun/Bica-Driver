@@ -21,7 +21,8 @@ const AdminDashboardPage: React.FC = () => {
     adminTickets, ticketsMeta,
     adminSettings, adminDashboardLoading, adminDashboardError, lastUpdated,
     loadAdminDashboard, loadUsersPage, loadTripsPage, loadPendingDrivers,
-    loadPendingPaymentsPage, loadPaymentHistoryPage, loadTicketsPage
+    loadPendingPaymentsPage, loadPaymentHistoryPage, loadTicketsPage,
+    setAdminDashboardError
   } = useAdminDashboard();
   const { currentUser } = useAuthStore();
 
@@ -195,6 +196,7 @@ const AdminDashboardPage: React.FC = () => {
       onResetWalletBalance={handleResetWalletBalance}
       onForcedLogout={() => logout()}
       onRetry={() => loadAdminDashboard()}
+      onClearError={() => setAdminDashboardError(null)}
       onBack={() => navigate('/')}
       onSimulate={() => { }}
       onPageChange={handlePageChange}

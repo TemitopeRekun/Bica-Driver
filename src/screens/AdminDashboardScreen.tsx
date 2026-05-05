@@ -55,6 +55,7 @@ interface AdminDashboardScreenProps {
   tickets: import('@/types').SupportTicket[];
   ticketsMeta: import('@/services/api.service').PaginationMeta | null;
   ticketsLoading?: boolean;
+  onClearError?: () => void;
 }
 
 
@@ -94,7 +95,8 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   adminSummary, adminSummaryPeriod, setAdminSummaryPeriod, adminSummaryLoading,
   historyStatusFilter, setHistoryStatusFilter, historyDateRange, setHistoryDateRange,
   onResetWalletBalance,
-  tickets, ticketsMeta, ticketsLoading
+  tickets, ticketsMeta, ticketsLoading,
+  onClearError, onViewTrip
 }) => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<AdminSection>('overview');
@@ -300,7 +302,37 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
           </div>
         </div>
 
-        {error ? (
+        {/* Background Error Banner */}
+        {error && users.length > 0 && (
+          <div className="mb-6 animate-slide-up">
+            <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-red-500">sync_problem</span>
+                <p className="text-[11px] font-black text-red-600 uppercase tracking-wider">
+                  Sync Issue: {error}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={onRetry}
+                  className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all"
+                >
+                  Retry
+                </button>
+                {onClearError && (
+                  <button 
+                    onClick={onClearError}
+                    className="size-8 flex items-center justify-center text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                  >
+                    <span className="material-symbols-outlined text-sm">close</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {error && users.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center p-8 text-center animate-fade-in">
             <div className="size-20 rounded-[2.5rem] bg-red-500/10 flex items-center justify-center text-red-500 mb-6">
               <span className="material-symbols-outlined text-4xl">error</span>

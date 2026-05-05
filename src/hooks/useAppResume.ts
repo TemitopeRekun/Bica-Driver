@@ -20,15 +20,21 @@ export const useAppResume = () => {
       const { isAuthenticated, currentUser } = useAuthStore.getState();
       if (!isAuthenticated || !currentUser) return;
 
+      // ADMIN has no ride context — skip ride/rating sync to avoid 403s
+      const role = currentUser.role;
+      const isRideUser = role === 'DRIVER' || role === 'OWNER';
+
       isResumingRef.current = true;
       try {
         telemetry.info('App resumed, restoring session state');
 
-        // 1. Resync active ride context safely
-        await syncCurrentRide();
+        if (isRideUser) {
+          // 1. Resync active ride context safely
+          await syncCurrentRide();
 
-        // 2. Check for pending ratings
-        await useRatingGateStore.getState().checkPendingRating();
+          // 2. Check for pending ratings
+          await useRatingGateStore.getState().checkPendingRating();
+        }
 
         // 3. Dispatch a custom window event so other hooks (realtime, payment) can react atomically
         window.dispatchEvent(new Event('bica-app-resumed'));
