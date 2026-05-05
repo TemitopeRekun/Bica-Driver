@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UserProfile, UserRole, ApprovalStatus, Trip, TripStatus, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminDashboardStats, AdminSection, DriverFilter, AdminPaymentsSummaryResponse, SummaryPeriod } from '@/types';
+import { UserProfile, UserRole, ApprovalStatus, Trip, TripStatus, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminDashboardStats, AdminSection, DriverFilter, AdminPaymentsSummaryResponse, SummaryPeriod, DateRangeFilter } from '@/types';
 import { mapUser } from '@/mappers/appMappers';
 import { useToast } from '@/hooks/useToast';
 
@@ -33,6 +33,7 @@ interface AdminDashboardScreenProps {
   onBlockUser: (userId: string, isBlocked: boolean) => Promise<void>;
   onRetrySubAccount: (userId: string) => Promise<any>;
   onUpdateSettings: (settings: SystemSettings) => Promise<void>;
+  onResetWalletBalance: (driverId: string) => Promise<void>;
   onForcedLogout: () => void;
   onRetry: () => Promise<void> | void;
   onBack: () => void;
@@ -57,7 +58,8 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   onUpdateStatus, onBlockUser, onRetrySubAccount, onUpdateSettings, onForcedLogout,
   onRetry, onBack, onSimulate, onPageChange,
   adminSummary, adminSummaryPeriod, setAdminSummaryPeriod, adminSummaryLoading,
-  historyStatusFilter, setHistoryStatusFilter, historyDateRange, setHistoryDateRange
+  historyStatusFilter, setHistoryStatusFilter, historyDateRange, setHistoryDateRange,
+  onResetWalletBalance
 }) => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<AdminSection>('overview');
@@ -333,6 +335,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
           retryingSubAccountIds={retryingSubAccountIds} onClose={() => setSelectedUser(null)}
           onUpdateStatus={onUpdateStatus} onBlockUser={onBlockUser}
           onRetrySubAccount={handleRetrySubAccountWrap} formatJoinedDate={formatJoinedDate}
+          onResetWalletBalance={onResetWalletBalance}
         />
       )}
     </div>

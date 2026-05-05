@@ -299,4 +299,8 @@ export const api = {
   // Payments
   getPaymentsSummary: (params: GetPaymentsSummaryParams): Promise<PaymentsSummaryResponse> =>
     request<PaymentsSummaryResponse>('GET', `/payments/summary?period=${params.period}`, undefined, true),
+
+  // Admin — Ledger Operations
+  resetWalletBalance: (driverId: string): Promise<{ message: string }> =>
+    request<{ message: string }>('POST', `/payments/wallet/reset`, { driverId }, true),
 };

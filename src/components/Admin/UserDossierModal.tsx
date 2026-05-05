@@ -9,6 +9,7 @@ interface UserDossierModalProps {
   onUpdateStatus: (userId: string, approvalStatus: ApprovalStatus) => Promise<void>;
   onBlockUser: (userId: string, isBlocked: boolean) => Promise<void>;
   onRetrySubAccount: (userId: string) => Promise<any>;
+  onResetWalletBalance: (driverId: string) => Promise<void>;
   formatJoinedDate: (value?: string | null) => string;
 }
 
@@ -124,12 +125,17 @@ const UserDossierModal: React.FC<UserDossierModalProps> = ({
   onUpdateStatus,
   onBlockUser,
   onRetrySubAccount,
+  onResetWalletBalance,
   formatJoinedDate
 }) => {
   const canApprove = user.role === UserRole.DRIVER
     && user.approvalStatus === 'PENDING'
     && !user.isBlocked
     && !!user.subAccountActive;
+
+  // Two-step confirmation guard for ledger reset
+  const [resetPending, setResetPending] = useState(false);
+  const [resettingLedger, setResettingLedger] = useState(false);
 
   return (
     // Backdrop - darkened, tapping closes
@@ -387,6 +393,68 @@ const UserDossierModal: React.FC<UserDossierModalProps> = ({
               CLOSE
             </button>
           </div>
+
+          {/* ── Reset Internal Ledger Balance (DRIVER only) ── */}
+          {user.role === UserRole.DRIVER && (
+            <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-2">
+              {!resetPending ? (
+                <button
+                  onClick={() => setResetPending(true)}
+                  className="w-full font-black py-3 rounded-2xl border-2 border-amber-400/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/5 transition-all active:scale-[0.97] flex items-center justify-center gap-2 text-xs"
+                >
+                  <span className="material-symbols-outlined text-base">restart_alt</span>
+                  RESET INTERNAL LEDGER BALANCE
+                </button>
+              ) : (
+                <div className="bg-amber-50 dark:bg-amber-500/10 border-2 border-amber-400/40 rounded-2xl p-4 space-y-3 animate-fade-in">
+                  <div className="flex items-start gap-3">
+                    <span className="material-symbols-outlined text-amber-600 shrink-0 mt-0.5">warning</span>
+                    <div>
+                      <p className="text-xs font-black text-amber-800 dark:text-amber-300 uppercase tracking-wide mb-1">
+                        Confirm Ledger Reset
+                      </p>
+                      <p className="text-[10px] text-amber-700/80 dark:text-amber-400/70 font-bold leading-relaxed">
+                        This zeroes <strong>{user.name}'s</strong> internal cleared-earnings tracker for the current period. It does <strong>not</strong> reverse any processed payouts or affect Monnify transactions.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setResetPending(false)}
+                      disabled={resettingLedger}
+                      className="font-black py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-[10px] uppercase tracking-widest"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setResettingLedger(true);
+                        try {
+                          await onResetWalletBalance(user.id);
+                          setResetPending(false);
+                          onClose();
+                        } finally {
+                          setResettingLedger(false);
+                        }
+                      }}
+                      disabled={resettingLedger}
+                      className="font-black py-2.5 rounded-xl bg-amber-500 disabled:bg-amber-300 text-white transition-all active:scale-95 text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5"
+                    >
+                      {resettingLedger ? (
+                        <span className="material-symbols-outlined text-[13px] animate-spin">progress_activity</span>
+                      ) : (
+                        <span className="material-symbols-outlined text-[13px]">check</span>
+                      )}
+                      {resettingLedger ? 'Resetting…' : 'Confirm Reset'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <p className="text-[9px] text-slate-400 text-center font-bold px-2">
+                Admin-only · Affects internal ledger tracker only · Irreversible
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

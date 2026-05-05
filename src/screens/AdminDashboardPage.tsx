@@ -122,6 +122,16 @@ const AdminDashboardPage: React.FC = () => {
     }
   };
 
+  const handleResetWalletBalance = async (driverId: string) => {
+    try {
+      await api.resetWalletBalance(driverId);
+      toast.success('Internal ledger balance has been reset for this driver.');
+      await loadAdminDashboard();
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to reset internal ledger balance.');
+    }
+  };
+
   return (
     <AdminDashboardScreen
       users={adminUsers || []}
@@ -142,6 +152,7 @@ const AdminDashboardPage: React.FC = () => {
       onBlockUser={handleBlockUser}
       onRetrySubAccount={handleRetrySubAccount}
       onUpdateSettings={handleUpdateSettings}
+      onResetWalletBalance={handleResetWalletBalance}
       onForcedLogout={() => logout()}
       onRetry={() => loadAdminDashboard()}
       onBack={() => navigate('/')}
