@@ -3,6 +3,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useRatingGateStore } from '../stores/ratingGateStore';
 import { UserRole } from '@/types';
 import GlobalRouteError from '@/components/Common/GlobalRouteError';
+import ErrorBoundary from '@/components/Common/ErrorBoundary';
 
 // Screens
 import WelcomeScreen from '../screens/WelcomeScreen';
@@ -21,6 +22,29 @@ import LoadingScreen from '../screens/LoadingScreen';
 import PaymentCompleteScreen from '../screens/PaymentCompleteScreen';
 import RateDriverScreen from '../screens/RateDriverScreen';
 import AwaitingPaymentScreen from '../screens/AwaitingPaymentScreen';
+
+const RouteErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const fallback = (
+    <div className="min-h-[400px] flex items-center justify-center p-6 text-center font-display">
+       <div className="w-full max-w-sm p-8 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-red-500/20 shadow-2xl">
+         <div className="size-16 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center text-red-500 mx-auto mb-6">
+           <span className="material-symbols-outlined text-3xl filled">error</span>
+         </div>
+         <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight mb-2">Something went wrong</h2>
+         <p className="text-slate-500 text-xs font-bold leading-relaxed mb-8 uppercase tracking-widest">
+           An unexpected error occurred in this section.
+         </p>
+         <button 
+           onClick={() => window.location.reload()}
+           className="w-full h-14 bg-primary text-white rounded-2xl font-black text-sm uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-primary/20"
+         >
+           Retry
+         </button>
+       </div>
+    </div>
+  );
+  return <ErrorBoundary fallback={fallback}>{children}</ErrorBoundary>;
+};
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; roles?: UserRole[], strictOwnerGate?: boolean, strictDriverGate?: boolean }> = ({ children, roles, strictOwnerGate = false, strictDriverGate = false }) => {
   const { currentUser, isAuthenticated, isInitializing } = useAuthStore();
@@ -118,7 +142,9 @@ export const router = createHashRouter([
     path: '/owner',
     element: (
       <ProtectedRoute roles={[UserRole.OWNER, UserRole.ADMIN]} strictOwnerGate>
-        <RequestRideScreen />
+        <RouteErrorBoundary>
+          <RequestRideScreen />
+        </RouteErrorBoundary>
       </ProtectedRoute>
     ),
   },
@@ -126,7 +152,9 @@ export const router = createHashRouter([
     path: '/owner/status',
     element: (
       <ProtectedRoute roles={[UserRole.OWNER, UserRole.ADMIN]} strictOwnerGate>
-        <TripStatusScreen />
+        <RouteErrorBoundary>
+          <TripStatusScreen />
+        </RouteErrorBoundary>
       </ProtectedRoute>
     ),
   },
@@ -143,7 +171,9 @@ export const router = createHashRouter([
     path: '/driver',
     element: (
       <ProtectedRoute roles={[UserRole.DRIVER, UserRole.ADMIN]}>
-        <DriverMainScreen />
+        <RouteErrorBoundary>
+          <DriverMainScreen />
+        </RouteErrorBoundary>
       </ProtectedRoute>
     ),
   },

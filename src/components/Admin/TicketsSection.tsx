@@ -34,9 +34,17 @@ const TicketsSection: React.FC<TicketsSectionProps> = ({ tickets, ticketsMeta, o
 
   if (tickets.length === 0) {
     return (
-      <div className="py-20 text-center opacity-40">
-        <span className="material-symbols-outlined text-6xl mb-4">support_agent</span>
-        <p className="font-black uppercase tracking-widest text-xs italic">No support tickets found</p>
+      <div className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-12 text-center bg-surface-light dark:bg-surface-dark">
+        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none" />
+        <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+          <span className="material-symbols-outlined text-3xl">support_agent</span>
+        </div>
+        <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">
+          No tickets yet
+        </h3>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-[240px] mx-auto font-medium">
+          User support inquiries will appear here once submitted.
+        </p>
       </div>
     );
   }

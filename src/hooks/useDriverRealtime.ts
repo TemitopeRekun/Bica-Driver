@@ -86,7 +86,7 @@ export const useDriverRealtime = ({
 
   const registerDriverSocket = useCallback(() => {
     if (!socketRef.current?.connected || !user?.id) return;
-    socketRef.current.emit('driver:register', { driverId: user.id });
+    socketRef.current.emit('driverregister', { driverId: user.id });
   }, [user?.id]);
 
   const pushDriverLocation = useCallback(async (latitude: number, longitude: number) => {

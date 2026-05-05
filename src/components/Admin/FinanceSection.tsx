@@ -230,9 +230,17 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
               </div>
             ))}
             {pendingPayments.length === 0 && (
-              <div className="col-span-full py-16 bg-slate-50 dark:bg-white/5 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 text-center text-slate-400">
-                 <span className="material-symbols-outlined text-3xl mb-2 opacity-30">verified_user</span>
-                 <p className="text-[10px] font-black uppercase tracking-[0.2em]">No transactional anomalies detected</p>
+              <div className="col-span-full relative overflow-hidden rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-12 text-center bg-white dark:bg-surface-dark shadow-sm">
+                <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-orange-500/10 to-transparent pointer-events-none" />
+                <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl bg-orange-500/10 text-orange-500">
+                  <span className="material-symbols-outlined text-3xl">verified_user</span>
+                </div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight italic">
+                  No transactional anomalies
+                </h3>
+                <p className="mt-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] max-w-[240px] mx-auto leading-relaxed">
+                  Every active trip is currently following standard settlement protocols.
+                </p>
               </div>
             )}
           </div>
@@ -402,7 +410,18 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
                 );
               })}
               {paymentHistory.length === 0 && (
-                <div className="p-16 text-center text-slate-400 italic text-sm font-bold uppercase tracking-widest opacity-30">Archive empty</div>
+                <div className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-12 text-center bg-white dark:bg-surface-dark">
+                  <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none" />
+                  <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
+                    <span className="material-symbols-outlined text-3xl">payments</span>
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight italic">
+                    No payment history yet
+                  </h3>
+                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-[240px] mx-auto font-medium italic">
+                    Verified settlements and transaction records will be archived here.
+                  </p>
+                </div>
               )}
             </div>
             {paymentHistory.length > 0 && (
