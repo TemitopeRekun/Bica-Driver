@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { mapTrip } from '@/mappers/appMappers';
 import { api, PaginatedResponse, PaginationMeta } from '@/services/api.service';
 import { OwnerActivityTab, PaymentHistoryRecord, Trip } from '@/types';
-import { Skeleton } from '@/components/Common/Skeleton';
+import { Skeleton, CardSkeleton } from '@/components/Common/Skeleton';
 import { InlineError } from '@/components/Common/InlineError';
 import { useAuthStore } from '@/stores/authStore';
 import { useRideStore } from '@/stores/rideStore';
@@ -209,9 +209,14 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
   };
 
   const renderTripList = () => {
-    if (!isLoading && trips.length === 0) {
-      return renderEmptyState('trips');
+    if (isLoading && trips.length === 0) {
+      return (
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => <CardSkeleton key={i} />)}
+        </div>
+      );
     }
+    if (trips.length === 0) return renderEmptyState('trips');
 
     return (
       <div className="space-y-4">
@@ -292,9 +297,14 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
   };
 
   const renderPaymentList = () => {
-    if (!isLoading && payments.length === 0) {
-      return renderEmptyState('payments');
+    if (isLoading && payments.length === 0) {
+      return (
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => <CardSkeleton key={i} />)}
+        </div>
+      );
     }
+    if (payments.length === 0) return renderEmptyState('payments');
 
     return (
       <div className="space-y-4">
@@ -414,114 +424,96 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
 
       <div className="flex-1 overflow-y-auto no-scrollbar relative">
         <div className="relative mx-auto flex max-w-md flex-col gap-5 px-4 pb-12 pt-6">
-        <div className={`relative overflow-hidden rounded-[2.5rem] p-6 shadow-2xl shadow-black/5 border ${activeTheme.hero}`}>
-          <div className={`absolute inset-x-0 top-0 h-32 bg-gradient-to-b ${activeTheme.glow} pointer-events-none`} />
-          <div className="relative flex items-start gap-5">
-            <div className={`flex size-14 shrink-0 items-center justify-center rounded-2xl shadow-lg ${activeTheme.iconSurface}`}>
-              <span className="material-symbols-outlined text-2xl">{activeTheme.icon}</span>
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Engagement History</p>
-              <h2 className="mt-1 text-xl font-black text-slate-900 dark:text-white leading-tight uppercase tracking-tight italic">
-                {activeTab === 'trips' ? 'Track your ride records' : 'Verified settlement ledger'}
-              </h2>
-            </div>
-          </div>
-
-          <div className="relative mt-6 grid grid-cols-2 gap-4">
-            <div className={`rounded-2xl border p-4 ${ACTIVITY_THEME.trips.metricSurface}`}>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Trips</p>
-              <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic">{trips.length}</p>
-            </div>
-            <div className={`rounded-2xl border p-4 ${ACTIVITY_THEME.payments.metricSurface}`}>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Total Spent</p>
-              <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic">
-                 ₦{payments.reduce((acc, curr) => acc + curr.totalAmount, 0).toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-1.5 shadow-sm backdrop-blur-md dark:border-white/5 dark:bg-white/5">
-          <button
-            onClick={() => setActiveTab('trips')}
-            className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${
-              activeTab === 'trips' ? activeTheme.activeTab : activeTheme.inactiveTab
-            }`}
-          >
-            History
-          </button>
-          <button
-            onClick={() => setActiveTab('payments')}
-            className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${
-              activeTab === 'payments' ? activeTheme.activeTab : activeTheme.inactiveTab
-            }`}
-          >
-            Ledger
-          </button>
-        </div>
-
-        {error ? (
-           <InlineError message={error} onRetry={loadActivity} />
-        ) : isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((item) => (
-              <div key={item} className={`rounded-[2rem] border p-5 ${activeTheme.card} overflow-hidden`}>
-                <div className="flex items-center gap-4 mb-5">
-                   <Skeleton circle width={48} height={48} />
-                   <div className="flex-1 space-y-2">
-                      <Skeleton width="70%" height={16} />
-                      <Skeleton width="40%" height={12} />
-                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                   <Skeleton height={60} />
-                   <Skeleton height={60} />
-                </div>
+          <div className={`relative overflow-hidden rounded-[2.5rem] p-6 shadow-2xl shadow-black/5 border ${activeTheme.hero}`}>
+            <div className={`absolute inset-x-0 top-0 h-32 bg-gradient-to-b ${activeTheme.glow} pointer-events-none`} />
+            <div className="relative flex items-start gap-5">
+              <div className={`flex size-14 shrink-0 items-center justify-center rounded-2xl shadow-lg ${activeTheme.iconSurface}`}>
+                <span className="material-symbols-outlined text-2xl">{activeTheme.icon}</span>
               </div>
-            ))}
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Engagement History</p>
+                <h2 className="mt-1 text-xl font-black text-slate-900 dark:text-white leading-tight uppercase tracking-tight italic">
+                  {activeTab === 'trips' ? 'Track your ride records' : 'Verified settlement ledger'}
+                </h2>
+              </div>
+            </div>
+
+            <div className="relative mt-6 grid grid-cols-2 gap-4">
+              <div className={`rounded-2xl border p-4 ${ACTIVITY_THEME.trips.metricSurface}`}>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Trips</p>
+                <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic">{trips.length}</p>
+              </div>
+              <div className={`rounded-2xl border p-4 ${ACTIVITY_THEME.payments.metricSurface}`}>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Total Spent</p>
+                <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic">
+                   ₦{payments.reduce((acc, curr) => acc + curr.totalAmount, 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
           </div>
-        ) : activeTab === 'trips' ? (
-           <>
-             {renderTripList()}
-             <button 
-                onClick={() => {
-                  setSupportContext({ openedAt: new Date().toISOString() });
-                  setSupportOpen(true);
-                }}
-                className="mt-4 w-full flex items-center justify-center gap-3 p-5 rounded-3xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 group shadow-sm active:scale-[0.98] transition-all"
-             >
-                <div className="size-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                   <span className="material-symbols-outlined">live_help</span>
-                </div>
-                <div className="flex-1 text-left">
-                   <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Help & Support</p>
-                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Need help with rides?</p>
-                </div>
-                <span className="material-symbols-outlined text-slate-400">chevron_right</span>
-             </button>
-           </>
-        ) : (
-           <>
-             {renderPaymentList()}
-             <button 
-                onClick={() => {
-                  setSupportContext({ openedAt: new Date().toISOString() });
-                  setSupportOpen(true);
-                }}
-                className="mt-4 w-full flex items-center justify-center gap-3 p-5 rounded-3xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 group shadow-sm active:scale-[0.98] transition-all"
-             >
-                <div className="size-10 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-all">
-                   <span className="material-symbols-outlined">payments</span>
-                </div>
-                <div className="flex-1 text-left">
-                   <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Help & Support</p>
-                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Billing inquiries?</p>
-                </div>
-                <span className="material-symbols-outlined text-slate-400">chevron_right</span>
-             </button>
-           </>
-        )}
+
+          <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-1.5 shadow-sm backdrop-blur-md dark:border-white/5 dark:bg-white/5">
+            <button
+              onClick={() => setActiveTab('trips')}
+              className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${
+                activeTab === 'trips' ? activeTheme.activeTab : activeTheme.inactiveTab
+              }`}
+            >
+              History
+            </button>
+            <button
+              onClick={() => setActiveTab('payments')}
+              className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${
+                activeTab === 'payments' ? activeTheme.activeTab : activeTheme.inactiveTab
+              }`}
+            >
+              Ledger
+            </button>
+          </div>
+
+          {error ? (
+             <InlineError message={error} onRetry={loadActivity} />
+          ) : activeTab === 'trips' ? (
+             <>
+               {renderTripList()}
+               <button 
+                  onClick={() => {
+                    setSupportContext({ openedAt: new Date().toISOString() });
+                    setSupportOpen(true);
+                  }}
+                  className="mt-4 w-full flex items-center justify-center gap-3 p-5 rounded-3xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 group shadow-sm active:scale-[0.98] transition-all"
+               >
+                  <div className="size-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                     <span className="material-symbols-outlined">live_help</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                     <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Help & Support</p>
+                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Need help with rides?</p>
+                  </div>
+                  <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+               </button>
+             </>
+          ) : (
+             <>
+               {renderPaymentList()}
+               <button 
+                  onClick={() => {
+                    setSupportContext({ openedAt: new Date().toISOString() });
+                    setSupportOpen(true);
+                  }}
+                  className="mt-4 w-full flex items-center justify-center gap-3 p-5 rounded-3xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 group shadow-sm active:scale-[0.98] transition-all"
+               >
+                  <div className="size-10 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-all">
+                     <span className="material-symbols-outlined">payments</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                     <p className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest italic">Help & Support</p>
+                     <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Billing inquiries?</p>
+                  </div>
+                  <span className="material-symbols-outlined text-slate-400">chevron_right</span>
+               </button>
+             </>
+          )}
         </div>
       </div>
     </div>

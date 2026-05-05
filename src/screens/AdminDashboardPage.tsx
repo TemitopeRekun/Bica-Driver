@@ -16,13 +16,11 @@ const AdminDashboardPage: React.FC = () => {
     adminUsers, usersMeta, adminTrips, tripsMeta, adminPendingDrivers, adminStats,
     adminPendingPayments, pendingPaymentsMeta,
     adminPaymentHistory, paymentHistoryMeta,
+    adminTickets, ticketsMeta,
     adminSettings, adminDashboardLoading, adminDashboardError, lastUpdated,
     loadAdminDashboard, loadUsersPage, loadTripsPage,
-    loadPendingPaymentsPage, loadPaymentHistoryPage
+    loadPendingPaymentsPage, loadPaymentHistoryPage, loadTicketsPage
   } = useAdminDashboard();
-  const [tickets, setTickets] = React.useState<import('@/types').SupportTicket[]>([]);
-  const [ticketsMeta, setTicketsMeta] = React.useState<import('@/services/api.service').PaginationMeta | null>(null);
-  const [ticketsLoading, setTicketsLoading] = React.useState(false);
   const { currentUser } = useAuthStore();
 
   const [adminSummaryPeriod, setAdminSummaryPeriod] = React.useState<SummaryPeriod>('monthly');
@@ -85,28 +83,14 @@ const AdminDashboardPage: React.FC = () => {
     },
   });
 
-  const loadTicketsPage = React.useCallback(async (page = 0) => {
-    setTicketsLoading(true);
-    try {
-      const response = await api.getSupportTickets(page);
-      setTickets(response.items);
-      setTicketsMeta(response.meta);
-    } catch (e) {
-      // Non-fatal
-    } finally {
-      setTicketsLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     loadAdminDashboard().catch(err => {
       console.error("Critical Admin Init Failed", err);
       toast.error("Failed to synchronize administrative records.");
     });
-    loadTicketsPage();
-  }, [loadAdminDashboard, loadTicketsPage]);
+  }, [loadAdminDashboard]);
 
-  const handlePageChange = (section: 'users' | 'trips' | 'pending' | 'history', page: number) => {
+  const handlePageChange = (section: 'users' | 'trips' | 'pending' | 'history' | 'tickets', page: number) => {
     switch (section) {
       case 'users': loadUsersPage(page); break;
       case 'trips': loadTripsPage(page); break;
@@ -209,9 +193,9 @@ const AdminDashboardPage: React.FC = () => {
       setHistoryStatusFilter={setHistoryStatusFilter}
       historyDateRange={historyDateRange}
       setHistoryDateRange={setHistoryDateRange}
-      tickets={tickets}
+      tickets={adminTickets}
       ticketsMeta={ticketsMeta}
-      ticketsLoading={ticketsLoading}
+      ticketsLoading={adminDashboardLoading}
     />
   );
 };

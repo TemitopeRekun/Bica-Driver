@@ -23,6 +23,9 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
   const [adminPaymentHistory, setAdminPaymentHistory] = useState<PaymentHistoryRecord[]>([]);
   const [paymentHistoryMeta, setPaymentHistoryMeta] = useState<PaginationMeta | null>(null);
 
+  const [adminTickets, setAdminTickets] = useState<import('@/types').SupportTicket[]>([]);
+  const [ticketsMeta, setTicketsMeta] = useState<PaginationMeta | null>(null);
+
   const [adminSettings, setAdminSettings] = useState<SystemSettings | null>(null);
   const [adminDashboardLoading, setAdminDashboardLoading] = useState(false);
   const [adminDashboardError, setAdminDashboardError] = useState<string | null>(null);
@@ -95,13 +98,24 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
     []
   );
 
+  const loadTicketsPage = useCallback(async (page: number, limit: number = 20) => {
+    try {
+      const response = await api.getSupportTickets(page, limit);
+      setAdminTickets(response.items);
+      setTicketsMeta(response.meta);
+    } catch (error: any) {
+      setAdminDashboardError(error.message);
+      throw error;
+    }
+  }, []);
+
   const loadAdminDashboard = useCallback(async () => {
     setAdminDashboardLoading(true);
     setAdminDashboardError(null);
 
     try {
       // Load the consolidated dashboard + role-specific user pages in parallel
-      const [dashboard, ownersRes, pendingPayments, paymentHistory] = await Promise.all([
+      const [dashboard, ownersRes, pendingPayments, paymentHistory, ticketsRes] = await Promise.all([
         api.get<{
           users: any;
           trips: any;
@@ -117,6 +131,7 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
         api.get<any>('/admin/users?limit=50').catch(() => null),
         api.get<any>('/payments/pending?limit=20').catch(() => ({ items: [], meta: null })),
         api.get<any>('/payments/history?limit=20').catch(() => ({ items: [], meta: null })),
+        api.getSupportTickets(0, 20).catch(() => ({ items: [], meta: null })),
       ]);
 
       // ── Users (from dashboard snapshot — latest 10 mixed) ──
@@ -167,6 +182,10 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
       setAdminPaymentHistory(paymentHistory?.items?.map(mapPaymentHistory) ?? []);
       setPaymentHistoryMeta(paymentHistory?.meta ?? null);
 
+      // ── Tickets ──
+      setAdminTickets(ticketsRes?.items ?? []);
+      setTicketsMeta(ticketsRes?.meta ?? null);
+
       setLastUpdated(new Date());
     } catch (error: any) {
       setAdminDashboardError(error.message || 'Could not load admin dashboard.');
@@ -187,6 +206,8 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
     pendingPaymentsMeta,
     adminPaymentHistory,
     paymentHistoryMeta,
+    adminTickets,
+    ticketsMeta,
     adminSettings,
     adminDashboardLoading,
     adminDashboardError,
@@ -198,5 +219,6 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
     loadPendingDrivers,
     loadPendingPaymentsPage,
     loadPaymentHistoryPage,
+    loadTicketsPage,
   };
 };

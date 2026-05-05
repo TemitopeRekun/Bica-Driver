@@ -11,13 +11,18 @@ interface Message {
   text: string;
 }
 
-const SupportChatbot: React.FC<{ user: UserProfile }> = ({ user }) => {
-  const { supportContext, setSupportContext, supportOpen, setSupportOpen } = useUIStore();
+const SupportChatbot: React.FC<{ user: UserProfile, context?: SupportContext }> = ({ user, context }) => {
+  const { supportContext: storeContext, setSupportContext, supportOpen, setSupportOpen } = useUIStore();
+  
+  // Effective context: prefer prop if provided, else store
+  const effectiveContext = context || storeContext;
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [category, setCategory] = useState<SupportCategory | null>(null);
+  const [hasPrefilled, setHasPrefilled] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<any>(null);
@@ -25,10 +30,10 @@ const SupportChatbot: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const hasApiKey = !!Config.apiKey?.trim();
 
-  // Reset ticket state when chat opens/closes
+  // Reset pre-fill state when chat closes
   useEffect(() => {
     if (!supportOpen) {
-      ticketFired.current = false;
+      setHasPrefilled(false);
     }
   }, [supportOpen]);
 
@@ -44,6 +49,28 @@ const SupportChatbot: React.FC<{ user: UserProfile }> = ({ user }) => {
       ]);
     }
   }, [supportOpen, user.name, messages.length]);
+
+  // Handle Category Selection & Context Pre-fill
+  const handleSelectCategory = (cat: SupportCategory) => {
+    setCategory(cat);
+    
+    // Pre-fill input with structured summary if context exists
+    if (effectiveContext && !hasPrefilled) {
+      const summary = [
+        `[Automated Support Context]`,
+        effectiveContext.tripId ? `Trip: ${effectiveContext.tripId.slice(0, 8)}` : null,
+        effectiveContext.tripStatus ? `Status: ${effectiveContext.tripStatus}` : null,
+        effectiveContext.paymentStatus ? `Payment: ${effectiveContext.paymentStatus}` : null,
+        effectiveContext.monnifyTxRef ? `Ref: ${effectiveContext.monnifyTxRef}` : null,
+        effectiveContext.recentFailureContext ? `Context: ${effectiveContext.recentFailureContext}` : null,
+        `---`,
+        `Please describe your issue here: `
+      ].filter(Boolean).join('\n');
+      
+      setInputText(summary);
+      setHasPrefilled(true);
+    }
+  };
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -84,7 +111,7 @@ User: ${u.name} | Role: ${u.role} | Category: ${cat}`;
 
     try {
       const ai = new GoogleGenAI({ apiKey: Config.apiKey! });
-      const systemInstruction = buildSystemPrompt(user, supportContext, category);
+      const systemInstruction = buildSystemPrompt(user, effectiveContext, category);
 
       chatRef.current = null; // Teardown previous
       chatRef.current = ai.chats.create({
@@ -101,7 +128,7 @@ User: ${u.name} | Role: ${u.role} | Category: ${cat}`;
     return () => {
       chatRef.current = null;
     };
-  }, [user, supportOpen, supportContext, category, hasApiKey]);
+  }, [user, supportOpen, effectiveContext, category, hasApiKey]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,10 +147,10 @@ User: ${u.name} | Role: ${u.role} | Category: ${cat}`;
       api.createSupportTicket({
         category,
         firstMessage: text,
-        openedAt: supportContext?.openedAt ?? new Date().toISOString(),
-        tripId: supportContext?.tripId,
-        paymentStatus: supportContext?.paymentStatus,
-        recentFailureContext: supportContext?.recentFailureContext,
+        openedAt: effectiveContext?.openedAt ?? new Date().toISOString(),
+        tripId: effectiveContext?.tripId,
+        paymentStatus: effectiveContext?.paymentStatus,
+        recentFailureContext: effectiveContext?.recentFailureContext,
       }).catch(e => console.warn('Support ticket submission failed:', e));
     }
 
@@ -161,6 +188,7 @@ User: ${u.name} | Role: ${u.role} | Category: ${cat}`;
     ticketFired.current = false;
     setSupportContext(null);
     setMessages([]);
+    setHasPrefilled(false);
   };
 
   return (
@@ -231,7 +259,7 @@ User: ${u.name} | Role: ${u.role} | Category: ${cat}`;
                     return (
                       <button
                         key={cat}
-                        onClick={() => setCategory(cat)}
+                        onClick={() => handleSelectCategory(cat)}
                         className="w-full p-5 rounded-full bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-center font-black text-slate-900 dark:text-white uppercase tracking-widest text-[11px] hover:border-primary transition-all active:scale-95 shadow-sm"
                       >
                         {labels[cat]}
@@ -281,13 +309,13 @@ User: ${u.name} | Role: ${u.role} | Category: ${cat}`;
               </div>
             ) : (
               <form onSubmit={handleSendMessage} className="flex items-center gap-3">
-                <input
-                  type="text"
+                <textarea
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   placeholder="How can we help?"
-                  className="flex-1 bg-slate-100 dark:bg-background-dark border-none rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                  className="flex-1 bg-slate-100 dark:bg-background-dark border-none rounded-2xl px-5 py-4 text-sm font-bold text-slate-900 dark:text-white focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none min-h-[56px] max-h-32"
                   disabled={isLoading || chatError !== null}
+                  rows={Math.min(5, inputText.split('\n').length)}
                 />
                 <button
                   type="submit"

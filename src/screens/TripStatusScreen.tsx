@@ -318,7 +318,27 @@ const TripStatusScreen: React.FC = () => {
                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Support available 24/7</p>
               </div>
            </div>
-           <button className="text-primary text-xs font-black uppercase tracking-widest px-4 py-2 bg-primary/10 rounded-xl hover:bg-primary hover:text-white transition-all">Chat</button>
+           <button 
+             onClick={() => {
+               const failureContext = (driverInfo?.otpAttempts && driverInfo.otpAttempts > 0) 
+                 ? `OTP verification failed ${driverInfo.otpAttempts} times.` 
+                 : (completedTripData?.paymentStatus === 'FAILED') 
+                 ? 'Payment verification failed.'
+                 : undefined;
+
+               useUIStore.getState().setSupportContext({
+                 tripId: currentTripId ?? undefined,
+                 tripStatus: rideState as any,
+                 paymentStatus: completedTripData?.paymentStatus as any,
+                 recentFailureContext: failureContext,
+                 openedAt: new Date().toISOString()
+               });
+               useUIStore.getState().setSupportOpen(true);
+             }}
+             className="text-primary text-xs font-black uppercase tracking-widest px-4 py-2 bg-primary/10 rounded-xl hover:bg-primary hover:text-white transition-all"
+           >
+             Chat
+           </button>
         </div>
       </div>
     </div>

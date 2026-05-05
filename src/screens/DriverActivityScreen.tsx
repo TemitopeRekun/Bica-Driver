@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { mapTrip, mapPaymentHistory } from '@/mappers/appMappers';
 import { api, PaginatedResponse, PaginationMeta } from '@/services/api.service';
 import { DriverActivityTab, PaymentHistoryRecord, Trip, WalletSummary, SummaryPeriod, DriverPaymentsSummaryResponse, SettlementStatusFilter, DateRangeFilter } from '@/types';
-import { Skeleton } from '@/components/Common/Skeleton';
+import { Skeleton, CardSkeleton } from '@/components/Common/Skeleton';
 import { InlineError } from '@/components/Common/InlineError';
 import { useUIStore } from '@/stores/uiStore';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -77,6 +77,7 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
       tripId: trip.id,
       tripStatus: trip.status,
       paymentStatus: trip.paymentStatus ?? undefined,
+      recentFailureContext: `Wallet Balance: ₦${walletSummary?.currentBalance.toLocaleString() || '---'}. Sub-account Active: ${walletSummary?.subAccountActive ?? 'Unknown'}`,
       openedAt: new Date().toISOString()
     });
     setSupportOpen(true);
@@ -86,6 +87,7 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
     setSupportContext({
       tripId: settlement.tripId,
       paymentStatus: 'PAID',
+      recentFailureContext: `Reporting settlement ${settlement.id}. Wallet Balance: ₦${walletSummary?.currentBalance.toLocaleString() || '---'}.`,
       openedAt: new Date().toISOString()
     });
     setSupportOpen(true);
@@ -289,7 +291,14 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   };
 
   const renderTripList = () => {
-    if (!isLoading && trips.length === 0) return renderEmptyState('trips');
+    if (isLoading && trips.length === 0) {
+      return (
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => <CardSkeleton key={i} />)}
+        </div>
+      );
+    }
+    if (trips.length === 0) return renderEmptyState('trips');
     return (
       <div className="space-y-4">
         {tripsMeta && tripsMeta.totalPages > 1 && (
@@ -357,7 +366,14 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   };
 
   const renderSettlementList = () => {
-    if (!isLoading && settlements.length === 0) return renderEmptyState('settlements');
+    if (isLoading && settlements.length === 0) {
+      return (
+        <div className="space-y-4">
+          {[1, 2, 3].map(i => <CardSkeleton key={i} />)}
+        </div>
+      );
+    }
+    if (settlements.length === 0) return renderEmptyState('settlements');
     return (
       <div className="space-y-4">
         {settlementsMeta && settlementsMeta.totalPages > 1 && (
@@ -685,24 +701,6 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
 
           {error ? (
              <InlineError message={error} onRetry={loadActivity} />
-          ) : isLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((item) => (
-                <div key={item} className={`rounded-[2rem] border p-5 ${activeTheme.card} overflow-hidden`}>
-                  <div className="flex items-center gap-4 mb-5">
-                     <Skeleton circle width={48} height={48} />
-                     <div className="flex-1 space-y-2">
-                        <Skeleton width="70%" height={16} />
-                        <Skeleton width="40%" height={12} />
-                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                     <Skeleton height={60} />
-                     <Skeleton height={60} />
-                  </div>
-                </div>
-              ))}
-            </div>
           ) : activeTab === 'trips' ? (
             <>
               {renderTripList()}

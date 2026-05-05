@@ -4,6 +4,7 @@ import { mapUser } from '@/mappers/appMappers';
 import { useToast } from '@/hooks/useToast';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { InlineError } from '@/components/Common/InlineError';
+import { Skeleton, CardSkeleton } from '@/components/Common/Skeleton';
 
 // Sub-components
 import OverviewSection from '@/components/Admin/OverviewSection';
@@ -42,6 +43,7 @@ interface AdminDashboardScreenProps {
   onBack: () => void;
   onSimulate: (role: UserRole) => void;
   onPageChange: (section: 'users' | 'trips' | 'pending' | 'history' | 'tickets', page: number) => void;
+  onViewTrip?: (tripId: string) => void;
   adminSummary?: AdminPaymentsSummaryResponse | null;
   adminSummaryPeriod?: SummaryPeriod;
   setAdminSummaryPeriod?: (period: SummaryPeriod) => void;
@@ -82,6 +84,11 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   const { isRefreshing, pullHandlers } = usePullToRefresh(async () => {
     if (onRetry) await onRetry();
   });
+
+  const handleViewTrip = (tripId: string) => {
+    setSearchTerm(tripId);
+    jumpToSection('trips');
+  };
 
   // Relative Time Logic
   useEffect(() => {
@@ -306,9 +313,18 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
             </button>
           </div>
         ) : isLoading && users.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center opacity-50">
-            <span className="material-symbols-outlined animate-spin text-4xl mb-2">refresh</span>
-            <p className="font-black uppercase tracking-widest text-xs">Synchronizing Records...</p>
+          <div className="space-y-6 animate-fade-in">
+             {activeSection === 'overview' ? (
+                <div className="grid grid-cols-2 gap-4">
+                   {[1, 2, 3, 4].map(i => (
+                      <Skeleton key={i} height={80} className="rounded-2xl" />
+                   ))}
+                </div>
+             ) : (
+                <div className="space-y-4">
+                   {[1, 2, 3].map(i => <CardSkeleton key={i} />)}
+                </div>
+             )}
           </div>
         ) : (
           <>
@@ -391,6 +407,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                 tickets={tickets} 
                 ticketsMeta={ticketsMeta} 
                 onPageChange={(p) => onPageChange('tickets', p)}
+                onViewTrip={handleViewTrip}
                 isLoading={ticketsLoading}
               />
             )}

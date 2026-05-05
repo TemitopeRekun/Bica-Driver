@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/services/api.service';
 import { useRatingGateStore } from '@/stores/ratingGateStore';
+import { useUIStore } from '@/stores/uiStore';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 2500;
@@ -339,6 +340,22 @@ const PaymentCompleteScreen: React.FC = () => {
           >
             Retry from Summary
           </button>
+
+          <button
+            onClick={() => {
+              useUIStore.getState().setSupportContext({
+                tripId: localStorage.getItem(STORAGE_KEY) || undefined,
+                paymentStatus: 'FAILED',
+                recentFailureContext: `Payment failed for trip. Verification count: ${pollCount}.`,
+                openedAt: new Date().toISOString()
+              });
+              useUIStore.getState().setSupportOpen(true);
+            }}
+            className="w-full flex items-center justify-center gap-2 text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:text-primary transition-colors"
+          >
+            <span className="material-symbols-outlined text-sm">support_agent</span>
+            Contact Support
+          </button>
         </div>
       )}
 
@@ -378,6 +395,22 @@ const PaymentCompleteScreen: React.FC = () => {
             className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black py-4 rounded-2xl transition-all active:scale-95 uppercase tracking-[0.2em] text-xs"
           >
             Back to Dashboard
+          </button>
+
+          <button
+            onClick={() => {
+              useUIStore.getState().setSupportContext({
+                tripId: localStorage.getItem(STORAGE_KEY) || undefined,
+                paymentStatus: 'TIMEOUT',
+                recentFailureContext: 'Verification timed out after 30 seconds.',
+                openedAt: new Date().toISOString()
+              });
+              useUIStore.getState().setSupportOpen(true);
+            }}
+            className="w-full flex items-center justify-center gap-2 text-slate-500 font-bold uppercase tracking-widest text-[10px] hover:text-primary transition-colors"
+          >
+            <span className="material-symbols-outlined text-sm">support_agent</span>
+            Contact Support
           </button>
         </div>
       )}
