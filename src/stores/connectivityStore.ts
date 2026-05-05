@@ -6,6 +6,7 @@ interface ConnectivityState {
   isOnline: boolean;
   isSocketConnected: boolean;
   isReconnecting: boolean;
+  socketEverConnected: boolean;   // True once a socket has connected at least once
   lastSyncError: string | null;
   locationStatus: LocationStatus;
   
@@ -19,14 +20,17 @@ export const useConnectivityStore = create<ConnectivityState>((set) => ({
   isOnline: navigator.onLine,
   isSocketConnected: false,
   isReconnecting: false,
+  socketEverConnected: false,    // Starts false — no socket until login
   lastSyncError: null,
   locationStatus: 'available',
 
   setOnline: (status) => set({ isOnline: status }),
-  setSocketStatus: (connected, reconnecting) => set({ 
+  setSocketStatus: (connected, reconnecting) => set((state) => ({ 
     isSocketConnected: connected, 
-    isReconnecting: reconnecting 
-  }),
+    isReconnecting: reconnecting,
+    // Once true, stays true for the session — socket was opened at least once
+    socketEverConnected: state.socketEverConnected || connected,
+  })),
   setSyncError: (error) => set({ lastSyncError: error }),
   setLocationStatus: (status) => set({ locationStatus: status }),
 }));

@@ -139,9 +139,9 @@ const Step2IdentityDocs: React.FC<StepProps> = ({ formData, errors, updateField,
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Luxury Car Category</label>
+        <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Car Category</label>
         <div className="grid grid-cols-2 gap-3">
-          {['Standard', 'Executive', 'Luxury', 'SUV'].map(type => (
+          {['Standard', 'Executive', 'SUV'].map(type => (
             <button
               key={type}
               onClick={() => updateField('carType', type)}

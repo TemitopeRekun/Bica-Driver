@@ -135,10 +135,12 @@ const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <ToastContainer>
-        <ConnectivityBanner />
         <div className="flex justify-center items-start min-h-screen bg-slate-950">
-          <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative">
+          <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative flex flex-col">
             
+            {/* Connectivity banner sits at the very top of the app frame, pushing content down */}
+            <ConnectivityBanner />
+
             <VersionEnforcer>
               {/* The Main Router */}
               <RouterProvider router={router} />

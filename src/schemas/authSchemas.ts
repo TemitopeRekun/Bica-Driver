@@ -34,7 +34,7 @@ export const DriverSignUpSchema = z.object({
 export const OwnerSignUpSchema = z.object({
   ...baseAuthSchema,
   role: z.literal('OWNER'),
-  carType: z.enum(['Standard', 'Executive', 'Luxury', 'SUV'], { message: 'Select a car category' }),
+  carType: z.enum(['Standard', 'Executive', 'SUV'], { message: 'Select a car category' }),
   carModel: z.string().min(2, 'Car model is required'),
   carYear: z.string().refine((val) => {
     const year = parseInt(val, 10);
