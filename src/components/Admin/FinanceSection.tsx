@@ -319,7 +319,8 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
 
           <div className="bg-white dark:bg-surface-dark rounded-[2.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl shadow-black/5">
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {paymentHistory.map((record) => (
+              {paymentHistory.map((record) => {
+                return (
                  <div key={record.id} className="divide-y divide-slate-100 dark:divide-slate-800">
                   <div 
                     className="p-6 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/5 transition-colors cursor-pointer"
@@ -398,7 +399,8 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
                     </div>
                   )}
                  </div>
-                ))}
+                );
+              })}
               {paymentHistory.length === 0 && (
                 <div className="p-16 text-center text-slate-400 italic text-sm font-bold uppercase tracking-widest opacity-30">Archive empty</div>
               )}
@@ -413,5 +415,6 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
     </div>
   );
 };
+
 
 export default FinanceSection;
