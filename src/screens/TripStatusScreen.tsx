@@ -269,13 +269,13 @@ const TripStatusScreen: React.FC = () => {
         {rideState === 'COMPLETED' ? (
            <TripPaymentSummary
              role="OWNER"
-             pickup={pickup ? getLocationShortText(pickup) : undefined}
-             destination={destination ? getLocationShortText(destination) : undefined}
+             pickup={pickup ? getLocationShortText(pickup) : (completedTripData?.pickupAddress || undefined)}
+             destination={destination ? getLocationShortText(destination) : (completedTripData?.destAddress || undefined)}
              onClose={() => { resetRide(); navigate('/owner'); }}
              fareBreakdown={{
-               distanceKm: completedTripData?.distanceKm || 0,
-               actualMins: completedTripData?.totalMins || 0,
-               finalFare: completedTripData?.amount || 0,
+               distanceKm: completedTripData?.distanceKm || completedTripData?.fareBreakdown?.distanceKm || 0,
+               actualMins: completedTripData?.totalMins || completedTripData?.fareBreakdown?.totalMins || 0,
+               finalFare: completedTripData?.amount || completedTripData?.finalFare || 0,
              }}
              paymentStatus={completedTripData?.paymentStatus || 'UNPAID'}
              onPayNow={() => {

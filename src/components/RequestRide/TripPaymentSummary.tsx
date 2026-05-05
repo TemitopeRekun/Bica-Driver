@@ -63,6 +63,29 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
         </div>
 
         <div className="p-8 space-y-8">
+          {/* Route Overview */}
+          {(pickup || destination) && (
+            <div className="space-y-4 pb-6 border-b border-slate-100 dark:border-slate-800">
+               <div className="flex gap-4 items-start group">
+                  <div className="flex flex-col items-center gap-1 shrink-0 pt-1">
+                     <span className="size-2 rounded-full bg-emerald-500 ring-4 ring-emerald-500/10"></span>
+                     <div className="w-0.5 h-6 bg-slate-100 dark:bg-white/5"></div>
+                     <span className="size-2 rounded-full bg-primary ring-4 ring-primary/10"></span>
+                  </div>
+                  <div className="flex-1 space-y-4">
+                     <div className="space-y-0.5">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Pickup</p>
+                        <p className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1 italic">{pickup || 'Current Location'}</p>
+                     </div>
+                     <div className="space-y-0.5">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Destination</p>
+                        <p className="text-xs font-bold text-slate-900 dark:text-white line-clamp-1 italic">{destination || 'Terminal Stop'}</p>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          )}
+
           {/* Detailed Breakdown */}
           <div className="space-y-4">
              <div className="flex justify-between items-center opacity-70">

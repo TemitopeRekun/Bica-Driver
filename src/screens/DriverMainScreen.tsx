@@ -145,8 +145,14 @@ const DriverMainScreen: React.FC = () => {
       try {
         setRequestsError(null);
         const trip = await syncCurrentRide();
-        if (trip && !['COMPLETED', 'CANCELLED', 'REJECTED'].includes(trip.status)) {
-           if (trip.driverId === currentUser?.id && trip.status !== 'PENDING_ACCEPTANCE') {
+        if (trip && !['CANCELLED', 'REJECTED'].includes(trip.status)) {
+           if (trip.status === 'COMPLETED') {
+             setCompletedTripSummary({
+               ...trip,
+               pickup: trip.pickupAddress,
+               destination: trip.destAddress
+             });
+           } else if (trip.driverId === currentUser?.id && trip.status !== 'PENDING_ACCEPTANCE') {
              setActiveRide({
                id: trip.id,
                ownerName: trip.owner?.name || 'Car Owner',
@@ -504,8 +510,8 @@ const DriverMainScreen: React.FC = () => {
           <TripPaymentSummary
             role="DRIVER" pickup={completedTripSummary.pickup} destination={completedTripSummary.destination}
             fareBreakdown={{
-              distanceKm: completedTripSummary.distanceKm || 0,
-              actualMins: completedTripSummary.actualMins || 0,
+              distanceKm: completedTripSummary.distanceKm || completedTripSummary.fareBreakdown?.distanceKm || 0,
+              actualMins: completedTripSummary.totalMins || completedTripSummary.fareBreakdown?.totalMins || completedTripSummary.actualMins || 0,
               finalFare: completedTripSummary.amount || completedTripSummary.finalFare || 0,
               driverEarnings: completedTripSummary.driverEarnings || 0
             }}

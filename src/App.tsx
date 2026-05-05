@@ -91,16 +91,21 @@ const App: React.FC = () => {
                const activeRide = await api.get<any>('/rides/current');
                if (activeRide && activeRide.postTripAction) {
                   const { postTripAction, id } = activeRide;
-                  const currentPath = window.location.pathname;
+                  const currentHash = window.location.hash;
                   
-                  if (postTripAction === 'AWAITING_PAYMENT' && mapped.role === UserRole.DRIVER && !currentPath.includes('/driver/awaiting-payment/')) {
-                     window.location.replace(`/driver/awaiting-payment/${id}`);
+                  if (postTripAction === 'AWAITING_PAYMENT' && mapped.role === UserRole.DRIVER && !currentHash.includes('/driver/awaiting-payment/')) {
+                     window.location.hash = `/driver/awaiting-payment/${id}`;
                   } else if (postTripAction === 'REQUIRE_PAYMENT' && mapped.role === UserRole.OWNER) {
                      const { setRideState, setCompletedTripData, setCurrentTripId } = await import('@/stores/rideStore').then(m => m.useRideStore.getState());
                      setCompletedTripData(activeRide);
                      setCurrentTripId(activeRide.id);
                      setRideState('COMPLETED');
-                     if (currentPath !== '/owner/status') window.location.replace('/owner/status');
+                     
+                     // Only redirect if not already on status or payment complete page
+                     const isSafePage = currentHash.includes('/owner/status') || currentHash.includes('/payment/complete');
+                     if (!isSafePage) {
+                        window.location.hash = '/owner/status';
+                     }
                   }
                }
             } catch (e) {
@@ -111,9 +116,18 @@ const App: React.FC = () => {
             if (mapped.role === UserRole.OWNER) {
               await useRatingGateStore.getState().checkPendingRating();
             }
-          } catch (e) {
+          } catch (e: any) {
             console.warn('Session restoration failed:', e);
-            await logout();
+            
+            // If it's an explicit 401, the token is dead — must logout.
+            // For other errors (500, network drop, timeout), we stay logged in with the cached data.
+            if (e.status === 401) {
+              await logout();
+            } else {
+              const mapped = mapUser(savedUser);
+              setCurrentUser(mapped);
+              telemetry.warn('Restored session from cache due to network verification failure', { error: e.message });
+            }
           }
         }
       } catch (e) {
@@ -132,13 +146,16 @@ const App: React.FC = () => {
     };
   }, []);
 
+  const { isOnline, isSocketConnected, socketEverConnected, locationStatus } = useConnectivityStore();
+  const hasBanner = !isOnline || (isOnline && socketEverConnected && !isSocketConnected) || (locationStatus !== 'available' && locationStatus !== 'unavailable');
+
   return (
     <ErrorBoundary>
       <ToastContainer>
         <div className="flex justify-center items-start min-h-screen bg-slate-950">
-          <div className="w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative flex flex-col">
+          <div className={`w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative flex flex-col transition-all duration-300 ${hasBanner ? 'pt-11' : ''}`}>
             
-            {/* Connectivity banner sits at the very top of the app frame, pushing content down */}
+            {/* Connectivity banner sits at the very top of the app frame */}
             <ConnectivityBanner />
 
             <VersionEnforcer>

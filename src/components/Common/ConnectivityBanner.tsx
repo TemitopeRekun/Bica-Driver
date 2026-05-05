@@ -51,13 +51,13 @@ const ConnectivityBanner: React.FC = () => {
   }
 
   return (
-    // Uses relative positioning so it pushes page content down — does NOT overlap back buttons or headers
+    // Uses fixed positioning to float at the very top of the app container
     <div
       role="alert"
       aria-live="polite"
-      className={`w-full ${bgColor} text-white px-4 py-2.5 flex items-center justify-center gap-3 shadow-md`}
+      className={`fixed top-0 left-0 right-0 z-[100] ${bgColor} text-white px-4 py-3 flex items-center justify-center gap-3 shadow-lg shadow-black/20 backdrop-blur-md animate-slide-down`}
     >
-      <span className={`material-symbols-outlined text-base ${showReconnecting ? 'animate-spin' : ''}`}>
+      <span className={`material-symbols-outlined text-sm ${showReconnecting ? 'animate-spin' : ''}`}>
         {icon}
       </span>
       <p className="text-[10px] font-black uppercase tracking-widest">{message}</p>

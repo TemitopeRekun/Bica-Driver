@@ -184,7 +184,7 @@ export const useOwnerRealtime = ({
     ownerSocketRef.current.on('trip:status', (data: any) => {
       // payload: { tripId, status, milestone }
       if (data.status === 'COMPLETED') {
-        onTripCompletedRef.current({ fareBreakdown: data.fareBreakdown });
+        onTripCompletedRef.current(data);
       } else if (data.status || data.milestone) {
         // Aligned with Guide: Fail-Forward sync logic
         onRideProgressRef.current?.({
