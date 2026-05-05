@@ -31,7 +31,7 @@ const DriverMainScreen: React.FC = () => {
   const { addToast } = useUIStore();
   const { rideMilestone, setRideState, setRideMilestone } = useRideStore();
   const { 
-    walletSummary, loadWalletSummary, updateRideStatus, acceptRide, declineRide, syncCurrentRide 
+    walletSummary, loadWalletSummary, updateRideStatus, acceptRide, declineRide, syncCurrentRide, regenerateOtp 
   } = useDriverManager();
   const { setSupportOpen, setSupportContext } = useUIStore();
 
@@ -69,6 +69,8 @@ const DriverMainScreen: React.FC = () => {
   const [otpAttempts, setOtpAttempts] = useState(0);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [isUploading, setIsUploading] = useState(false); // For selfie
+  const [isLockedOut, setIsLockedOut] = useState(false);
+  const [regenCooldown, setRegenCooldown] = useState(0);
 
   const {
     isOnline, driverPos, liveRideRequests, enableOnline, disableOnline, removeRideRequest
@@ -230,7 +232,7 @@ const DriverMainScreen: React.FC = () => {
   };
 
   const verifyOtpAndStart = async () => {
-    if (!activeRide || !otpValue) return;
+    if (!activeRide || !otpValue || isLockedOut) return;
     try {
       setIsVerifyingOtp(true);
       await updateRideStatus(activeRide.id, 'IN_PROGRESS', {
@@ -243,11 +245,38 @@ const DriverMainScreen: React.FC = () => {
       setShowOtpModal(false);
       setOtpValue('');
       setOtpAttempts(0);
+      setIsLockedOut(false);
       addToast('Ride started! Drive safely.', 'success');
     } catch (error: any) {
+      const msg = error.message || '';
+      if (msg.includes('Maximum PIN attempts reached') || msg.includes('Too many failed attempts')) {
+        setIsLockedOut(true);
+      }
       setOtpAttempts(prev => prev + 1);
     } finally { setIsVerifyingOtp(false); }
   };
+
+  const handleRegenerateOtp = async () => {
+    if (!activeRide || regenCooldown > 0) return;
+    
+    const res = await regenerateOtp(activeRide.id);
+    if (res.success || res.cooldown) {
+      setRegenCooldown(60);
+      if (res.success) {
+        setIsLockedOut(false);
+        setOtpValue('');
+        setOtpAttempts(0);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (regenCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setRegenCooldown(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [regenCooldown]);
 
   const handleUpdateStatus = async (status: 'ARRIVED' | 'IN_PROGRESS' | 'COMPLETED') => {
     if (!activeRide) return;
@@ -387,15 +416,38 @@ const DriverMainScreen: React.FC = () => {
               <div className="space-y-4">
                 <input 
                   type="number" value={otpValue} onChange={(e) => setOtpValue(e.target.value.slice(0, 4))}
-                  placeholder="0000" className="w-full bg-white/5 border-2 border-white/10 rounded-2xl py-6 text-center text-4xl font-black text-white tracking-[1rem] focus:border-primary outline-none"
+                  disabled={isLockedOut}
+                  placeholder="0000" className={`w-full bg-white/5 border-2 ${isLockedOut ? 'border-red-500/30' : 'border-white/10'} rounded-2xl py-6 text-center text-4xl font-black text-white tracking-[1rem] focus:border-primary outline-none transition-colors`}
                 />
-                {otpAttempts > 0 && <p className="text-center text-red-400 text-xs font-bold animate-shake">Incorrect PIN. Attempt {otpAttempts} of 5.</p>}
+                {isLockedOut ? (
+                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl animate-shake">
+                    <p className="text-center text-red-400 text-[10px] font-black uppercase tracking-widest">
+                      Too many failed attempts. Please request a new PIN from the owner.
+                    </p>
+                  </div>
+                ) : otpAttempts > 0 && (
+                  <p className="text-center text-red-400 text-xs font-bold animate-shake">Incorrect PIN. Attempt {otpAttempts} of 5.</p>
+                )}
               </div>
               <div className="space-y-3">
-                <button onClick={verifyOtpAndStart} disabled={otpValue.length < 4 || isVerifyingOtp} className="w-full bg-primary disabled:bg-slate-700 py-5 rounded-2xl text-white font-black text-xl flex items-center justify-center gap-3">
+                <button 
+                  onClick={verifyOtpAndStart} 
+                  disabled={otpValue.length < 4 || isVerifyingOtp || isLockedOut} 
+                  className="w-full bg-primary disabled:bg-slate-700 py-5 rounded-2xl text-white font-black text-xl flex items-center justify-center gap-3 transition-all"
+                >
                   {isVerifyingOtp ? <div className="size-6 border-3 border-white/30 border-t-white rounded-full animate-spin" /> : 'Start Trip'}
                 </button>
-                <button onClick={() => setShowOtpModal(false)} className="w-full py-4 text-slate-500 font-bold text-sm">Cancel</button>
+                
+                <button 
+                  onClick={handleRegenerateOtp}
+                  disabled={regenCooldown > 0}
+                  className="w-full py-4 bg-white/5 hover:bg-white/10 disabled:bg-transparent rounded-2xl text-slate-300 disabled:text-slate-600 font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-sm">{regenCooldown > 0 ? 'timer' : 'refresh'}</span>
+                  {regenCooldown > 0 ? `Resend PIN (${regenCooldown}s)` : 'Resend PIN'}
+                </button>
+
+                <button onClick={() => setShowOtpModal(false)} className="w-full py-2 text-slate-500 font-bold text-xs uppercase tracking-widest mt-2">Cancel</button>
               </div>
             </div>
           </div>

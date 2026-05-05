@@ -73,6 +73,20 @@ export const useDriverManager = () => {
     }
   }, [addToast]);
 
+  const regenerateOtp = useCallback(async (tripId: string) => {
+    try {
+      await api.post(`/rides/${tripId}/regenerate-otp`);
+      addToast('New PIN sent to owner.', 'success');
+      return { success: true };
+    } catch (error: any) {
+      if (error.message?.includes('wait 60 seconds')) {
+        return { success: false, cooldown: true };
+      }
+      addToast(error.message || 'Failed to regenerate PIN.', 'error');
+      return { success: false };
+    }
+  }, [addToast]);
+
   return {
     walletSummary,
     isUpdatingStatus,
@@ -80,6 +94,7 @@ export const useDriverManager = () => {
     updateRideStatus,
     acceptRide,
     declineRide,
+    regenerateOtp,
     syncCurrentRide: useCallback(async () => {
       try {
         const activeTrip = await api.get<Trip>('/rides/current');

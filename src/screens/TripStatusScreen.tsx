@@ -12,6 +12,7 @@ import TripPaymentSummary from '@/components/RequestRide/TripPaymentSummary';
 import { IMAGES } from '@/constants';
 import { getLocationShortText } from '@/services/LocationService';
 import { api } from '@/services/api.service';
+import { notificationService } from '@/services/NotificationService';
 
 const TripStatusScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -66,7 +67,10 @@ const TripStatusScreen: React.FC = () => {
     onPaymentUpdated: (payload) => {
        if (payload.paymentStatus === 'PAID') {
           addToast('Payment confirmed! Your ride is fully settled.', 'success');
-          setCompletedTripData((prev: any) => ({ ...prev, paymentStatus: 'PAID' }));
+          const current = useRideStore.getState().completedTripData;
+          if (current) {
+            setCompletedTripData({ ...current, paymentStatus: 'PAID' });
+          }
        }
     },
     onLocationUpdated: (lat, lng) => setTrackedDriverPos([lat, lng]),
@@ -141,7 +145,10 @@ const TripStatusScreen: React.FC = () => {
         const data = await api.getPaymentStatus(currentTripId);
         if (data.paymentStatus === 'PAID') {
           addToast('Payment confirmed! Your ride is fully settled.', 'success');
-          setCompletedTripData((prev: any) => ({ ...prev, paymentStatus: 'PAID' }));
+          const current = useRideStore.getState().completedTripData;
+          if (current) {
+            setCompletedTripData({ ...current, paymentStatus: 'PAID' });
+          }
         }
       } catch (error) {
         console.warn('[PaymentPoll] Background status check failed:', error);
@@ -154,6 +161,20 @@ const TripStatusScreen: React.FC = () => {
     window.addEventListener('bica-app-resumed', handleResume);
     return () => window.removeEventListener('bica-app-resumed', handleResume);
   }, [currentTripId, completedTripData?.paymentStatus, setCompletedTripData, addToast]);
+
+  // Handle FCM Push for OTP Regeneration
+  useEffect(() => {
+    const unsubscribe = notificationService.addListener((payload) => {
+      if (payload.type === 'otp_regenerated' && payload.otp) {
+        console.log('🔔 [FCM] OTP regenerated received:', payload.otp);
+        setDriverInfo({
+          ...driverInfo,
+          otp: payload.otp
+        });
+      }
+    });
+    return () => { unsubscribe(); };
+  }, [driverInfo, setDriverInfo]);
 
   return (
     <div className="h-screen w-full flex flex-col bg-background-light dark:bg-background-dark overflow-hidden">
