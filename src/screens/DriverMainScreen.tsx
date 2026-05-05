@@ -94,7 +94,20 @@ const DriverMainScreen: React.FC = () => {
     onPaymentUpdated: (payload) => {
        if (payload.paymentStatus === 'PAID') {
           addToast('Payment received! Fare settled.', 'success');
-          setCompletedTripSummary((prev: any) => prev ? { ...prev, paymentStatus: 'PAID' } : null);
+          setCompletedTripSummary((prev: any) => {
+            if (prev) return { ...prev, paymentStatus: 'PAID' };
+            
+            // Reconstruct summary if it was dismissed, using persisted store data
+            const storedTrip = useRideStore.getState().completedTripData;
+            if (!storedTrip) return null;
+            
+            return {
+              ...storedTrip,
+              paymentStatus: 'PAID',
+              driverEarnings: payload.driverEarnings ?? storedTrip.driverEarnings,
+              paidAt: payload.paidAt ?? new Date().toISOString(),
+            };
+          });
         }
     }
   });

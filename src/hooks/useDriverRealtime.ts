@@ -38,7 +38,7 @@ interface UseDriverRealtimeOptions {
   onForcedLogout?: (message?: string) => void;
   onRideProgress?: (payload: { tripId: string; milestone: string }) => void;
   onRideCancelled?: (payload: { tripId: string; message?: string }) => void;
-  onPaymentUpdated?: (payload: { tripId: string; paymentStatus: string; paidAt?: string; amount?: number; message?: string }) => void;
+  onPaymentUpdated?: (payload: { tripId: string; paymentStatus: string; paidAt?: string; amount?: number; driverEarnings?: number; message?: string }) => void;
 }
 
 const DEFAULT_DRIVER_POS: [number, number] = [6.4549, 3.3896];

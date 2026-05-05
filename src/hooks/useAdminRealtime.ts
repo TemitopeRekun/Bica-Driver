@@ -10,9 +10,10 @@ interface UseAdminRealtimeOptions {
   adminId?: string;
   onNewDriver?: (data: any) => void;
   onTripCompleted?: (data: any) => void;
+  onDashboardUpdate?: (event: string) => void;
 }
 
-export const useAdminRealtime = ({ adminId, onNewDriver, onTripCompleted }: UseAdminRealtimeOptions) => {
+export const useAdminRealtime = ({ adminId, onNewDriver, onTripCompleted, onDashboardUpdate }: UseAdminRealtimeOptions) => {
   const socketRef = useRef<Socket | null>(null);
   const { addToast } = useUIStore();
 
@@ -43,11 +44,16 @@ export const useAdminRealtime = ({ adminId, onNewDriver, onTripCompleted }: UseA
       onTripCompleted?.(data);
     });
 
+    // General dashboard update signal
+    socketRef.current.on('admindashboardupdate', (data: any) => {
+      onDashboardUpdate?.(data.event ?? 'unknown');
+    });
+
     return () => {
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
-  }, [adminId, onNewDriver, onTripCompleted, addToast]);
+  }, [adminId, onNewDriver, onTripCompleted, onDashboardUpdate, addToast]);
 
   return {
     socket: socketRef.current,

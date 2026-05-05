@@ -300,6 +300,9 @@ export const api = {
   getPaymentsSummary: (params: GetPaymentsSummaryParams): Promise<PaymentsSummaryResponse> =>
     request<PaymentsSummaryResponse>('GET', `/payments/summary?period=${params.period}`, undefined, true),
 
+  getPaymentStatus: (tripId: string) =>
+    request<{ paymentStatus: import('@/types').PaymentStatus; amount?: number }>('GET', `/payments/status/${tripId}`, undefined, true),
+
   // Admin — Ledger Operations
   resetWalletBalance: (driverId: string): Promise<{ message: string }> =>
     request<{ message: string }>('POST', `/payments/wallet/reset`, { driverId }, true),

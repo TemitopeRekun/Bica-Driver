@@ -51,6 +51,19 @@ const AdminDashboardPage: React.FC = () => {
     return () => { cancelled = true; };
   }, [adminSummaryPeriod]);
 
+  const dashboardUpdateDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLoadingRef = React.useRef(false);
+
+  React.useEffect(() => {
+    isLoadingRef.current = adminDashboardLoading;
+  }, [adminDashboardLoading]);
+
+  React.useEffect(() => {
+    return () => {
+      if (dashboardUpdateDebounceRef.current) clearTimeout(dashboardUpdateDebounceRef.current);
+    };
+  }, []);
+
   const handleNewRegistration = React.useCallback(() => {
     loadAdminDashboard().catch(() => { });
   }, [loadAdminDashboard]);
@@ -60,6 +73,16 @@ const AdminDashboardPage: React.FC = () => {
     adminId: currentUser?.id,
     onNewDriver: handleNewRegistration,
     onTripCompleted: handleNewRegistration,
+    onDashboardUpdate: () => {
+      if (dashboardUpdateDebounceRef.current) {
+        clearTimeout(dashboardUpdateDebounceRef.current);
+      }
+      dashboardUpdateDebounceRef.current = setTimeout(() => {
+        if (!isLoadingRef.current) {
+          loadAdminDashboard().catch(console.warn);
+        }
+      }, 2000);
+    },
   });
 
   const loadTicketsPage = React.useCallback(async (page = 0) => {
@@ -102,7 +125,9 @@ const AdminDashboardPage: React.FC = () => {
       // Backend requires key 'approvalStatus' not 'status'
       await api.patch(`/users/${userId}/approval`, { approvalStatus });
       toast.success(`Driver ${approvalStatus === 'APPROVED' ? 'approved' : 'rejected'} successfully`);
-      await loadAdminDashboard();
+      Promise.allSettled([loadPendingDrivers(), loadUsersPage(0)]).then(results => {
+        results.forEach(res => { if (res.status === 'rejected') console.warn('Background refresh failed:', res.reason); });
+      });
     } catch (e: any) {
       toast.error(e.message || 'Failed to update approval status');
     }
@@ -112,7 +137,7 @@ const AdminDashboardPage: React.FC = () => {
     try {
       await api.patch(`/users/${userId}/block`, { isBlocked: blocked });
       toast.success(`User ${blocked ? 'blocked' : 'unblocked'}`);
-      await loadAdminDashboard();
+      loadUsersPage(0).catch(console.warn);
     } catch (e: any) {
       toast.error(e.message || 'Failed to update block status');
     }

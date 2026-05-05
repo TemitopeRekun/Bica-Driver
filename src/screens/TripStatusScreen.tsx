@@ -11,6 +11,7 @@ import DriverStatusCard from '@/components/RequestRide/DriverStatusCard';
 import TripPaymentSummary from '@/components/RequestRide/TripPaymentSummary';
 import { IMAGES } from '@/constants';
 import { getLocationShortText } from '@/services/LocationService';
+import { api } from '@/services/api.service';
 
 const TripStatusScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -23,6 +24,9 @@ const TripStatusScreen: React.FC = () => {
     completedTripData, setCompletedTripData,
     pickup, destination, resetRide
   } = useRideStore();
+  
+  const [isPolling, setIsPolling] = React.useState(false);
+  const isPollingRef = React.useRef(false);
   
   const { cancelRide, syncCurrentRide, initiatePayment } = useRideManager();
   
@@ -117,6 +121,39 @@ const TripStatusScreen: React.FC = () => {
       navigate(`/driver/awaiting-payment/${currentTripId}`, { replace: true });
     }
   }, [rideState, currentUser?.role, currentTripId, navigate]);
+  
+  // Payment Polling on App Resume
+  useEffect(() => {
+    const handleResume = async () => {
+      if (!currentTripId) return;
+      
+      // Check current payment status from store data
+      const currentStatus = completedTripData?.paymentStatus || 'UNPAID';
+      if (['PAID', 'REFUNDED'].includes(currentStatus)) return;
+      
+      if (isPollingRef.current) return;
+      
+      console.log('🔄 [PaymentPoll] App resumed, checking status for:', currentTripId);
+      isPollingRef.current = true;
+      setIsPolling(true);
+      
+      try {
+        const data = await api.getPaymentStatus(currentTripId);
+        if (data.paymentStatus === 'PAID') {
+          addToast('Payment confirmed! Your ride is fully settled.', 'success');
+          setCompletedTripData((prev: any) => ({ ...prev, paymentStatus: 'PAID' }));
+        }
+      } catch (error) {
+        console.warn('[PaymentPoll] Background status check failed:', error);
+      } finally {
+        isPollingRef.current = false;
+        setIsPolling(false);
+      }
+    };
+
+    window.addEventListener('bica-app-resumed', handleResume);
+    return () => window.removeEventListener('bica-app-resumed', handleResume);
+  }, [currentTripId, completedTripData?.paymentStatus, setCompletedTripData, addToast]);
 
   return (
     <div className="h-screen w-full flex flex-col bg-background-light dark:bg-background-dark overflow-hidden">
@@ -171,7 +208,7 @@ const TripStatusScreen: React.FC = () => {
                finalFare: completedTripData?.amount || 0,
              }}
              paymentStatus={completedTripData?.paymentStatus || 'UNPAID'}
-             onPayNow={() => currentTripId && initiatePayment(currentTripId)}
+             onPayNow={() => !isPolling && currentTripId && initiatePayment(currentTripId)}
            />
         ) : (
           <DriverStatusCard
