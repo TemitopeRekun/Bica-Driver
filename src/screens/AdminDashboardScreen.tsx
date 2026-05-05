@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UserProfile, UserRole, ApprovalStatus, Trip, TripStatus, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminDashboardStats, AdminSection, DriverFilter } from '@/types';
+import { UserProfile, UserRole, ApprovalStatus, Trip, TripStatus, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminDashboardStats, AdminSection, DriverFilter, AdminPaymentsSummaryResponse, SummaryPeriod } from '@/types';
 import { mapUser } from '@/mappers/appMappers';
 import { useToast } from '@/hooks/useToast';
 
@@ -38,6 +38,10 @@ interface AdminDashboardScreenProps {
   onBack: () => void;
   onSimulate: (role: UserRole) => void;
   onPageChange: (section: 'users' | 'trips' | 'pending' | 'history', page: number) => void;
+  adminSummary?: AdminPaymentsSummaryResponse | null;
+  adminSummaryPeriod?: SummaryPeriod;
+  setAdminSummaryPeriod?: (period: SummaryPeriod) => void;
+  adminSummaryLoading?: boolean;
 }
 
 
@@ -47,7 +51,8 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   pendingPayments, pendingPaymentsMeta, paymentHistory, paymentHistoryMeta,
   settings, isLoading, error, lastUpdated,
   onUpdateStatus, onBlockUser, onRetrySubAccount, onUpdateSettings, onForcedLogout,
-  onRetry, onBack, onSimulate, onPageChange
+  onRetry, onBack, onSimulate, onPageChange,
+  adminSummary, adminSummaryPeriod, setAdminSummaryPeriod, adminSummaryLoading
 }) => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<AdminSection>('overview');
@@ -296,6 +301,10 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                 paymentHistory={paymentHistory} paymentHistoryMeta={paymentHistoryMeta}
                 onPageChange={onPageChange}
                 formatCurrency={formatCurrency} formatShortDate={formatShortDate}
+                adminSummary={adminSummary}
+                adminSummaryPeriod={adminSummaryPeriod ?? 'monthly'}
+                setAdminSummaryPeriod={setAdminSummaryPeriod}
+                adminSummaryLoading={adminSummaryLoading ?? false}
               />
             )}
 

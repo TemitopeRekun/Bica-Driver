@@ -5,7 +5,7 @@ import { useAdminRealtime } from '@/hooks/useAdminRealtime';
 import AdminDashboardScreen from './AdminDashboardScreen';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/useToast';
-import { ApprovalStatus, SystemSettings, UserRole } from '@/types';
+import { ApprovalStatus, SystemSettings, UserRole, SummaryPeriod, AdminPaymentsSummaryResponse } from '@/types';
 import { api } from '@/services/api.service';
 
 const AdminDashboardPage: React.FC = () => {
@@ -21,6 +21,29 @@ const AdminDashboardPage: React.FC = () => {
     loadPendingPaymentsPage, loadPaymentHistoryPage
   } = useAdminDashboard();
   const { currentUser } = useAuthStore();
+
+  const [adminSummaryPeriod, setAdminSummaryPeriod] = React.useState<SummaryPeriod>('monthly');
+  const [adminSummary, setAdminSummary] = React.useState<AdminPaymentsSummaryResponse | null>(null);
+  const [adminSummaryLoading, setAdminSummaryLoading] = React.useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchAdminSummary = async () => {
+      setAdminSummaryLoading(true);
+      try {
+        const data = await api.getPaymentsSummary({ period: adminSummaryPeriod });
+        if (!cancelled && data.role === 'ADMIN') {
+          setAdminSummary(data);
+        }
+      } catch (e: any) {
+        // Non-fatal; existing finance data still renders
+      } finally {
+        if (!cancelled) setAdminSummaryLoading(false);
+      }
+    };
+    fetchAdminSummary();
+    return () => { cancelled = true; };
+  }, [adminSummaryPeriod]);
 
   const handleNewRegistration = React.useCallback(() => {
     loadAdminDashboard().catch(() => { });
@@ -117,6 +140,10 @@ const AdminDashboardPage: React.FC = () => {
       onBack={() => navigate('/')}
       onSimulate={() => { }}
       onPageChange={handlePageChange}
+      adminSummary={adminSummary}
+      adminSummaryPeriod={adminSummaryPeriod}
+      setAdminSummaryPeriod={setAdminSummaryPeriod}
+      adminSummaryLoading={adminSummaryLoading}
     />
   );
 };

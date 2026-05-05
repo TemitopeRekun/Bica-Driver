@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { mapTrip } from '@/mappers/appMappers';
 import { api, PaginatedResponse, PaginationMeta } from '@/services/api.service';
-import { DriverActivityTab, PaymentHistoryRecord, Trip, WalletSummary } from '@/types';
+import { DriverActivityTab, PaymentHistoryRecord, Trip, WalletSummary, SummaryPeriod, DriverPaymentsSummaryResponse } from '@/types';
 import { Skeleton } from '@/components/Common/Skeleton';
 import { InlineError } from '@/components/Common/InlineError';
 
@@ -61,6 +61,10 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   const [walletSummary, setWalletSummary] = useState<WalletSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [period, setPeriod] = useState<SummaryPeriod>('weekly');
+  const [driverSummary, setDriverSummary] = useState<DriverPaymentsSummaryResponse | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -152,6 +156,25 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   useEffect(() => {
     loadActivity().catch(() => setIsLoading(false));
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchSummary = async () => {
+      setSummaryLoading(true);
+      try {
+        const data = await api.getPaymentsSummary({ period });
+        if (!cancelled && data.role === 'DRIVER') {
+          setDriverSummary(data);
+        }
+      } catch {
+        // Non-fatal: leave existing summary in place; do not setError
+      } finally {
+        if (!cancelled) setSummaryLoading(false);
+      }
+    };
+    fetchSummary();
+    return () => { cancelled = true; };
+  }, [period]);
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('en-NG', {
@@ -380,6 +403,70 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
             </div>
           </div>
         </div>
+
+        {activeTab === 'settlements' && (
+          <div className="flex flex-col gap-3 animate-fade-in">
+            <div className="flex gap-2 p-1 bg-white/40 dark:bg-white/5 rounded-2xl w-fit border border-emerald-100 dark:border-emerald-500/10">
+              {(['daily', 'weekly', 'monthly'] as SummaryPeriod[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                    period === p
+                      ? 'bg-emerald-500 text-white shadow'
+                      : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div className={`rounded-2xl border px-3 py-3.5 ${ACTIVITY_THEME.settlements.metricSurface}`}>
+                <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Period Earnings</p>
+                {summaryLoading ? (
+                  <div className="mt-1 h-7 w-24 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
+                ) : (
+                  <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">
+                    {formatCurrency(driverSummary?.totals.driverEarnings ?? 0)}
+                  </p>
+                )}
+              </div>
+              <div className={`rounded-2xl border px-3 py-3.5 ${ACTIVITY_THEME.settlements.metricSurface}`}>
+                <p className="text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">Cleared Trips</p>
+                {summaryLoading ? (
+                  <div className="mt-1 h-7 w-16 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
+                ) : (
+                  <p className="mt-1 text-lg font-black text-slate-900 dark:text-white">
+                    {driverSummary?.totals.clearedTrips ?? 0}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {driverSummary?.buckets && driverSummary.buckets.length > 0 && (
+              <div className="mt-3 rounded-2xl border border-white/70 bg-white/75 dark:border-white/5 dark:bg-black/20 overflow-hidden">
+                {driverSummary.buckets.map((bucket) => (
+                  <div
+                    key={bucket.label}
+                    className="flex items-center justify-between px-4 py-3 border-b border-slate-100/80 dark:border-slate-800 last:border-none"
+                  >
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      {bucket.label}
+                    </span>
+                    <div className="flex items-center gap-4 text-right">
+                      <span className="text-[10px] text-slate-400 font-bold">{bucket.clearedTrips} trips</span>
+                      <span className="text-sm font-black text-slate-900 dark:text-white">
+                        {formatCurrency(bucket.driverEarnings)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* New Wallet Clarity Card */}
         <div className="bg-primary/5 border border-primary/10 rounded-3xl p-5 flex gap-4 items-start animate-fade-in shadow-sm shadow-primary/5">

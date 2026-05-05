@@ -1,5 +1,5 @@
 import React from 'react';
-import { SystemSettings, PendingPaymentTrip, PaymentHistoryRecord } from '@/types';
+import { SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminPaymentsSummaryResponse, SummaryPeriod } from '@/types';
 import { PaginationMeta } from '@/services/api.service';
 
 interface FinanceSectionProps {
@@ -13,6 +13,10 @@ interface FinanceSectionProps {
   formatCurrency: (amount: number) => string;
   formatShortDate: (value?: string | null) => string;
   onPageChange: (section: 'pending' | 'history', page: number) => void;
+  adminSummary?: AdminPaymentsSummaryResponse | null;
+  adminSummaryPeriod: SummaryPeriod;
+  setAdminSummaryPeriod?: (period: SummaryPeriod) => void;
+  adminSummaryLoading?: boolean;
 }
 
 const FinanceSection: React.FC<FinanceSectionProps> = ({
@@ -25,35 +29,134 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
   paymentHistoryMeta,
   formatCurrency,
   formatShortDate,
-  onPageChange
+  onPageChange,
+  adminSummary,
+  adminSummaryPeriod,
+  setAdminSummaryPeriod,
+  adminSummaryLoading
 }) => {
+  const displayPlatformRevenue = adminSummary?.totals.platformRevenue ?? platformFees;
+  const displayGrossThroughput = adminSummary?.totals.grossThroughput ?? totalRevenue;
+  const displayDriverPayouts = adminSummary?.totals.driverPayouts;
+
   return (
     <div className="space-y-8 animate-slide-up font-display">
        {/* Platform Financial Summary */}
        <div className="relative overflow-hidden p-8 rounded-[3rem] bg-slate-900 shadow-2xl group">
           <div className="absolute top-0 right-0 size-64 bg-primary/20 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-primary/30 transition-all"></div>
           <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="size-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
-                <span className="material-symbols-outlined filled">account_balance</span>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="size-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
+                  <span className="material-symbols-outlined filled">account_balance</span>
+                </div>
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Operational Liquidity</h3>
               </div>
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Operational Liquidity</h3>
             </div>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 opacity-80 italic">Platform Net Commission</p>
-            <h2 className="text-5xl font-black text-white tracking-tighter italic uppercase">{formatCurrency(platformFees)}</h2>
+
+            {setAdminSummaryPeriod && (
+              <div className="flex gap-2 mb-6 p-1 bg-white/5 rounded-2xl w-fit">
+                {(['daily', 'weekly', 'monthly'] as SummaryPeriod[]).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setAdminSummaryPeriod(p)}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                      adminSummaryPeriod === p
+                        ? 'bg-primary text-white shadow'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 opacity-80">
+              Platform Net Commission
+            </p>
+            <h2 className="text-5xl font-black text-white tracking-tighter">
+              {adminSummaryLoading ? (
+                <span className="text-3xl text-slate-500 animate-pulse">—</span>
+              ) : (
+                formatCurrency(displayPlatformRevenue)
+              )}
+            </h2>
+
             <div className="flex gap-6 mt-8">
               <div>
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Gross Throughput</p>
-                <p className="text-xl font-black text-white tracking-tighter">{formatCurrency(totalRevenue)}</p>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                  Gross Throughput
+                </p>
+                <p className="text-xl font-black text-white">
+                  {adminSummaryLoading ? '—' : formatCurrency(displayGrossThroughput)}
+                </p>
               </div>
-              <div className="w-px h-10 bg-white/10"></div>
+              <div className="w-px h-10 bg-white/10" />
+              {displayDriverPayouts !== undefined && (
+                <>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                      Driver Payouts
+                    </p>
+                    <p className="text-xl font-black text-white">
+                      {adminSummaryLoading ? '—' : formatCurrency(displayDriverPayouts)}
+                    </p>
+                  </div>
+                  <div className="w-px h-10 bg-white/10" />
+                </>
+              )}
               <div>
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Global Fee</p>
-                <p className="text-xl font-black text-primary tracking-tighter">{settings.commission}%</p>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                  Fee Rate
+                </p>
+                <p className="text-xl font-black text-primary">{settings.commission}%</p>
               </div>
             </div>
           </div>
        </div>
+
+       {adminSummary?.buckets && adminSummary.buckets.length > 0 && (
+         <div className="bg-white dark:bg-surface-dark rounded-[2.5rem] border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+           <div className="p-5 border-b border-slate-100 dark:border-slate-800">
+             <h3 className="font-black text-sm uppercase tracking-[0.2em] text-slate-500">
+               Period Breakdown
+             </h3>
+           </div>
+           <div className="divide-y divide-slate-100 dark:divide-slate-800">
+             {adminSummary.buckets.map((bucket) => (
+               <div
+                 key={bucket.label}
+                 className="px-5 py-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+               >
+                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                   {bucket.label}
+                 </span>
+                 <div className="flex items-center gap-6 text-right">
+                   <div>
+                     <p className="text-[9px] font-black text-slate-400 uppercase mb-0.5">Throughput</p>
+                     <p className="text-sm font-black text-slate-900 dark:text-white">
+                       {formatCurrency(bucket.grossThroughput)}
+                     </p>
+                   </div>
+                   <div>
+                     <p className="text-[9px] font-black text-slate-400 uppercase mb-0.5">Commission</p>
+                     <p className="text-sm font-black text-primary">
+                       {formatCurrency(bucket.platformRevenue)}
+                     </p>
+                   </div>
+                   <div>
+                     <p className="text-[9px] font-black text-slate-400 uppercase mb-0.5">Payouts</p>
+                     <p className="text-sm font-black text-emerald-500">
+                       {formatCurrency(bucket.driverPayouts)}
+                     </p>
+                   </div>
+                 </div>
+               </div>
+             ))}
+           </div>
+         </div>
+       )}
 
        {/* Settlement Model Info */}
        <div className="bg-emerald-500/5 border border-emerald-500/10 p-6 rounded-[2.5rem] flex gap-4 items-start shadow-sm shadow-emerald-500/5">

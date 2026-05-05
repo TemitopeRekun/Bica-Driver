@@ -1,5 +1,5 @@
 import { requireApiUrl } from './Config';
-import { PendingRatingTrip } from '@/types';
+import { PendingRatingTrip, GetPaymentsSummaryParams, PaymentsSummaryResponse } from '@/types';
 
 interface RequestOptions {
   signal?: AbortSignal;
@@ -292,4 +292,8 @@ export const api = {
     request<PendingRatingTrip | null>('GET', '/rides/pending-rating', undefined, true),
   rateTrip: (tripId: string, score: number) =>
     request<{ message: string; driverRating: number; driverRatingCount: number }>('POST', `/rides/${tripId}/rate`, { score }, true),
+
+  // Payments
+  getPaymentsSummary: (params: GetPaymentsSummaryParams): Promise<PaymentsSummaryResponse> =>
+    request<PaymentsSummaryResponse>('GET', `/payments/summary?period=${params.period}`, undefined, true),
 };

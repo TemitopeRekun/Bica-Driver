@@ -315,3 +315,53 @@ export interface AdminDashboardStats {
   pendingDriversCount: number;
   totalEarnings: number; // Platform Total Commission
 }
+
+// --- Payments Summary Types ---
+
+export type SummaryPeriod = 'daily' | 'weekly' | 'monthly';
+
+export interface GetPaymentsSummaryParams {
+  period: SummaryPeriod;
+}
+
+export interface DriverSummaryBucket {
+  label: string;            
+  driverEarnings: number;
+  clearedTrips: number;
+}
+
+export interface AdminSummaryBucket {
+  label: string;
+  grossThroughput: number;
+  platformRevenue: number;
+  driverPayouts: number;
+}
+
+export interface DriverSummaryTotals {
+  driverEarnings: number;
+  clearedTrips: number;
+}
+
+export interface AdminSummaryTotals {
+  grossThroughput: number;
+  platformRevenue: number;
+  driverPayouts: number;
+}
+
+export interface DriverPaymentsSummaryResponse {
+  role: 'DRIVER';
+  period: SummaryPeriod;
+  totals: DriverSummaryTotals;
+  buckets: DriverSummaryBucket[];
+}
+
+export interface AdminPaymentsSummaryResponse {
+  role: 'ADMIN';
+  period: SummaryPeriod;
+  totals: AdminSummaryTotals;
+  buckets: AdminSummaryBucket[];
+}
+
+export type PaymentsSummaryResponse =
+  | DriverPaymentsSummaryResponse
+  | AdminPaymentsSummaryResponse;
