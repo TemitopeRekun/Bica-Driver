@@ -365,3 +365,10 @@ export interface AdminPaymentsSummaryResponse {
 export type PaymentsSummaryResponse =
   | DriverPaymentsSummaryResponse
   | AdminPaymentsSummaryResponse;
+// --- Filter / Drilldown Types ---
+export type SettlementStatusFilter = 'ALL' | 'PAID' | 'FAILED';
+
+export interface DateRangeFilter {
+  from: string | null; // ISO date string YYYY-MM-DD
+  to: string | null;
+}

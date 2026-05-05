@@ -5,7 +5,7 @@ import { useAdminRealtime } from '@/hooks/useAdminRealtime';
 import AdminDashboardScreen from './AdminDashboardScreen';
 import { useAuthStore } from '@/stores/authStore';
 import { useToast } from '@/hooks/useToast';
-import { ApprovalStatus, SystemSettings, UserRole, SummaryPeriod, AdminPaymentsSummaryResponse } from '@/types';
+import { ApprovalStatus, SystemSettings, UserRole, SummaryPeriod, AdminPaymentsSummaryResponse, DateRangeFilter } from '@/types';
 import { api } from '@/services/api.service';
 
 const AdminDashboardPage: React.FC = () => {
@@ -25,6 +25,9 @@ const AdminDashboardPage: React.FC = () => {
   const [adminSummaryPeriod, setAdminSummaryPeriod] = React.useState<SummaryPeriod>('monthly');
   const [adminSummary, setAdminSummary] = React.useState<AdminPaymentsSummaryResponse | null>(null);
   const [adminSummaryLoading, setAdminSummaryLoading] = React.useState(false);
+
+  const [historyStatusFilter, setHistoryStatusFilter] = React.useState<'ALL' | 'PAID' | 'FAILED'>('ALL');
+  const [historyDateRange, setHistoryDateRange] = React.useState<DateRangeFilter>({ from: null, to: null });
 
   useEffect(() => {
     let cancelled = false;
@@ -68,9 +71,13 @@ const AdminDashboardPage: React.FC = () => {
       case 'users': loadUsersPage(page); break;
       case 'trips': loadTripsPage(page); break;
       case 'pending': loadPendingPaymentsPage(page); break;
-      case 'history': loadPaymentHistoryPage(page); break;
+      case 'history': loadPaymentHistoryPage(page, 20, historyStatusFilter, historyDateRange.from ?? undefined, historyDateRange.to ?? undefined); break;
     }
   };
+
+  useEffect(() => {
+    loadPaymentHistoryPage(0, 20, historyStatusFilter, historyDateRange.from ?? undefined, historyDateRange.to ?? undefined);
+  }, [historyStatusFilter, historyDateRange, loadPaymentHistoryPage]);
 
   const handleUpdateStatus = async (userId: string, approvalStatus: ApprovalStatus) => {
     try {
@@ -144,6 +151,10 @@ const AdminDashboardPage: React.FC = () => {
       adminSummaryPeriod={adminSummaryPeriod}
       setAdminSummaryPeriod={setAdminSummaryPeriod}
       adminSummaryLoading={adminSummaryLoading}
+      historyStatusFilter={historyStatusFilter}
+      setHistoryStatusFilter={setHistoryStatusFilter}
+      historyDateRange={historyDateRange}
+      setHistoryDateRange={setHistoryDateRange}
     />
   );
 };

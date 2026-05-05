@@ -75,16 +75,25 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
     }
   }, []);
 
-  const loadPaymentHistoryPage = useCallback(async (page: number, limit: number = 20) => {
-    try {
-      const response = await api.get<PaginatedResponse<any>>(`/payments/history?page=${page}&limit=${limit}`);
-      setAdminPaymentHistory(response.items.map(mapPaymentHistory));
-      setPaymentHistoryMeta(response.meta);
-    } catch (error: any) {
-      setAdminDashboardError(error.message);
-      throw error;
-    }
-  }, []);
+  const loadPaymentHistoryPage = useCallback(
+    async (page: number, limit = 20, status?: string, from?: string, to?: string) => {
+      try {
+        const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+        if (status && status !== 'ALL') params.set('status', status);
+        if (from) params.set('from', from);
+        if (to) params.set('to', to);
+        const response = await api.getPaginatedResponse<any>(
+          `payments/history?${params}`
+        );
+        setAdminPaymentHistory(response.items.map(mapPaymentHistory));
+        setPaymentHistoryMeta(response.meta);
+      } catch (error: any) {
+        setAdminDashboardError(error.message);
+        throw error;
+      }
+    },
+    []
+  );
 
   const loadAdminDashboard = useCallback(async () => {
     setAdminDashboardLoading(true);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { mapTrip } from '@/mappers/appMappers';
 import { api, PaginatedResponse, PaginationMeta } from '@/services/api.service';
-import { DriverActivityTab, PaymentHistoryRecord, Trip, WalletSummary, SummaryPeriod, DriverPaymentsSummaryResponse } from '@/types';
+import { DriverActivityTab, PaymentHistoryRecord, Trip, WalletSummary, SummaryPeriod, DriverPaymentsSummaryResponse, SettlementStatusFilter, DateRangeFilter } from '@/types';
 import { Skeleton } from '@/components/Common/Skeleton';
 import { InlineError } from '@/components/Common/InlineError';
 
@@ -65,6 +65,10 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   const [period, setPeriod] = useState<SummaryPeriod>('weekly');
   const [driverSummary, setDriverSummary] = useState<DriverPaymentsSummaryResponse | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+
+  const [settlementStatusFilter, setSettlementStatusFilter] = useState<SettlementStatusFilter>('ALL');
+  const [settlementDateRange, setSettlementDateRange] = useState<DateRangeFilter>({ from: null, to: null });
+  const [expandedSettlementId, setExpandedSettlementId] = useState<string | null>(null);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -143,7 +147,13 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
   const loadSettlementsPage = async (page: number) => {
     setIsLoading(true);
     try {
-      const result = await api.get<PaginatedResponse<any>>(`/payments/history?page=${page}&limit=20`);
+      const params = new URLSearchParams({ page: String(page), limit: '20' });
+      if (settlementStatusFilter !== 'ALL') params.set('status', settlementStatusFilter);
+      if (settlementDateRange.from) params.set('from', settlementDateRange.from);
+      if (settlementDateRange.to) params.set('to', settlementDateRange.to);
+      const result = await api.getPaginatedResponse<PaymentHistoryRecord>(
+        `payments/history?${params}`
+      );
       setSettlements(result?.items || []);
       setSettlementsMeta(result?.meta || null);
     } catch (e: any) {
@@ -152,6 +162,10 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadSettlementsPage(0);
+  }, [settlementStatusFilter, settlementDateRange]);
 
   useEffect(() => {
     loadActivity().catch(() => setIsLoading(false));
@@ -323,7 +337,10 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
         {settlements.map((settlement) => (
           <div key={settlement.id} className={`relative overflow-hidden rounded-[2rem] border p-5 ${ACTIVITY_THEME.settlements.card}`}>
             <div className={`absolute inset-x-0 top-0 h-20 bg-gradient-to-b ${ACTIVITY_THEME.settlements.glow} pointer-events-none`} />
-            <div className="relative mb-5 flex items-start justify-between gap-3">
+            <div 
+              className="relative mb-5 flex items-start justify-between gap-3 cursor-pointer"
+              onClick={() => setExpandedSettlementId(expandedSettlementId === settlement.id ? null : settlement.id)}
+            >
               <div className="flex min-w-0 items-start gap-4">
                 <div className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${ACTIVITY_THEME.settlements.iconSurface}`}>
                   <span className="material-symbols-outlined">receipt_long</span>
@@ -335,9 +352,14 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
                   <p className="mt-1 text-xs font-bold text-slate-500 uppercase tracking-widest">{formatDate(settlement.paidAt || settlement.createdAt)}</p>
                 </div>
               </div>
-              <span className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${getStatusClassName('PAID')}`}>
-                Settled
-              </span>
+              <div className="flex flex-col items-end gap-2">
+                <span className={`shrink-0 rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${getStatusClassName('PAID')}`}>
+                  Settled
+                </span>
+                <span className="material-symbols-outlined text-slate-400 text-sm">
+                  {expandedSettlementId === settlement.id ? 'expand_less' : 'expand_more'}
+                </span>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.settlements.metricSurface}`}>
@@ -349,6 +371,45 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
                 <p className={`mt-1 font-black text-sm ${ACTIVITY_THEME.settlements.accentText}`}>{formatCurrency(settlement.driverAmount)}</p>
               </div>
             </div>
+
+            {expandedSettlementId === settlement.id && (
+              <div className="mt-5 pt-5 border-t border-slate-200 dark:border-slate-800 animate-fade-in">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Trip ID</span>
+                    <span className="text-xs font-mono font-black text-slate-900 dark:text-white">#{settlement.tripId.slice(0, 8)}</span>
+                  </div>
+                  <div className="flex justify-between items-start gap-4">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Route</span>
+                    <span className="text-xs font-black text-slate-900 dark:text-white text-right">{settlement.trip.pickupAddress} → {settlement.trip.destAddress}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Trip Date</span>
+                    <span className="text-xs font-black text-slate-900 dark:text-white">{formatDate(settlement.paidAt || settlement.createdAt)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Fare</span>
+                    <span className="text-xs font-black text-slate-900 dark:text-white">{formatCurrency(settlement.totalAmount)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Driver Earnings</span>
+                    <span className="text-xs font-black text-emerald-500">{formatCurrency(settlement.driverAmount)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Platform Cut</span>
+                    <span className="text-xs font-black text-slate-600 dark:text-slate-400">{formatCurrency(settlement.platformAmount)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Payment Method</span>
+                    <span className="text-xs font-black text-slate-900 dark:text-white">{settlement.paymentMethod || '—'}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tx Ref</span>
+                    <span className="text-xs font-mono font-bold text-slate-500 truncate ml-4">{settlement.monnifyTxRef || '—'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -480,6 +541,57 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
               </p>
            </div>
         </div>
+        {activeTab === 'settlements' && (
+          <div className="flex flex-col gap-4 p-5 rounded-[2rem] bg-white/40 dark:bg-white/5 border border-emerald-100 dark:border-emerald-500/10 animate-fade-in">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex gap-1.5 p-1 bg-slate-100 dark:bg-black/20 rounded-xl">
+                {(['ALL', 'PAID', 'FAILED'] as SettlementStatusFilter[]).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setSettlementStatusFilter(status)}
+                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
+                      settlementStatusFilter === status
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => {
+                  setSettlementStatusFilter('ALL');
+                  setSettlementDateRange({ from: null, to: null });
+                }}
+                className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest hover:underline"
+              >
+                Clear Filters
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">From</p>
+                <input
+                  type="date"
+                  value={settlementDateRange.from || ''}
+                  onChange={(e) => setSettlementDateRange({ ...settlementDateRange, from: e.target.value })}
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-black text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">To</p>
+                <input
+                  type="date"
+                  value={settlementDateRange.to || ''}
+                  onChange={(e) => setSettlementDateRange({ ...settlementDateRange, to: e.target.value })}
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-black text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-1.5 shadow-sm backdrop-blur-md dark:border-white/5 dark:bg-white/5">
           <button onClick={() => setActiveTab('trips')} className={`rounded-xl py-3 text-[11px] font-black uppercase tracking-[0.2em] transition-all ${activeTab === 'trips' ? ACTIVITY_THEME.trips.activeTab : ACTIVITY_THEME.trips.inactiveTab}`}>History</button>

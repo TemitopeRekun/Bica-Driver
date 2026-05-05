@@ -287,6 +287,9 @@ export const api = {
   delete: <T>(path: string, requiresAuth = true, options?: RequestOptions) =>
     request<T>('DELETE', path, undefined, requiresAuth, options),
 
+  getPaginatedResponse: <T>(path: string, requiresAuth = true, options?: RequestOptions) =>
+    request<PaginatedResponse<T>>('GET', path, undefined, requiresAuth, options),
+
   // Ratings
   getPendingRating: () =>
     request<PendingRatingTrip | null>('GET', '/rides/pending-rating', undefined, true),

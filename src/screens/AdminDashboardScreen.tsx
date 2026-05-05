@@ -42,6 +42,10 @@ interface AdminDashboardScreenProps {
   adminSummaryPeriod?: SummaryPeriod;
   setAdminSummaryPeriod?: (period: SummaryPeriod) => void;
   adminSummaryLoading?: boolean;
+  historyStatusFilter: 'ALL' | 'PAID' | 'FAILED';
+  setHistoryStatusFilter: (status: 'ALL' | 'PAID' | 'FAILED') => void;
+  historyDateRange: DateRangeFilter;
+  setHistoryDateRange: (range: DateRangeFilter) => void;
 }
 
 
@@ -52,7 +56,8 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   settings, isLoading, error, lastUpdated,
   onUpdateStatus, onBlockUser, onRetrySubAccount, onUpdateSettings, onForcedLogout,
   onRetry, onBack, onSimulate, onPageChange,
-  adminSummary, adminSummaryPeriod, setAdminSummaryPeriod, adminSummaryLoading
+  adminSummary, adminSummaryPeriod, setAdminSummaryPeriod, adminSummaryLoading,
+  historyStatusFilter, setHistoryStatusFilter, historyDateRange, setHistoryDateRange
 }) => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState<AdminSection>('overview');
@@ -305,6 +310,10 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                 adminSummaryPeriod={adminSummaryPeriod ?? 'monthly'}
                 setAdminSummaryPeriod={setAdminSummaryPeriod}
                 adminSummaryLoading={adminSummaryLoading ?? false}
+                historyStatusFilter={historyStatusFilter}
+                setHistoryStatusFilter={setHistoryStatusFilter}
+                historyDateRange={historyDateRange}
+                setHistoryDateRange={setHistoryDateRange}
               />
             )}
 

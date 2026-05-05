@@ -1,5 +1,5 @@
 import React from 'react';
-import { SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminPaymentsSummaryResponse, SummaryPeriod } from '@/types';
+import { SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminPaymentsSummaryResponse, SummaryPeriod, DateRangeFilter } from '@/types';
 import { PaginationMeta } from '@/services/api.service';
 
 interface FinanceSectionProps {
@@ -17,6 +17,10 @@ interface FinanceSectionProps {
   adminSummaryPeriod: SummaryPeriod;
   setAdminSummaryPeriod?: (period: SummaryPeriod) => void;
   adminSummaryLoading?: boolean;
+  historyStatusFilter: 'ALL' | 'PAID' | 'FAILED';
+  setHistoryStatusFilter: (status: 'ALL' | 'PAID' | 'FAILED') => void;
+  historyDateRange: DateRangeFilter;
+  setHistoryDateRange: (range: DateRangeFilter) => void;
 }
 
 const FinanceSection: React.FC<FinanceSectionProps> = ({
@@ -33,8 +37,13 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
   adminSummary,
   adminSummaryPeriod,
   setAdminSummaryPeriod,
-  adminSummaryLoading
+  adminSummaryLoading,
+  historyStatusFilter,
+  setHistoryStatusFilter,
+  historyDateRange,
+  setHistoryDateRange
 }) => {
+  const [expandedHistoryId, setExpandedHistoryId] = React.useState<string | null>(null);
   const displayPlatformRevenue = adminSummary?.totals.platformRevenue ?? platformFees;
   const displayGrossThroughput = adminSummary?.totals.grossThroughput ?? totalRevenue;
   const displayDriverPayouts = adminSummary?.totals.driverPayouts;
@@ -231,8 +240,58 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
 
        {/* Archive History */}
        <section className="space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <h3 className="font-black text-[11px] uppercase tracking-[0.2em] text-slate-500">Confirmed Settlement Ledger</h3>
+           <div className="flex flex-col gap-4 px-2">
+             <div className="flex items-center justify-between">
+               <h3 className="font-black text-[11px] uppercase tracking-[0.2em] text-slate-500">Confirmed Settlement Ledger</h3>
+               <button
+                 onClick={() => {
+                   setHistoryStatusFilter('ALL');
+                   setHistoryDateRange({ from: null, to: null });
+                 }}
+                 className="text-[9px] font-black text-primary uppercase tracking-widest hover:underline"
+               >
+                 Clear Filters
+               </button>
+             </div>
+
+             <div className="flex flex-col md:flex-row items-start md:items-end gap-4 bg-slate-50 dark:bg-white/5 p-4 rounded-3xl border border-slate-100 dark:border-slate-800">
+               <div className="flex gap-1.5 p-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
+                 {(['ALL', 'PAID', 'FAILED'] as const).map((status) => (
+                   <button
+                     key={status}
+                     onClick={() => setHistoryStatusFilter(status)}
+                     className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
+                       historyStatusFilter === status
+                         ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm'
+                         : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'
+                     }`}
+                   >
+                     {status}
+                   </button>
+                 ))}
+               </div>
+               <div className="flex gap-3 flex-1">
+                 <div className="space-y-1 flex-1">
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">From</p>
+                   <input
+                     type="date"
+                     value={historyDateRange.from || ''}
+                     onChange={(e) => setHistoryDateRange({ ...historyDateRange, from: e.target.value })}
+                     className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-black text-slate-900 dark:text-white outline-none"
+                   />
+                 </div>
+                 <div className="space-y-1 flex-1">
+                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">To</p>
+                   <input
+                     type="date"
+                     value={historyDateRange.to || ''}
+                     onChange={(e) => setHistoryDateRange({ ...historyDateRange, to: e.target.value })}
+                     className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-black text-slate-900 dark:text-white outline-none"
+                   />
+                 </div>
+               </div>
+             </div>
+           </div>
             
             {/* Pagination Controls */}
             {paymentHistoryMeta && paymentHistoryMeta.totalPages > 1 && (
@@ -261,26 +320,85 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
           <div className="bg-white dark:bg-surface-dark rounded-[2.5rem] border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xl shadow-black/5">
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
               {paymentHistory.map((record) => (
-                <div key={record.id} className="p-6 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="size-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500">
-                      <span className="material-symbols-outlined text-lg">payments</span>
+                 <div key={record.id} className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <div 
+                    className="p-6 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                    onClick={() => setExpandedHistoryId(expandedHistoryId === record.id ? null : record.id)}
+                  >
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="size-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500">
+                        <span className="material-symbols-outlined text-lg">payments</span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-slate-900 dark:text-white truncate uppercase tracking-tight italic">
+                          {record.trip.pickupAddress.split(',')[0]} → {record.trip.destAddress.split(',')[0]}
+                        </p>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase truncate italic opacity-70">
+                          Ref: {record.monnifyTxRef.slice(-12)} · {formatShortDate(record.paidAt)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-black text-slate-900 dark:text-white truncate uppercase tracking-tight italic">
-                        {record.trip.pickupAddress.split(',')[0]} → {record.trip.destAddress.split(',')[0]}
-                      </p>
-                      <p className="text-[10px] text-slate-500 font-bold uppercase truncate italic opacity-70">
-                        Ref: {record.monnifyTxRef.slice(-12)} · {formatShortDate(record.paidAt)}
-                      </p>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right shrink-0">
+                        <p className="text-lg font-black text-slate-900 dark:text-white tracking-tighter">{formatCurrency(record.totalAmount)}</p>
+                        <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mt-1 italic">Verified Clean</p>
+                      </div>
+                      <span className="material-symbols-outlined text-slate-400 text-sm">
+                        {expandedHistoryId === record.id ? 'expand_less' : 'expand_more'}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-lg font-black text-slate-900 dark:text-white tracking-tighter">{formatCurrency(record.totalAmount)}</p>
-                    <p className="text-[9px] font-black text-emerald-500 uppercase tracking-widest mt-1 italic">Verified Clean</p>
-                  </div>
-                </div>
-              ))}
+
+                  {expandedHistoryId === record.id && (
+                    <div className="p-6 bg-slate-50/50 dark:bg-black/20 animate-fade-in border-t border-slate-100 dark:border-slate-800">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-12">
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Trip ID</span>
+                            <span className="text-xs font-mono font-black text-slate-900 dark:text-white">#{record.tripId.slice(0, 8)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Owner</span>
+                            <span className="text-xs font-black text-slate-900 dark:text-white">{record.trip.owner.name}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Driver</span>
+                            <span className="text-xs font-black text-slate-900 dark:text-white">{record.trip.driver?.name ?? '—'}</span>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gross Fare</span>
+                            <span className="text-xs font-black text-slate-900 dark:text-white">{formatCurrency(record.totalAmount)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Platform Net</span>
+                            <span className="text-xs font-black text-primary">{formatCurrency(record.platformAmount)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Driver Payout</span>
+                            <span className="text-xs font-black text-emerald-500">{formatCurrency(record.driverAmount)}</span>
+                          </div>
+                        </div>
+                        <div className="md:col-span-2 pt-4 mt-4 border-t border-slate-200 dark:border-slate-800 space-y-4">
+                          <div className="flex justify-between items-start gap-4">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Route</span>
+                            <span className="text-xs font-black text-slate-900 dark:text-white text-right">{record.trip.pickupAddress} → {record.trip.destAddress}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tx Ref</span>
+                            <span className="text-xs font-mono font-bold text-slate-500">{record.monnifyTxRef || '—'}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Paid At</span>
+                            <span className="text-xs font-black text-slate-900 dark:text-white">{new Date(record.paidAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                 </div>
+               ))}        ))}
               {paymentHistory.length === 0 && (
                 <div className="p-16 text-center text-slate-400 italic text-sm font-bold uppercase tracking-widest opacity-30">Archive empty</div>
               )}
