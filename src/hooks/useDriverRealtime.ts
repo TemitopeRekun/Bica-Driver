@@ -329,9 +329,9 @@ export const useDriverRealtime = ({
           throw new Error('Live location was unavailable.');
         }
 
-        if (!socketRef.current?.connected) {
+        if (socketRef.current && !socketRef.current.connected) {
           socketRef.current.connect();
-        } else {
+        } else if (socketRef.current) {
           registerDriverSocket();
         }
 
@@ -377,7 +377,7 @@ export const useDriverRealtime = ({
           updateOnlineState(false);
         } else {
           // Transient issues (timeouts/network hiccups) should not force drivers offline.
-          if (!socketRef.current?.connected) {
+          if (socketRef.current && !socketRef.current.connected) {
             socketRef.current.connect();
           }
           // Keep driver online — next heartbeat interval will resend coords
