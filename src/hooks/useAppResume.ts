@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useRideManager } from '@/hooks/useRideManager';
 import { useRatingGateStore } from '@/stores/ratingGateStore';
 import { telemetry } from '@/services/TelemetryService';
+import { UserRole } from '@/types';
 
 export const useAppResume = () => {
   const isResumingRef = useRef(false);
@@ -32,8 +33,10 @@ export const useAppResume = () => {
           // 1. Resync active ride context safely
           await syncCurrentRide();
 
-          // 2. Check for pending ratings
-          await useRatingGateStore.getState().checkPendingRating();
+          // 2. Check for pending ratings (Owners only)
+          if (currentUser?.role === UserRole.OWNER) {
+            await useRatingGateStore.getState().checkPendingRating();
+          }
         }
 
         // 3. Dispatch a custom window event so other hooks (realtime, payment) can react atomically

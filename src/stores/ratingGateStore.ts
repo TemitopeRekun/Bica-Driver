@@ -23,8 +23,12 @@ export const useRatingGateStore = create<RatingGateState>((set) => ({
       const pending = await api.getPendingRating();
       set({ pendingRating: pending, isChecking: false });
       return pending;
-    } catch (e) {
-      console.error('Failed to check pending ratings', e);
+    } catch (e: any) {
+      if (e?.status === 403) {
+        set({ isChecking: false });
+        return null;
+      }
+      console.warn('Failed to check pending ratings', e);
       set({ isChecking: false });
       return null;
     }
