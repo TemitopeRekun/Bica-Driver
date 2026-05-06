@@ -24,7 +24,7 @@ import { useConnectivityStore } from './stores/connectivityStore';
 import ConnectivityBanner from '@/components/Common/ConnectivityBanner';
 
 const App: React.FC = () => {
-  const { currentUser, setCurrentUser, logout, isAuthenticated, setInitializing, isInitializing } = useAuthStore();
+  const { currentUser, setCurrentUser, logout, isAuthenticated, setInitializing } = useAuthStore();
   const { loadSettings } = useSettingsStore();
   const { addToast } = useUIStore();
   const { initStatusBar } = CapacitorService;
@@ -149,24 +149,24 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const { isOnline, isSocketConnected, socketEverConnected, locationStatus } = useConnectivityStore();
+  const { isOnline, isReconnecting, socketEverConnected, locationStatus } = useConnectivityStore();
   const [showBannerPadding, setShowBannerPadding] = React.useState(false);
 
   useEffect(() => {
     const showOffline = !isOnline;
     const showLocationIssue = isOnline && locationStatus !== 'available' && locationStatus !== 'unavailable';
-    const isSocketStale = isOnline && socketEverConnected && !isSocketConnected;
+    const isSocketStale = isOnline && socketEverConnected && isReconnecting;
 
-    if (showOffline || showLocationIssue) {
-      setShowBannerPadding(true);
-    } else if (isSocketStale) {
-      // Align with ConnectivityBanner 2s delay to prevent layout jump on quick reconnects
-      const timer = setTimeout(() => setShowBannerPadding(true), 2000);
+    // Padding debounce matches ConnectivityBanner's BANNER_DEBOUNCE_MS to prevent layout jumps before banner appears
+    if (showOffline || isSocketStale) {
+      const timer = setTimeout(() => setShowBannerPadding(true), 2500);
       return () => clearTimeout(timer);
+    } else if (showLocationIssue) {
+      setShowBannerPadding(true);
     } else {
       setShowBannerPadding(false);
     }
-  }, [isOnline, isSocketConnected, socketEverConnected, locationStatus]);
+  }, [isOnline, isReconnecting, socketEverConnected, locationStatus]);
 
   return (
     <ErrorBoundary>

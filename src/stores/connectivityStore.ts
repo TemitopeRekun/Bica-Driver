@@ -17,7 +17,7 @@ interface ConnectivityState {
 }
 
 export const useConnectivityStore = create<ConnectivityState>((set) => ({
-  isOnline: navigator.onLine,
+  isOnline: true, // Assume online — navigator.onLine is unreliable on Android WebViews at boot
   isSocketConnected: false,
   isReconnecting: false,
   socketEverConnected: false,    // Starts false — no socket until login

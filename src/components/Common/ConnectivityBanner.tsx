@@ -1,36 +1,61 @@
 import React, { useEffect, useState } from 'react';
 import { useConnectivityStore } from '@/stores/connectivityStore';
 
+const BANNER_DEBOUNCE_MS = 2500;
+
 const ConnectivityBanner: React.FC = () => {
   const { isOnline, isSocketConnected, isReconnecting, socketEverConnected, locationStatus } = useConnectivityStore();
 
-  // Delay showing the reconnecting banner by 2s to avoid flashing during fast reconnects
+  // Debounce both offline and reconnecting banners — avoids false positives from brief signal drops
+  const [showDelayedOffline, setShowDelayedOffline] = useState(false);
   const [showDelayedReconnect, setShowDelayedReconnect] = useState(false);
+  // Brief "back online" confirmation so users know connectivity was restored
+  const [showBackOnline, setShowBackOnline] = useState(false);
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
-    const shouldReconnect = isOnline && socketEverConnected && (!isSocketConnected || isReconnecting);
+    if (!isOnline) {
+      timer = setTimeout(() => setShowDelayedOffline(true), BANNER_DEBOUNCE_MS);
+    } else {
+      if (showDelayedOffline) {
+        // Was showing offline — briefly show "back online" confirmation
+        setShowDelayedOffline(false);
+        setShowBackOnline(true);
+        timer = setTimeout(() => setShowBackOnline(false), 2000);
+      } else {
+        setShowDelayedOffline(false);
+      }
+    }
+    return () => clearTimeout(timer);
+  }, [isOnline]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    // Only show when actively reconnecting after a drop — intentional disconnects (navigation) set isReconnecting=false
+    const shouldReconnect = isOnline && socketEverConnected && isReconnecting;
     if (shouldReconnect) {
-      // Only show after 2 seconds — avoids flash on page load or quick reconnects
-      timer = setTimeout(() => setShowDelayedReconnect(true), 2000);
+      timer = setTimeout(() => setShowDelayedReconnect(true), BANNER_DEBOUNCE_MS);
     } else {
       setShowDelayedReconnect(false);
     }
     return () => clearTimeout(timer);
   }, [isOnline, isSocketConnected, isReconnecting, socketEverConnected]);
 
-  const showOffline = !isOnline;
-  // Only warn about socket if we were previously connected (i.e. user is logged in)
+  const showOffline = showDelayedOffline;
   const showReconnecting = showDelayedReconnect;
   const showLocationIssue = isOnline && locationStatus !== 'available' && locationStatus !== 'unavailable';
 
-  if (!showOffline && !showReconnecting && !showLocationIssue) return null;
+  if (!showOffline && !showReconnecting && !showLocationIssue && !showBackOnline) return null;
 
   let message = '';
   let bgColor = '';
   let icon = '';
 
-  if (showOffline) {
+  if (showBackOnline) {
+    message = 'Back online.';
+    bgColor = 'bg-emerald-600';
+    icon = 'wifi';
+  } else if (showOffline) {
     message = 'No internet connection.';
     bgColor = 'bg-red-600';
     icon = 'cloud_off';

@@ -23,6 +23,10 @@ allprojects {
         google()
         mavenCentral()
     }
+    // Silence deprecation and unchecked warnings from libraries
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs << "-Xlint:-deprecation" << "-Xlint:-unchecked"
+    }
 }
 
 task clean(type: Delete) {

@@ -259,18 +259,23 @@ async function request<T>(
     const canRetryMutation = (method !== 'GET') && !!currentIdempotencyKey;
     const shouldRetry = (method === 'GET' || canRetryMutation);
 
-    if (shouldRetry && error.message.includes('Failed to fetch') && retryCount < 3) {
-      // Mark offline if we definitely can't fetch
-      useConnectivityStore.getState().setOnline(false);
-      
+    // Intentional aborts (AbortController) are not network failures — never mark offline
+    const isAbort = error.name === 'AbortError' || error.message === 'The user aborted a request.';
+    const isNetworkFailure = !isAbort && error.message.includes('Failed to fetch');
+
+    if (shouldRetry && isNetworkFailure && retryCount < 3) {
+      // Only mark offline after retries start failing — avoids false positive on first transient drop
+      if (retryCount > 0) {
+        useConnectivityStore.getState().setOnline(false);
+      }
       const backoffMs = Math.pow(2, retryCount) * 1000;
       console.warn(`[API] Connection lost during ${method} ${path}. Retrying with same key after ${backoffMs}ms...`);
       await sleep(backoffMs);
       return request<T>(method, path, body, requiresAuth, options, retryCount + 1, currentIdempotencyKey);
     }
-    
-    // If it's a persistent "Failed to fetch", ensure we are marked offline
-    if (error.message.includes('Failed to fetch')) {
+
+    // Persistent network failure after retries exhausted — confirm offline
+    if (isNetworkFailure) {
       useConnectivityStore.getState().setOnline(false);
     }
 
