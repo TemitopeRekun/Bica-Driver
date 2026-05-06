@@ -24,7 +24,12 @@ const EmergencyHelpSheet: React.FC<EmergencyHelpSheetProps> = ({ context, onClos
     : 'Location unavailable';
 
   const whatsappMsg = encodeURIComponent(
-    `EMERGENCY HELP REQUEST\nDriver: ${context.driverName} (${context.driverPhone})\nTrip ID: ${context.tripId ?? 'N/A'}\nLocation: ${locationUrl}\nStatus: ${context.tripStatus ?? 'N/A'}`
+    `🚨 EMERGENCY HELP REQUEST 🚨\n\n` +
+    `👤 OWNER: ${context.ownerName} (${context.ownerPhone})\n` +
+    `🚕 DRIVER: ${context.driverName} (${context.driverPhone})\n` +
+    `🆔 TRIP ID: ${context.tripId ?? 'N/A'}\n` +
+    `📍 LOCATION: ${locationUrl}\n` +
+    `🚦 STATUS: ${context.tripStatus ?? 'N/A'}`
   );
 
   return (
@@ -135,16 +140,6 @@ const EmergencyHelpSheet: React.FC<EmergencyHelpSheetProps> = ({ context, onClos
               <span className="material-symbols-outlined">chat</span>
               <span className="font-black uppercase tracking-widest italic">WhatsApp (Location Unavailable)</span>
             </button>
-          )}
-
-          {context.ownerPhone && (
-            <a 
-              href={`tel:${context.ownerPhone}`}
-              className="w-full py-5 rounded-2xl bg-slate-700 text-white flex items-center justify-center gap-3 shadow-lg shadow-slate-900/40 active:scale-95 transition-all"
-            >
-              <span className="material-symbols-outlined">person</span>
-              <span className="font-black uppercase tracking-widest italic">Call Owner — {context.ownerName || 'Owner'}</span>
-            </a>
           )}
         </div>
       </div>

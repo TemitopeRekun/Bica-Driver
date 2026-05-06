@@ -117,7 +117,12 @@ async function request<T>(
   }
 
   try {
-    const response = await fetch(`${baseUrl}${path}`, {
+    // Ensure there is exactly one slash between baseUrl and path
+    const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
+    const normalizedPath = path.replace(/^\/+/, '');
+    const fullUrl = `${normalizedBaseUrl}/${normalizedPath}`;
+
+    const response = await fetch(fullUrl, {
       method,
       headers,
       body: body ? JSON.stringify(body) : undefined,

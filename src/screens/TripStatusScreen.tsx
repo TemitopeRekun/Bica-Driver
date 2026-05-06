@@ -13,6 +13,7 @@ import { IMAGES } from '@/constants';
 import { getLocationShortText } from '@/services/LocationService';
 import { api } from '@/services/api.service';
 import { notificationService } from '@/services/NotificationService';
+import EmergencyHelpSheet from '@/components/EmergencyHelpSheet';
 
 const ScheduledHoldingCard: React.FC<{
   scheduledAt?: string;
@@ -76,6 +77,7 @@ const TripStatusScreen: React.FC = () => {
   } = useRideStore();
   
   const [isPolling, setIsPolling] = React.useState(false);
+  const [showEmergencyHelp, setShowEmergencyHelp] = React.useState(false);
   const isPollingRef = React.useRef(false);
   
   const { cancelRide, syncCurrentRide, initiatePayment } = useRideManager();
@@ -140,6 +142,19 @@ const TripStatusScreen: React.FC = () => {
        }
     }
   });
+
+  const emergencyContext = React.useMemo(() => ({
+    tripId: currentTripId ?? undefined,
+    tripStatus: rideState as any,
+    pickupAddress: pickup ? getLocationShortText(pickup) : undefined,
+    destAddress: destination ? getLocationShortText(destination) : undefined,
+    ownerName: currentUser?.name || 'Car Owner',
+    ownerPhone: currentUser?.phone || '',
+    driverName: driverInfo?.name || 'Driver',
+    driverPhone: driverInfo?.phone || '',
+    locationLat: trackedDriverPos?.[0] || pickup?.lat,
+    locationLng: trackedDriverPos?.[1] || pickup?.lon,
+  }), [currentTripId, rideState, pickup, destination, currentUser, driverInfo, trackedDriverPos]);
 
   const handleCancel = async () => {
     if (currentTripId) {
@@ -298,49 +313,35 @@ const TripStatusScreen: React.FC = () => {
             rideMilestone={rideMilestone}
             lastMilestoneUpdate={new Date().toISOString()}
             onCall={() => window.open(`tel:${driverInfo?.phone}`, '_self')}
-            onChat={() => {}}
-            onTrack={() => {}}
-            onSOS={() => {}}
+            onChat={() => {
+              addToast('P2P Chat coming soon!', 'info');
+            }}
+            onSupport={() => {
+              useUIStore.getState().setSupportContext({
+                tripId: currentTripId ?? undefined,
+                tripStatus: rideState as any,
+                paymentStatus: completedTripData?.paymentStatus as any,
+                openedAt: new Date().toISOString()
+              });
+              useUIStore.getState().setSupportOpen(true);
+            }}
+            onTrack={() => {
+              addToast('Tracking driver location...', 'info');
+            }}
+            onSOS={() => setShowEmergencyHelp(true)}
             onCancel={handleCancel}
             trackedDriverPos={trackedDriverPos}
             pickup={pickup}
           />
         )}
-        
-        {/* Support Quick Link */}
-        <div className="mt-6 p-5 bg-slate-100 dark:bg-white/5 rounded-3xl border border-slate-200 dark:border-white/5 flex items-center justify-between">
-           <div className="flex items-center gap-4">
-              <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center">
-                 <span className="material-symbols-outlined text-primary text-xl">headset_mic</span>
-              </div>
-              <div>
-                 <p className="text-sm font-bold text-slate-900 dark:text-white">Need help?</p>
-                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Support available 24/7</p>
-              </div>
-           </div>
-           <button 
-             onClick={() => {
-               const failureContext = (driverInfo?.otpAttempts && driverInfo.otpAttempts > 0) 
-                 ? `OTP verification failed ${driverInfo.otpAttempts} times.` 
-                 : (completedTripData?.paymentStatus === 'FAILED') 
-                 ? 'Payment verification failed.'
-                 : undefined;
-
-               useUIStore.getState().setSupportContext({
-                 tripId: currentTripId ?? undefined,
-                 tripStatus: rideState as any,
-                 paymentStatus: completedTripData?.paymentStatus as any,
-                 recentFailureContext: failureContext,
-                 openedAt: new Date().toISOString()
-               });
-               useUIStore.getState().setSupportOpen(true);
-             }}
-             className="text-primary text-xs font-black uppercase tracking-widest px-4 py-2 bg-primary/10 rounded-xl hover:bg-primary hover:text-white transition-all"
-           >
-             Chat
-           </button>
-        </div>
       </div>
+
+      {showEmergencyHelp && (
+        <EmergencyHelpSheet
+          context={emergencyContext}
+          onClose={() => setShowEmergencyHelp(false)}
+        />
+      )}
     </div>
   );
 };

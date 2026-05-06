@@ -51,6 +51,7 @@ const DriverMainScreen: React.FC = () => {
   } = useCarVerification(activeRide?.id || '');
 
   const [showOtpModal, setShowOtpModal] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(false);
   const [otpValue, setOtpValue] = useState('');
   const [otpAttempts, setOtpAttempts] = useState(0);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
@@ -111,6 +112,17 @@ const DriverMainScreen: React.FC = () => {
     onRideCancelled,
     onPaymentUpdated,
   });
+
+  // ── Effects for Loading State ──
+  useEffect(() => {
+    if (isOnline && isSocketConnected && liveRideRequests.length === 0) {
+      setIsInitialLoading(true);
+      const timer = setTimeout(() => setIsInitialLoading(false), 5000);
+      return () => clearTimeout(timer);
+    } else {
+      setIsInitialLoading(false);
+    }
+  }, [isOnline, isSocketConnected, liveRideRequests.length]);
 
   // ── Derived memoized values ──────────────────────────────────────────────
   const emergencyContext = useMemo<EmergencyHelpContext>(() => ({
@@ -366,7 +378,7 @@ const DriverMainScreen: React.FC = () => {
                    />
                 ) : liveRideRequests.length > 0 ? (
                    liveRideRequests.map((req) => <RideRequestCard key={req.id} request={req} onAccept={handleAcceptRide} onDecline={(r) => declineRide(r.id)} />)
-                ) : (isOnline && isSocketConnected) ? (
+                ) : (isOnline && isSocketConnected && isInitialLoading) ? (
                    <div className="space-y-4 animate-pulse">
                       <CardSkeleton />
                       <CardSkeleton />
@@ -388,10 +400,11 @@ const DriverMainScreen: React.FC = () => {
                           <img src={activeRide.avatar} className="size-12 rounded-full border-2 border-primary" alt="" />
                           <h4 className="font-bold text-white text-lg">{activeRide.ownerName}</h4>
                         </div>
-                        {(['ASSIGNED', 'INPROGRESS'].includes(activeRide?.status as any) || rideMilestone === 'arrived') && (
+                        {/* Show Help during any active stage: Assigned, Arrived, or In Progress */}
+                        {(['ASSIGNED', 'INPROGRESS', 'IN_PROGRESS', 'ARRIVED'].includes(activeRide?.status as any) || ['assigned', 'arrived', 'in_progress'].includes(rideMilestone)) && (
                           <button
                             onClick={() => setShowEmergencyHelp(true)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[9px] font-black uppercase tracking-widest active:scale-95 transition-all"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all"
                           >
                             <span className="material-symbols-outlined text-sm">emergency</span>
                             Get Help
@@ -401,12 +414,18 @@ const DriverMainScreen: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={handleReportActiveTripIssue}
-                          className="size-12 rounded-2xl bg-white/10 text-slate-400 flex items-center justify-center border border-white/10"
+                          className="size-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-500 flex items-center justify-center border border-amber-500/10"
                           aria-label="Report Issue"
                         >
-                          <span className="material-symbols-outlined">flag</span>
+                          <span className="material-symbols-outlined">support_agent</span>
                         </button>
-                        <button className="size-12 rounded-2xl bg-primary/20 text-primary flex items-center justify-center" aria-label="Call Owner"><span className="material-symbols-outlined">call</span></button>
+                        <button 
+                          onClick={() => activeRide?.ownerPhone && window.open(`tel:${activeRide.ownerPhone}`, '_self')}
+                          className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center border border-primary/10" 
+                          aria-label="Call Owner"
+                        >
+                          <span className="material-symbols-outlined">call</span>
+                        </button>
                       </div>
                    </div>
                    {rideMilestone === 'assigned' && <button onClick={() => handleUpdateStatus('ARRIVED')} className="w-full bg-primary py-5 rounded-2xl text-white font-black text-lg">I Have Arrived</button>}

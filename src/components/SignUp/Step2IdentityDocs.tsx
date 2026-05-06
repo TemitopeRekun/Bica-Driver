@@ -134,23 +134,22 @@ const Step2IdentityDocs: React.FC<StepProps> = ({ formData, errors, updateField,
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
       <div className="mb-2">
-        <h2 className="text-2xl font-bold mb-1">Vehicle Specs</h2>
-        <p className="text-sm text-slate-500 font-medium">Tell us about the car being used.</p>
+        <h2 className="text-2xl font-bold mb-1">Vehicle Details</h2>
+        <p className="text-sm text-slate-500 font-medium">Identify the car that will be used for trips.</p>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Car Category</label>
-        <div className="grid grid-cols-2 gap-3">
-          {['Standard', 'Executive', 'SUV'].map(type => (
-            <button
-              key={type}
-              onClick={() => updateField('carType', type)}
-              className={`py-4 rounded-2xl text-sm font-bold border transition-all ${formData.carType === type ? 'bg-primary border-primary text-white' : 'bg-white dark:bg-surface-dark border-slate-100 dark:border-white/5 text-slate-600 dark:text-slate-400'}`}
-            >
-              {type}
-            </button>
-          ))}
+        <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Vehicle Make / Brand</label>
+        <div className={`flex items-center bg-white dark:bg-surface-dark border rounded-2xl px-4 h-14 transition-all ${errors.carType ? 'border-red-500 bg-red-500/5' : 'border-slate-100 dark:border-white/5'}`}>
+          <span className="material-symbols-outlined text-slate-400 mr-3 text-xl">directions_car</span>
+          <input 
+            className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0"
+            placeholder="e.g. Toyota, Honda, Mercedes"
+            value={formData.carType || ''}
+            onChange={e => updateField('carType', e.target.value)}
+          />
         </div>
+        {errors.carType && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.carType}</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -183,17 +182,22 @@ const Step2IdentityDocs: React.FC<StepProps> = ({ formData, errors, updateField,
 
       <div className="flex flex-col gap-1.5">
         <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Transmission</label>
-        <div className={`flex items-center bg-white dark:bg-surface-dark border rounded-2xl px-4 h-14 transition-all ${errors.transmission ? 'border-red-500 bg-red-500/5' : 'border-slate-100 dark:border-white/5'}`}>
-          <select 
-            className="bg-transparent border-none text-slate-900 dark:text-white text-base font-bold w-full focus:ring-0 p-0"
-            value={formData.transmission || ''}
-            onChange={e => updateField('transmission', e.target.value)}
-          >
-            <option value="Automatic" className="text-slate-900 dark:text-white bg-white dark:bg-surface-dark">Automatic (Most Common)</option>
-            <option value="Manual" className="text-slate-900 dark:text-white bg-white dark:bg-surface-dark">Manual Transmission</option>
-          </select>
+        <div className="grid grid-cols-2 gap-3">
+          {['Automatic', 'Manual'].map(type => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => updateField('transmission', type)}
+              className={`py-4 rounded-2xl text-sm font-bold border transition-all ${
+                formData.transmission === type
+                  ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20'
+                  : 'bg-white dark:bg-surface-dark border-slate-100 dark:border-white/5 text-slate-600 dark:text-slate-400'
+              }`}
+            >
+              {type}
+            </button>
+          ))}
         </div>
-        {errors.transmission && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.transmission}</p>}
       </div>
 
       <button 

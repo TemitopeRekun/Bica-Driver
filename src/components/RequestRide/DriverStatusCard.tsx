@@ -22,6 +22,7 @@ interface DriverStatusCardProps {
   pickup?: { lat: number; lon: number } | null;
   onCall: () => void;
   onChat: () => void;
+  onSupport: () => void;
   onTrack: () => void;
   onSOS: () => void;
   onCancel?: () => void;
@@ -35,6 +36,7 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   driverInfo,
   onCall,
   onChat,
+  onSupport,
   onTrack,
   onSOS,
   onCancel,
@@ -42,6 +44,7 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   trackedDriverPos,
   pickup,
 }) => {
+  const [isPreviewOpen, setIsPreviewOpen] = React.useState(false);
   const isDark = document.documentElement.classList.contains('dark');
   
   // 🧭 Real-time ETA Logic
@@ -121,7 +124,7 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
           {driverInfo.acceptanceImageUrl && (
             <div 
               className="absolute -bottom-1 -right-1 size-16 rounded-2xl border-4 border-surface-light dark:border-surface-dark overflow-hidden shadow-2xl ring-2 ring-primary bg-slate-900 cursor-zoom-in group-hover/avatar:scale-110 transition-transform"
-              onClick={() => window.open(driverInfo.acceptanceImageUrl, '_blank')}
+              onClick={() => setIsPreviewOpen(true)}
             >
               <img src={driverInfo.acceptanceImageUrl} className="w-full h-full object-cover" title="Tap to expand verification selfie" alt="" />
               <div className="absolute top-0 right-0 bg-primary px-1 rounded-bl-lg">
@@ -142,11 +145,14 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          <button onClick={onCall} className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
-            <span className="material-symbols-outlined">call</span>
+          <button onClick={onCall} className="size-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm">
+            <span className="material-symbols-outlined text-xl">call</span>
           </button>
-          <button onClick={onChat} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 transition-colors">
-            <span className="material-symbols-outlined">chat</span>
+          <button onClick={onChat} className="size-11 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 transition-all">
+            <span className="material-symbols-outlined text-xl">chat</span>
+          </button>
+          <button onClick={onSupport} className="size-11 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-500 flex items-center justify-center hover:bg-amber-500 hover:text-white transition-all">
+            <span className="material-symbols-outlined text-xl">support_agent</span>
           </button>
         </div>
       </div>
@@ -154,14 +160,17 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
       <div className="flex gap-3">
         <button
           onClick={onTrack}
-          className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2"
+          className="flex-1 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 font-black text-[10px] uppercase tracking-widest text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined text-lg">map</span>
           Track
         </button>
-        <button onClick={onSOS} className="flex-1 py-3 rounded-xl bg-red-500/10 font-bold text-red-500 flex items-center justify-center gap-2">
-          <span className="material-symbols-outlined text-lg">shield</span>
-          SOS
+        <button 
+          onClick={onSOS} 
+          className="flex-1 py-4 rounded-2xl bg-red-500/10 font-black text-[10px] uppercase tracking-widest text-red-500 flex items-center justify-center gap-2 border border-red-500/20 active:scale-95 transition-all"
+        >
+          <span className="material-symbols-outlined text-lg">emergency</span>
+          Get Help
         </button>
       </div>
 
@@ -183,6 +192,44 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
           <span className="material-symbols-outlined">flag</span>
           I have arrived
         </button>
+      )}
+      {/* 🖼️ High-Fidelity Photo Preview Overlay */}
+      {isPreviewOpen && driverInfo.acceptanceImageUrl && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-fade-in">
+           <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl" onClick={() => setIsPreviewOpen(false)} />
+           
+           <div className="relative w-full max-w-sm aspect-[3/4] bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 animate-scale-up">
+              <img 
+                src={driverInfo.acceptanceImageUrl} 
+                className="w-full h-full object-cover" 
+                alt="Driver Verification"
+              />
+              
+              <div className="absolute top-0 left-0 right-0 p-6 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between">
+                 <div className="flex items-center gap-3">
+                    <div className="size-10 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+                       <span className="material-symbols-outlined text-white">verified_user</span>
+                    </div>
+                    <div>
+                       <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-0.5">Verification Selfie</p>
+                       <p className="text-sm font-black text-white italic uppercase tracking-tight">{driverInfo.name}</p>
+                    </div>
+                 </div>
+                 <button 
+                   onClick={() => setIsPreviewOpen(false)}
+                   className="size-10 rounded-full bg-white/10 backdrop-blur-md text-white flex items-center justify-center border border-white/20 active:scale-90 transition-all"
+                 >
+                    <span className="material-symbols-outlined">close</span>
+                 </button>
+              </div>
+
+              <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/80 to-transparent">
+                 <p className="text-xs text-white/60 font-medium leading-relaxed">
+                   This photo was taken by the chauffeur at the moment of trip acceptance to verify identity and vehicle presence.
+                 </p>
+              </div>
+           </div>
+        </div>
       )}
     </div>
   );
