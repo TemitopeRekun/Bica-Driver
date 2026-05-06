@@ -106,6 +106,9 @@ const App: React.FC = () => {
                      if (!isSafePage) {
                         window.location.hash = '/owner/status';
                      }
+                  } else if (postTripAction === 'REQUIRE_RATING' && mapped.role === UserRole.OWNER) {
+                     // If they owe a rating, send them to the rating screen
+                     window.location.hash = `/rate-driver/${id}`;
                   }
                }
             } catch (e) {
@@ -147,13 +150,29 @@ const App: React.FC = () => {
   }, []);
 
   const { isOnline, isSocketConnected, socketEverConnected, locationStatus } = useConnectivityStore();
-  const hasBanner = !isOnline || (isOnline && socketEverConnected && !isSocketConnected) || (locationStatus !== 'available' && locationStatus !== 'unavailable');
+  const [showBannerPadding, setShowBannerPadding] = React.useState(false);
+
+  useEffect(() => {
+    const showOffline = !isOnline;
+    const showLocationIssue = isOnline && locationStatus !== 'available' && locationStatus !== 'unavailable';
+    const isSocketStale = isOnline && socketEverConnected && !isSocketConnected;
+
+    if (showOffline || showLocationIssue) {
+      setShowBannerPadding(true);
+    } else if (isSocketStale) {
+      // Align with ConnectivityBanner 2s delay to prevent layout jump on quick reconnects
+      const timer = setTimeout(() => setShowBannerPadding(true), 2000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowBannerPadding(false);
+    }
+  }, [isOnline, isSocketConnected, socketEverConnected, locationStatus]);
 
   return (
     <ErrorBoundary>
       <ToastContainer>
         <div className="flex justify-center items-start min-h-screen bg-slate-950">
-          <div className={`w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative flex flex-col transition-all duration-300 ${hasBanner ? 'pt-11' : ''}`}>
+          <div className={`w-full max-w-md min-h-screen bg-background-light dark:bg-background-dark shadow-2xl overflow-x-hidden relative flex flex-col transition-[padding] duration-500 ${showBannerPadding ? 'pt-11' : 'pt-0'}`}>
             
             {/* Connectivity banner sits at the very top of the app frame */}
             <ConnectivityBanner />

@@ -4,10 +4,11 @@ import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/services/api.service';
 import { useRatingGateStore } from '@/stores/ratingGateStore';
 import { useUIStore } from '@/stores/uiStore';
+import { useOwnerRealtime } from '@/hooks/useOwnerRealtime';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 2500;
-const MAX_POLLS = 12; // 30 seconds total
+const MAX_POLLS = 48; // 2 minutes total
 const STORAGE_KEY = 'bica_pending_payment_tripId';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -58,7 +59,7 @@ const ProgressDots: React.FC<{ count: number; max: number }> = ({ count, max }) 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const PaymentCompleteScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { isInitializing, isAuthenticated } = useAuthStore();
+  const { isInitializing, isAuthenticated, currentUser } = useAuthStore();
 
   const [screenState, setScreenState] = useState<ScreenState>('waiting_session');
   const [pollCount, setPollCount] = useState(0);
@@ -67,7 +68,60 @@ const PaymentCompleteScreen: React.FC = () => {
 
   const pollCountRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tripIdRef = useRef<string | null>(null);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasStartedRef = useRef(false);
+
+  const handleSuccess = (data: any) => {
+    clearInterval_();
+    localStorage.removeItem(STORAGE_KEY);
+    setResult(data);
+    setScreenState('paid');
+    
+    // Clear any existing timeout
+    if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+
+    successTimeoutRef.current = setTimeout(async () => {
+      try {
+        const pending = await useRatingGateStore.getState().checkPendingRating();
+        if (pending) {
+          navigate(`/rate-driver/${pending.tripId}`, { replace: true });
+        } else {
+          navigate('/owner', { replace: true });
+        }
+      } catch (err) {
+        console.error('Failed to check rating gate after success', err);
+        navigate('/owner', { replace: true });
+      }
+    }, 4500);
+  };
+
+  useEffect(() => {
+    return () => {
+      clearInterval_();
+      if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    };
+  }, []);
+
+  // 🛡️ Real-time Success Handshake
+  useOwnerRealtime({
+    ownerId: currentUser?.id,
+    rideState: 'COMPLETED',
+    trackedDriverIdRef: { current: null },
+    pickupRef: { current: null },
+    rideStateRef: { current: 'COMPLETED' },
+    showDriverPickerRef: { current: false },
+    refreshAvailableDriversRef: { current: async () => {} },
+    onDriverAccepted: () => {},
+    onDriverDeclined: () => {},
+    onTripCompleted: () => {},
+    onLocationUpdated: () => {},
+    onPaymentUpdated: (payload) => {
+      if (payload.paymentStatus === 'PAID' || payload.message?.toLowerCase().includes('success')) {
+        handleSuccess(payload);
+      }
+    }
+  });
 
   const clearInterval_ = () => {
     if (intervalRef.current) {
@@ -89,18 +143,7 @@ const PaymentCompleteScreen: React.FC = () => {
         const data: PollResult = await api.get(`/payments/status/${tripId}`);
 
         if (data.paymentStatus === 'PAID' || data.paymentStatus === 'OVERPAID') {
-          clearInterval_();
-          localStorage.removeItem(STORAGE_KEY);
-          setResult(data);
-          setScreenState('paid');
-          setTimeout(async () => {
-            const pending = await useRatingGateStore.getState().checkPendingRating();
-            if (pending) {
-              navigate(`/rate-driver/${pending.tripId}`, { replace: true });
-            } else {
-              navigate('/owner', { replace: true });
-            }
-          }, 3000);
+          handleSuccess(data);
           return;
         }
 
@@ -189,7 +232,7 @@ const PaymentCompleteScreen: React.FC = () => {
   }, [isInitializing, isAuthenticated]);
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background-light dark:bg-background-dark px-6 py-12 font-display">
+    <div className="min-h-screen w-full flex flex-col items-center justify-start bg-background-light dark:bg-background-dark px-6 pt-32 pb-12 font-display">
 
       {/* ── WAITING FOR SESSION ─────────────────────────────────────────── */}
       {(screenState === 'waiting_session') && (
@@ -359,42 +402,41 @@ const PaymentCompleteScreen: React.FC = () => {
         </div>
       )}
 
-      {/* ── TIMEOUT ─────────────────────────────────────────────────────── */}
+      {/* ── TIMEOUT (Extended Verification) ────────────────────────────── */}
       {screenState === 'timeout' && (
         <div className="flex flex-col items-center gap-6 animate-fade-in max-w-xs text-center">
-          <div className="w-20 h-20 rounded-full bg-blue-500/10 border-2 border-blue-500/20 flex items-center justify-center">
-            <span className="material-symbols-outlined text-blue-500 text-4xl">history</span>
+          <div className="w-20 h-20 rounded-full bg-amber-500/10 border-2 border-amber-500/20 flex items-center justify-center">
+            <span className="material-symbols-outlined text-amber-500 text-4xl animate-pulse">hourglass_top</span>
           </div>
-
+          
           <div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight italic uppercase">
-              Pending Sync
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight italic uppercase tracking-tighter">
+              Awaiting Bank Confirmation
             </h1>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-bold">
-              Verification is taking longer than usual. Your payment is being processed in the background.
+              We've been polling for 2 minutes and your bank hasn't confirmed yet. 
+              <span className="text-primary block mt-2">Please stay with your driver until we receive the success signal.</span>
             </p>
           </div>
 
-          <div className="w-full p-5 rounded-3xl bg-blue-500/5 border border-blue-500/20 space-y-3">
-            <div className="flex items-start gap-3">
-               <span className="material-symbols-outlined text-blue-500 text-sm mt-0.5">info</span>
-               <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300 text-left leading-relaxed">
-                 BICA will continue to check your payment status automatically. You don't need to pay again.
-               </p>
-            </div>
-            <div className="flex items-start gap-3">
-               <span className="material-symbols-outlined text-blue-500 text-sm mt-0.5">check_circle</span>
-               <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300 text-left leading-relaxed">
-                 Check your "Activity" tab in 5-10 minutes to see the confirmed status.
-               </p>
-            </div>
+          <div className="w-full p-5 rounded-3xl bg-blue-500/5 border border-blue-500/10 space-y-3">
+             <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-2">Driver Instructions</p>
+             <p className="text-[11px] font-medium text-slate-600 dark:text-slate-300 text-left leading-relaxed italic">
+               "Ask the driver to check their wallet in a few minutes. If you have been debited, do not pay again."
+             </p>
           </div>
 
           <button
-            onClick={() => navigate('/owner', { replace: true })}
-            className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black py-4 rounded-2xl transition-all active:scale-95 uppercase tracking-[0.2em] text-xs"
+            onClick={() => {
+              hasStartedRef.current = false;
+              pollCountRef.current = 0;
+              setPollCount(0);
+              const tripId = localStorage.getItem(STORAGE_KEY);
+              if (tripId) startPolling(tripId);
+            }}
+            className="w-full bg-primary text-white font-black py-4 rounded-2xl shadow-lg shadow-primary/20 transition-all active:scale-95 uppercase tracking-[0.2em] text-xs"
           >
-            Back to Dashboard
+            Retry Verification Now
           </button>
 
           <button
