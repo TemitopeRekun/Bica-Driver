@@ -27,6 +27,7 @@ interface PollResult {
   amountPaid?: number;
   amountRemaining?: number;
   amount?: number;
+  postTripAction?: string;
 }
 
 // ─── Animated Spinner ─────────────────────────────────────────────────────────
@@ -143,7 +144,11 @@ const PaymentCompleteScreen: React.FC = () => {
         const data: PollResult = await api.get(`/payments/status/${tripId}`);
 
         if (data.paymentStatus === 'PAID' || data.paymentStatus === 'OVERPAID') {
-          handleSuccess(data);
+          if (data.postTripAction === 'REQUIRE_RATING') {
+            handleSuccess(data);
+          } else {
+            handleSuccess(data); // fallback: still navigate away
+          }
           return;
         }
 
