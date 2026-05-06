@@ -1,9 +1,10 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
 
 android {
     namespace "com.bicadriver.app"
     compileSdk rootProject.ext.compileSdkVersion
-    buildToolsVersion '36.0.0'
+    buildToolsVersion "36.0.0"
 
     defaultConfig {
         applicationId "com.bicadriver.app"
@@ -46,11 +47,6 @@ android {
     }
 }
 
-repositories {
-    flatDir{
-        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
-    }
-}
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
