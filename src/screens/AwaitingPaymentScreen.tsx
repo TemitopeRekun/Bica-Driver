@@ -11,6 +11,13 @@ type ScreenState = 'verifying' | 'paid' | 'failed' | 'timeout';
 const AwaitingPaymentScreen: React.FC = () => {
   const { tripId } = useParams<{ tripId: string }>();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!tripId) {
+      navigate('/driver', { replace: true });
+    }
+  }, []);
+
   const { currentUser } = useAuthStore();
   
   const [screenState, setScreenState] = useState<ScreenState>('verifying');
@@ -50,7 +57,8 @@ const AwaitingPaymentScreen: React.FC = () => {
   });
 
   useEffect(() => {
-    if (!tripId || screenState !== 'verifying') return;
+    if (!tripId) return;
+    if (screenState !== 'verifying') return;
 
     const pollStatus = async () => {
       pollCountRef.current += 1;
