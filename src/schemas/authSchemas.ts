@@ -29,6 +29,10 @@ export const DriverSignUpSchema = z.object({
   backgroundCheckAccepted: z.literal(true, {
     message: 'You must read and agree to the Terms & Conditions to continue.',
   }),
+  confirmPassword: z.string().min(1, 'Confirm your password'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 });
 
 export const OwnerSignUpSchema = z.object({
@@ -45,6 +49,10 @@ export const OwnerSignUpSchema = z.object({
   backgroundCheckAccepted: z.literal(true, {
     message: 'You must read and agree to the Terms & Conditions to continue.',
   }),
+  confirmPassword: z.string().min(1, 'Confirm your password'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 });
 
 export type DriverSignUpData = z.infer<typeof DriverSignUpSchema>;

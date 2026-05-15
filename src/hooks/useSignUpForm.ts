@@ -20,6 +20,7 @@ export const useSignUpForm = (initialRole: UserRole) => {
     nationality: 'Nigerian',
     transmission: 'Automatic',
     backgroundCheckAccepted: false,
+    confirmPassword: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -33,8 +34,8 @@ export const useSignUpForm = (initialRole: UserRole) => {
     const stepFields: Record<number, string[]> = {
       1: ['name', 'email', 'phone', 'age', 'gender', 'nationality', 'address'],
       2: isDriver ? ['nin', 'transmission', 'licenseImage', 'selfieImage', 'ninImage'] : ['carType', 'carModel', 'carYear', 'transmission'],
-      3: isDriver ? ['bankCode', 'accountNumber', 'accountName'] : ['password', 'backgroundCheckAccepted'],
-      4: ['password', 'backgroundCheckAccepted'],
+      3: isDriver ? ['bankCode', 'accountNumber', 'accountName'] : ['password', 'confirmPassword', 'backgroundCheckAccepted'],
+      4: ['password', 'confirmPassword', 'backgroundCheckAccepted'],
     };
 
     const currentFields = stepFields[step];
@@ -86,10 +87,11 @@ export const useSignUpForm = (initialRole: UserRole) => {
     setIsLoading(true);
     try {
       // Transform data for API to match backend contract exactly
-      // 🛡️ We destructure to pull out UI-specific names and avoid "extra field" errors (400)
+      // 🛡️ Destructure to pull out UI-specific names and confirmPassword (never sent to API)
       const { 
         licenseImage, selfieImage, ninImage, 
         carType, carModel, carYear,
+        confirmPassword: _confirmPassword, // excluded — backend validates but we never send raw confirmation
         ...rest 
       } = formData;
 
@@ -117,17 +119,17 @@ export const useSignUpForm = (initialRole: UserRole) => {
         };
       }
 
-      const response = await api.post<AuthResponse>('/auth/register', finalPayload, false);
+      const response = await api.post<any>('/auth/register', finalPayload, false);
 
-      if (response.token) {
-        const mapped = mapUser(response.user);
-        await login(mapped, response.token);
-        addToast(`Welcome to BICA, ${mapped.name}!`, 'success');
-        navigate(mapped.role === UserRole.DRIVER ? '/driver' : '/owner');
-      } else {
-        addToast(response.message || 'Registration successful! Please log in.', 'info');
-        navigate('/login');
-      }
+      addToast(response.message || 'Registration successful! Please verify your email.', 'info');
+      
+      // Redirect to verification screen with email context
+      navigate('/verify-email', { 
+        state: { 
+          email: formData.email,
+          role: formData.role
+        } 
+      });
     } catch (error: any) {
        // Global error handler handles toasts
     } finally {

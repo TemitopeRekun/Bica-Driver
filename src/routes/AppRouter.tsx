@@ -22,6 +22,9 @@ import LoadingScreen from '../screens/LoadingScreen';
 import PaymentCompleteScreen from '../screens/PaymentCompleteScreen';
 import RateDriverScreen from '../screens/RateDriverScreen';
 import AwaitingPaymentScreen from '../screens/AwaitingPaymentScreen';
+import VerificationScreen from '../screens/VerificationScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 
 const RouteErrorBoundary: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const fallback = (
@@ -136,6 +139,18 @@ export const router = createHashRouter([
   {
     path: '/role-selection',
     element: <RoleSelectionScreen />,
+  },
+  {
+    path: '/verify-email',
+    element: <VerificationScreen />,
+  },
+  {
+    path: '/forgot-password',
+    element: <ForgotPasswordScreen />,
+  },
+  {
+    path: '/reset-password',
+    element: <ResetPasswordScreen />,
   },
   // Owner Routes
   {

@@ -183,7 +183,15 @@ const App: React.FC = () => {
             </VersionEnforcer>
 
             {/* Global Overlays */}
-            {currentUser && <SupportChatbot user={currentUser} />}
+            {(() => {
+              const currentHash = window.location.hash.split('?')[0].replace('#', '') || '/';
+              const isPublicRoute = ['/', '/login', '/register', '/role-selection', '/verify-email', '/forgot-password', '/reset-password'].includes(currentHash);
+              
+              if (isAuthenticated && currentUser && !isPublicRoute) {
+                return <SupportChatbot user={currentUser} />;
+              }
+              return null;
+            })()}
             
           </div>
         </div>

@@ -11,21 +11,23 @@ const LoginScreen: React.FC = () => {
   const { login } = useAuthStore();
   const { addToast } = useUIStore();
   
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  // Inline error shown below the form fields — more appropriate than toasts for login failures
+  const [inlineError, setInlineError] = useState<string | null>(null);
+
+  const clearError = () => setInlineError(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.email || !formData.password) {
-      addToast('Please enter both email and password.', 'warning');
+      setInlineError('Please enter both your email and password.');
       return;
     }
 
     setIsLoading(true);
+    clearError();
     try {
       const response = await api.post<AuthResponse>(
         '/auth/login',
@@ -34,7 +36,7 @@ const LoginScreen: React.FC = () => {
       );
 
       if (!response.token) {
-        addToast(response.message || 'Login failed. Please contact support.', 'error');
+        setInlineError(response.message || 'Login failed. Please contact support.');
         return;
       }
 
@@ -42,33 +44,39 @@ const LoginScreen: React.FC = () => {
       
       // Defense-in-depth: if backend somehow returns a token for an unapproved driver
       if (mapped.role === UserRole.DRIVER && mapped.approvalStatus !== 'APPROVED') {
-        addToast('Access Denied: Your driver account is not yet approved.', 'error');
+        setInlineError('Your driver account is not yet approved. Please wait for admin review.');
         return;
       }
 
       await login(mapped, response.token);
       addToast(`Welcome back, ${mapped.name}!`, 'success');
 
-      // Navigate based on role
-      if (mapped.role === UserRole.ADMIN) {
-        navigate('/admin');
-      } else if (mapped.role === UserRole.DRIVER) {
-        navigate('/driver');
-      } else {
-        navigate('/owner');
-      }
+      if (mapped.role === UserRole.ADMIN) navigate('/admin');
+      else if (mapped.role === UserRole.DRIVER) navigate('/driver');
+      else navigate('/owner');
+
     } catch (error: any) {
-      if (error.status === 404) {
-        addToast('No account found with this email. Would you like to create one?', 'warning');
+      const status = error?.status;
+      const message = error?.message || '';
+
+      if (status === 401) {
+        // Wrong email or wrong password — stay intentionally vague for security
+        setInlineError('Incorrect email or password. Please try again.');
+      } else if (status === 403 && message.toLowerCase().includes('email not verified')) {
+        // Edge case: registered but never verified (e.g. closed app after sign-up)
+        setInlineError('Your email address hasn\'t been verified yet.');
+        // Navigate them to complete verification
+        setTimeout(() => navigate('/verify-email', { state: { email: formData.email } }), 1500);
+      } else if (status === 403) {
+        // Driver pending/rejected
+        setInlineError(message || 'Access denied. Please contact support.');
       } else {
-        // Use the context-aware message from our API service (Prettified)
-        addToast(error.message || "We're having trouble logging you in. Please check your connection.", 'error');
+        setInlineError("We're having trouble connecting. Please check your internet and try again.");
       }
     } finally {
       setIsLoading(false);
     }
   };
-
 
   return (
     <div className="flex h-screen w-full flex-col bg-background-light dark:bg-background-dark">
@@ -102,7 +110,7 @@ const LoginScreen: React.FC = () => {
                 placeholder="email@example.com" 
                 type="email" 
                 value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
+                onChange={(e) => { setFormData({...formData, email: e.target.value}); clearError(); }}
               />
             </div>
           </div>
@@ -113,7 +121,7 @@ const LoginScreen: React.FC = () => {
               <button 
                 type="button"
                 className="text-primary text-xs font-bold hover:underline"
-                onClick={() => addToast("Forgot password functionality coming soon.", "info")}
+                onClick={() => navigate('/forgot-password')}
               >
                 Forgot Password?
               </button>
@@ -126,7 +134,7 @@ const LoginScreen: React.FC = () => {
                 placeholder="Enter your password" 
                 type={showPassword ? "text" : "password"}
                 value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                onChange={(e) => { setFormData({...formData, password: e.target.value}); clearError(); }}
               />
               <button 
                 type="button"
@@ -140,10 +148,18 @@ const LoginScreen: React.FC = () => {
             </div>
           </div>
 
+          {/* Inline error banner */}
+          {inlineError && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-500/10 rounded-xl border border-red-200 dark:border-red-500/20">
+              <span className="material-symbols-outlined text-red-500 text-sm mt-0.5 shrink-0">error</span>
+              <p className="text-red-600 dark:text-red-400 text-sm font-semibold leading-relaxed">{inlineError}</p>
+            </div>
+          )}
+
           <button 
             type="submit"
             disabled={isLoading}
-            className="w-full bg-primary hover:bg-opacity-90 active:bg-opacity-100 text-white font-bold text-lg h-14 rounded-xl shadow-lg shadow-primary/25 mt-4 transition-all transform active:scale-[0.98] disabled:opacity-50"
+            className="w-full bg-primary hover:bg-opacity-90 active:bg-opacity-100 text-white font-bold text-lg h-14 rounded-xl shadow-lg shadow-primary/25 mt-2 transition-all transform active:scale-[0.98] disabled:opacity-50"
           >
             {isLoading ? 'Logging in...' : 'Log In'}
           </button>
