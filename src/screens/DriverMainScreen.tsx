@@ -102,7 +102,7 @@ const DriverMainScreen: React.FC = () => {
   }, [addToast]);
 
   const {
-    isOnline, driverPos, liveRideRequests, enableOnline, disableOnline, removeRideRequest
+    isOnline, driverPos, liveRideRequests, enableOnline, disableOnline, removeRideRequest, availabilityIssue,
   } = useDriverRealtime({
     user: currentUser,
     approvalStatus: currentUser?.approvalStatus || 'PENDING',
@@ -344,21 +344,63 @@ const DriverMainScreen: React.FC = () => {
         <InteractiveMap center={driverPos} markers={mapMarkers} />
       </div>
 
-       <header className="relative z-10 p-4 pt-8 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
-          <button onClick={() => navigate('/profile')} className="size-11 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 overflow-hidden" aria-label="Profile">
-             {currentUser?.avatar ? <img src={currentUser.avatar} className="w-full h-full object-cover" alt="" /> : <span className="material-symbols-outlined text-white">person</span>}
-          </button>
-          <div className={`flex-1 mx-4 h-12 bg-white/10 backdrop-blur-md rounded-full border border-white/10 p-1 flex ${activeRide || completedTripSummary ? 'opacity-50 pointer-events-none' : ''}`}>
-             <button onClick={handleToggleOnline} className={`flex-1 rounded-full text-[10px] font-black uppercase transition-all ${!isOnline ? 'bg-slate-600 text-white' : 'text-slate-400'}`}>Offline</button>
-             <button onClick={handleToggleOnline} className={`flex-1 rounded-full text-[10px] font-black uppercase transition-all ${isOnline ? 'bg-primary text-white' : 'text-slate-400'}`}>Online</button>
+       <header className="relative z-10 p-4 pt-8 flex flex-col gap-2 bg-gradient-to-b from-black/80 to-transparent">
+          <div className="flex items-center justify-between">
+            <button onClick={() => navigate('/profile')} className="size-11 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 overflow-hidden" aria-label="Profile">
+               {currentUser?.avatar ? <img src={currentUser.avatar} className="w-full h-full object-cover" alt="" /> : <span className="material-symbols-outlined text-white">person</span>}
+            </button>
+            <div className={`flex-1 mx-4 h-12 bg-white/10 backdrop-blur-md rounded-full border border-white/10 p-1 flex ${activeRide || completedTripSummary ? 'opacity-50 pointer-events-none' : ''}`}>
+               <button onClick={handleToggleOnline} className={`flex-1 rounded-full text-[10px] font-black uppercase transition-all ${!isOnline ? 'bg-slate-600 text-white' : 'text-slate-400'}`}>Offline</button>
+               <button onClick={handleToggleOnline} className={`flex-1 rounded-full text-[10px] font-black uppercase transition-all ${isOnline ? 'bg-primary text-white' : 'text-slate-400'}`}>Online</button>
+            </div>
+            <div className="flex flex-col items-center gap-0.5">
+              <button
+                onClick={() => !activeRide && !completedTripSummary && navigate('/driver/activity')}
+                className={`size-11 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 text-white ${activeRide || completedTripSummary ? 'opacity-50 cursor-not-allowed' : ''}`}
+                aria-label="Activity"
+              >
+                <span className="material-symbols-outlined">receipt_long</span>
+              </button>
+              {currentUser?.ratingPoints !== undefined && (
+                <span className="text-[9px] font-black text-white/80 tracking-tight">
+                  {(currentUser.ratingPoints / 100).toFixed(2)} ⭐
+                </span>
+              )}
+            </div>
           </div>
-          <button
-            onClick={() => !activeRide && !completedTripSummary && navigate('/driver/activity')}
-            className={`size-11 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 text-white ${activeRide || completedTripSummary ? 'opacity-50 cursor-not-allowed' : ''}`}
-            aria-label="Activity"
-          >
-             <span className="material-symbols-outlined">receipt_long</span>
-          </button>
+
+          {/* Suspension banner */}
+          {(currentUser?.isBlocked && currentUser?.suspendedUntil) && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-2xl bg-red-500/20 border border-red-500/30 backdrop-blur-md">
+              <span className="material-symbols-outlined text-red-400 text-base mt-0.5 shrink-0">gavel</span>
+              <p className="text-[10px] font-bold text-red-300 leading-snug">
+                Account suspended until{' '}
+                <span className="font-black text-red-200">
+                  {new Date(currentUser.suspendedUntil).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                </span>
+              </p>
+            </div>
+          )}
+
+          {/* Server-side suspension or block message (e.g. after attempting to go online) */}
+          {availabilityIssue && !availabilityIssue.includes('location') && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-2xl bg-red-500/20 border border-red-500/30 backdrop-blur-md">
+              <span className="material-symbols-outlined text-red-400 text-base mt-0.5 shrink-0">block</span>
+              <p className="text-[10px] font-bold text-red-300 leading-snug">{availabilityIssue}</p>
+            </div>
+          )}
+
+          {/* Rating warning banner */}
+          {!currentUser?.isBlocked && currentUser?.ratingPoints !== undefined && currentUser.ratingPoints < 460 && (
+            <div className="flex items-start gap-2 px-3 py-2 rounded-2xl bg-amber-500/20 border border-amber-500/30 backdrop-blur-md">
+              <span className="material-symbols-outlined text-amber-400 text-base mt-0.5 shrink-0">warning</span>
+              <p className="text-[10px] font-bold text-amber-300 leading-snug">
+                Rating Alert: Your rating is{' '}
+                <span className="font-black text-amber-200">{(currentUser.ratingPoints / 100).toFixed(2)}</span>.
+                {' '}Improve your service to avoid suspension.
+              </p>
+            </div>
+          )}
        </header>
 
        <div className="flex-1"></div>

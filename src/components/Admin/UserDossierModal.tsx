@@ -369,19 +369,60 @@ const UserDossierModal: React.FC<UserDossierModalProps> = ({
                   ) : ratingHistory.length === 0 ? (
                     <div className="p-8 text-center text-[11px] text-slate-400 font-bold uppercase tracking-widest">No ratings yet</div>
                   ) : (
-                    <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-                      {ratingHistory.map((log) => (
-                        <div key={log.id} className="p-3 text-[10px] flex items-center justify-between">
-                          <div>
-                            <span className={`font-black text-[12px] ${log.score === 5 ? 'text-green-500' : 'text-red-500'}`}>{log.score} Star{log.score !== 1 && 's'}</span>
-                            <p className="text-slate-500 mt-0.5">Points: {log.previousPoints} → {log.newPoints}</p>
+                    <div className="max-h-64 overflow-y-auto">
+                      {ratingHistory.map((log, i) => {
+                        const delta = log.newPoints - log.previousPoints;
+                        const isCritical = !!log.actionTriggered;
+                        const isPositive = delta >= 0;
+                        return (
+                          <div key={log.id} className="relative flex gap-3 px-3 py-3">
+                            {/* Timeline spine */}
+                            {i < ratingHistory.length - 1 && (
+                              <div className="absolute left-[1.85rem] top-8 bottom-0 w-px bg-slate-200 dark:bg-slate-700" />
+                            )}
+                            {/* Icon dot */}
+                            <div className={`shrink-0 size-6 rounded-full flex items-center justify-center z-10 mt-0.5 ${
+                              isCritical ? 'bg-red-500/20 border border-red-500/40' :
+                              log.score === 5 ? 'bg-green-500/15 border border-green-500/30' :
+                              'bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600'
+                            }`}>
+                              <span className={`material-symbols-outlined text-[11px] ${
+                                isCritical ? 'text-red-500' :
+                                log.score === 5 ? 'text-green-500' : 'text-slate-400'
+                              }`}>
+                                {isCritical ? 'gavel' : log.score === 5 ? 'star' : 'star_half'}
+                              </span>
+                            </div>
+                            {/* Content */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className={`font-black text-[11px] ${
+                                  log.score === 5 ? 'text-green-600 dark:text-green-400' :
+                                  log.score === 1 ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'
+                                }`}>
+                                  {log.score} Star{log.score !== 1 && 's'}
+                                </span>
+                                <span className="text-[9px] text-slate-400 shrink-0">
+                                  {new Date(log.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: '2-digit' })}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[9px] text-slate-500">
+                                  {log.previousPoints} → {log.newPoints}
+                                </span>
+                                <span className={`text-[9px] font-black ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                                  {isPositive ? '+' : ''}{delta}
+                                </span>
+                              </div>
+                              {isCritical && (
+                                <span className="inline-block mt-1 text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-500 border border-red-500/20">
+                                  {log.actionTriggered}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-right text-slate-400">
-                            {new Date(log.createdAt).toLocaleDateString()}
-                            {log.actionTriggered && <span className="block text-orange-500 font-black mt-0.5">{log.actionTriggered}</span>}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

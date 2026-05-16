@@ -118,20 +118,25 @@ export const useDriverRealtime = ({
 
   const enableOnline = useCallback(async () => {
     setAvailabilityIssue(null);
+
+    const goOnline = async (lat?: number, lng?: number) => {
+      const body: Record<string, any> = { isOnline: true };
+      if (lat !== undefined && lng !== undefined) {
+        body.lat = lat;
+        body.lng = lng;
+      }
+      await api.patch('/users/online', body);
+    };
+
     try {
       const pos = await CapacitorService.getCurrentLocation();
       if (pos?.coords) {
         const { latitude, longitude } = pos.coords;
-        await api.patch('/users/online', {
-          isOnline: true,
-          lat: latitude,
-          lng: longitude,
-        });
+        await goOnline(latitude, longitude);
         setDriverPos([latitude, longitude]);
         updateOnlineState(true);
       } else {
-        // Should rarely happen if getCurrentLocation returns successfully, but as a safety:
-        await api.patch('/users/online', { isOnline: true });
+        await goOnline();
         setAvailabilityIssue(
           'You are online but your location could not be detected. ' +
           'Ride requests may not reach you until location is refreshed. ' +
@@ -139,18 +144,28 @@ export const useDriverRealtime = ({
         );
         updateOnlineState(true);
       }
-    } catch {
-      // If GPS fails, still try to go online
+    } catch (error: any) {
+      // Suspension or permanent block — don't retry, surface the message
+      if (error?.status === 403) {
+        updateOnlineState(false);
+        setAvailabilityIssue(error.message || 'Your account is currently suspended. Please contact support.');
+        return;
+      }
+      // GPS failed — attempt to go online without coords
       try {
-        await api.patch('/users/online', { isOnline: true });
+        await goOnline();
         setAvailabilityIssue(
           'You are online but your location could not be detected. ' +
           'Ride requests may not reach you until location is refreshed. ' +
           'Tap "Refresh Location" to fix this.'
         );
         updateOnlineState(true);
-      } catch {
-        // Full failure (network down)
+      } catch (innerError: any) {
+        if (innerError?.status === 403) {
+          updateOnlineState(false);
+          setAvailabilityIssue(innerError.message || 'Your account is currently suspended. Please contact support.');
+          return;
+        }
         updateOnlineState(false);
         setAvailabilityIssue("We couldn't connect to the server. Please check your connection and try again.");
       }

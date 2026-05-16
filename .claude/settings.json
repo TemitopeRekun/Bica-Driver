@@ -3,7 +3,11 @@
     "allow": [
       "Bash(xargs wc *)",
       "Bash(npm run *)",
-      "Bash(npx cap *)"
+      "Bash(npx cap *)",
+      "Read(//c/Users/Projects/bica-backend/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Projects\\bica-backend\\src\\users"
     ]
   }
 }
