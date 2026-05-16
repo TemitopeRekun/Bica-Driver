@@ -186,22 +186,29 @@ const ResetPasswordScreen: React.FC = () => {
 
           <div className="flex flex-col gap-1.5">
             <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Confirm New Password</label>
-            <div className="flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border border-slate-100 dark:border-white/5 focus-within:border-primary transition-all">
+            <div className={`flex items-center bg-white dark:bg-input-dark rounded-xl px-4 h-14 border transition-all ${
+              formData.confirmPassword && formData.password !== formData.confirmPassword
+                ? 'border-red-400 bg-red-500/5 dark:bg-red-500/10'
+                : 'border-slate-100 dark:border-white/5 focus-within:border-primary'
+            }`}>
               <span className="material-symbols-outlined text-slate-400 mr-3">lock_reset</span>
-              <input 
+              <input
                 required
-                className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-bold w-full focus:ring-0 p-0" 
-                placeholder="Repeat new password" 
+                className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-bold w-full focus:ring-0 p-0"
+                placeholder="Repeat new password"
                 type={showPassword ? "text" : "password"}
                 value={formData.confirmPassword}
                 onChange={(e) => { setFormData({...formData, confirmPassword: e.target.value}); clearError(); }}
               />
             </div>
+            {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+              <p className="text-[11px] text-red-500 font-bold ml-1 animate-fade-in">Passwords do not match.</p>
+            )}
           </div>
 
           <button 
             type="submit"
-            disabled={isLoading || otp.join('').length < 6 || !formData.password || isLocked}
+            disabled={isLoading || otp.join('').length < 6 || !formData.password || formData.password !== formData.confirmPassword || isLocked}
             className="w-full bg-primary text-white font-black text-lg h-14 rounded-2xl shadow-lg shadow-primary/25 transition-all active:scale-[0.98] mt-2 disabled:opacity-50"
           >
             {isLoading ? 'Updating Password...' : 'Reset Password'}

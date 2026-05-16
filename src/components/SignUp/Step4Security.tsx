@@ -50,9 +50,13 @@ const Step4Security: React.FC<StepProps> = ({ formData, errors, updateField, onS
       {/* Confirm Password field */}
       <div className="flex flex-col gap-1.5">
         <label className="text-[10px] font-black text-slate-400 ml-1 uppercase tracking-widest">Confirm Password</label>
-        <div className={`flex items-center bg-white dark:bg-surface-dark border rounded-2xl px-4 h-14 transition-all ${errors.confirmPassword ? 'border-red-500 bg-red-500/5' : 'border-slate-100 dark:border-white/5'}`}>
+        <div className={`flex items-center bg-white dark:bg-surface-dark border rounded-2xl px-4 h-14 transition-all ${
+          (errors.confirmPassword || (formData.confirmPassword && formData.password !== formData.confirmPassword))
+            ? 'border-red-500 bg-red-500/5'
+            : 'border-slate-100 dark:border-white/5'
+        }`}>
           <span className="material-symbols-outlined text-slate-400 mr-3 text-xl">lock_reset</span>
-          <input 
+          <input
             className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-bold w-full focus:ring-0 p-0"
             placeholder="Repeat password"
             type={showPassword ? "text" : "password"}
@@ -60,7 +64,12 @@ const Step4Security: React.FC<StepProps> = ({ formData, errors, updateField, onS
             onChange={e => updateField('confirmPassword', e.target.value)}
           />
         </div>
-        {errors.confirmPassword && <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.confirmPassword}</p>}
+        {errors.confirmPassword
+          ? <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">{errors.confirmPassword}</p>
+          : formData.confirmPassword && formData.password !== formData.confirmPassword
+          ? <p className="text-[10px] text-red-500 font-bold ml-1 animate-fade-in">Passwords do not match.</p>
+          : null
+        }
       </div>
 
       {/* Terms & Conditions Consent */}
@@ -136,9 +145,9 @@ const Step4Security: React.FC<StepProps> = ({ formData, errors, updateField, onS
         </p>
       )}
 
-      <button 
+      <button
         onClick={onSubmit}
-        disabled={isLoading || !termsAccepted}
+        disabled={isLoading || !termsAccepted || (!!formData.confirmPassword && formData.password !== formData.confirmPassword)}
         className={`w-full py-5 rounded-2xl text-white font-black text-lg shadow-xl active:scale-[0.98] transition-all mt-4 flex items-center justify-center gap-2 ${
           termsAccepted && !isLoading
             ? 'bg-primary shadow-primary/20 cursor-pointer'

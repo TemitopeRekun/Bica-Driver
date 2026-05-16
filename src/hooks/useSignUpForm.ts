@@ -88,11 +88,10 @@ export const useSignUpForm = (initialRole: UserRole) => {
     try {
       // Transform data for API to match backend contract exactly
       // 🛡️ Destructure to pull out UI-specific names and confirmPassword (never sent to API)
-      const { 
-        licenseImage, selfieImage, ninImage, 
+      const {
+        licenseImage, selfieImage, ninImage,
         carType, carModel, carYear,
-        confirmPassword: _confirmPassword, // excluded — backend validates but we never send raw confirmation
-        ...rest 
+        ...rest
       } = formData;
 
       const basePayload = {
