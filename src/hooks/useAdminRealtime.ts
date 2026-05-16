@@ -44,8 +44,24 @@ export const useAdminRealtime = ({ adminId, onNewDriver, onTripCompleted, onDash
       onTripCompleted?.(data);
     });
 
+    // Listen for rating warnings
+    socketRef.current.on('admin:driver:rating_warning', (data: any) => {
+      console.log('📡 [AdminWS] Rating Warning:', data);
+      sounds.playNotification();
+      addToast(`⚠️ Rating Warning (Tier ${data.tier}): ${data.driverName} dropped to ${(data.newRating / 100).toFixed(2)}`, 'warning');
+      onDashboardUpdate?.('admin:driver:rating_warning');
+    });
+
+    // Listen for rating suspensions
+    socketRef.current.on('admin:driver:suspended', (data: any) => {
+      console.log('📡 [AdminWS] Driver Suspended:', data);
+      sounds.playNotification();
+      addToast(`🚫 Driver Suspended (Tier ${data.suspensionTier}): ${data.driverName}`, 'error');
+      onDashboardUpdate?.('admin:driver:suspended');
+    });
+
     // General dashboard update signal
-    socketRef.current.on('admindashboardupdate', (data: any) => {
+    socketRef.current.on('admin:dashboard:update', (data: any) => {
       onDashboardUpdate?.(data.event ?? 'unknown');
     });
 

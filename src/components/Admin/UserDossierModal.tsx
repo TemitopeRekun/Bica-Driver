@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { UserProfile, UserRole, ApprovalStatus } from '@/types';
+import React, { useState, useEffect } from 'react';
+import { UserProfile, UserRole, ApprovalStatus, RatingAuditEntry } from '@/types';
+import api from '@/services/api.service';
 
 interface UserDossierModalProps {
   user: UserProfile;
@@ -133,9 +134,46 @@ const UserDossierModal: React.FC<UserDossierModalProps> = ({
     && !user.isBlocked
     && !!user.subAccountActive;
 
-  // Two-step confirmation guard for ledger reset
   const [resetPending, setResetPending] = useState(false);
   const [resettingLedger, setResettingLedger] = useState(false);
+
+  const [ratingHistory, setRatingHistory] = useState<RatingAuditEntry[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [terminating, setTerminating] = useState(false);
+  const [lifting, setLifting] = useState(false);
+
+  useEffect(() => {
+    if (user.role === UserRole.DRIVER) {
+      setLoadingHistory(true);
+      api.get(`/admin/drivers/${user.id}/rating-history`)
+         .then(res => setRatingHistory(res.data))
+         .catch(console.error)
+         .finally(() => setLoadingHistory(false));
+    }
+  }, [user.id, user.role]);
+
+  const handleLiftSuspension = async () => {
+    setLifting(true);
+    try {
+      await api.post(`/admin/drivers/${user.id}/lift-suspension`);
+      onClose();
+    } catch (e) {
+      console.error(e);
+      setLifting(false);
+    }
+  };
+
+  const handleTerminate = async () => {
+    if (!window.confirm(`Are you sure you want to PERMANENTLY terminate ${user.name}? This cannot be undone.`)) return;
+    setTerminating(true);
+    try {
+      await api.post(`/admin/drivers/${user.id}/terminate`);
+      onClose();
+    } catch (e) {
+      console.error(e);
+      setTerminating(false);
+    }
+  };
 
   return (
     // Backdrop - darkened, tapping closes
@@ -203,8 +241,9 @@ const UserDossierModal: React.FC<UserDossierModalProps> = ({
                     : user.approvalStatus === 'REJECTED' ? 'bg-red-500/10 text-red-600 border border-red-500/20'
                     : 'bg-orange-500/10 text-orange-600 border border-orange-500/20'
                   }`}>{user.approvalStatus}</span>
-                  {user.isBlocked && <span className="text-[8px] font-black bg-red-500 text-white px-2 py-0.5 rounded-full uppercase">Blocked</span>}
-                  {user.isOnline && <span className="text-[8px] font-black bg-green-500/10 text-green-600 border border-green-500/20 px-2 py-0.5 rounded-full uppercase">Online</span>}
+                  {user.isBlocked && !user.suspendedUntil && <span className="text-[8px] font-black bg-slate-500/10 border border-slate-500/20 text-slate-500 px-2 py-0.5 rounded-full uppercase">Blocked</span>}
+                  {!!user.suspendedUntil && <span className="text-[8px] font-black bg-red-500 text-white px-2 py-0.5 rounded-full uppercase">Suspended</span>}
+                  {user.isOnline && !user.isBlocked && <span className="text-[8px] font-black bg-green-500/10 text-green-600 border border-green-500/20 px-2 py-0.5 rounded-full uppercase">Online</span>}
                 </div>
               </div>
             </div>
@@ -282,15 +321,28 @@ const UserDossierModal: React.FC<UserDossierModalProps> = ({
                   <p className="font-black text-sm text-slate-900 dark:text-white truncate">{formatJoinedDate(user.createdAt)}</p>
                 </div>
 
-                {/* Rating */}
+                {/* Rating Points */}
                 <div className="bg-slate-50 dark:bg-white/5 p-3.5 rounded-2xl border border-slate-100 dark:border-slate-800">
                   <p className="text-[9px] uppercase text-slate-500 font-black tracking-widest mb-1">Rating</p>
                   <div className="flex items-center gap-1">
                     <span className="material-symbols-outlined text-yellow-500 text-sm filled">star</span>
-                    <p className="font-black text-sm text-slate-900 dark:text-white">{user.rating || 'N/A'}</p>
-                    <span className="text-[9px] text-slate-500 font-bold">({user.trips || 0} trips)</span>
+                    <p className="font-black text-sm text-slate-900 dark:text-white">
+                      {user.ratingPoints !== undefined ? (user.ratingPoints / 100).toFixed(2) : '5.00'}
+                    </p>
+                    <span className="text-[9px] text-slate-500 font-bold">({user.ratingCount || 0} trips)</span>
                   </div>
                 </div>
+
+                {/* Suspension Status */}
+                {user.role === UserRole.DRIVER && (
+                  <div className={`bg-slate-50 dark:bg-white/5 p-3.5 rounded-2xl border ${user.suspendedUntil ? 'border-red-500/30' : 'border-slate-100 dark:border-slate-800'}`}>
+                    <p className="text-[9px] uppercase text-slate-500 font-black tracking-widest mb-1">Suspension Tier</p>
+                    <p className={`font-black text-sm ${user.suspendedUntil ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
+                      Tier {user.suspensionTier || 0}
+                      {user.suspendedUntil && <span className="block text-[10px] text-red-500/80 font-bold mt-0.5">Until {new Date(user.suspendedUntil).toLocaleString()}</span>}
+                    </p>
+                  </div>
+                )}
 
                 {/* Address — shown for owners, also for drivers if available */}
                 {(user.role === UserRole.OWNER || user.address) && (
@@ -306,6 +358,35 @@ const UserDossierModal: React.FC<UserDossierModalProps> = ({
                 )}
               </div>
             </section>
+
+            {/* ── 4.5. Rating History (Drivers only) ── */}
+            {user.role === UserRole.DRIVER && (
+              <section className="space-y-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-slate-400">Rating History</p>
+                <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden">
+                  {loadingHistory ? (
+                    <div className="p-8 flex justify-center"><span className="material-symbols-outlined animate-spin text-slate-400">progress_activity</span></div>
+                  ) : ratingHistory.length === 0 ? (
+                    <div className="p-8 text-center text-[11px] text-slate-400 font-bold uppercase tracking-widest">No ratings yet</div>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                      {ratingHistory.map((log) => (
+                        <div key={log.id} className="p-3 text-[10px] flex items-center justify-between">
+                          <div>
+                            <span className={`font-black text-[12px] ${log.score === 5 ? 'text-green-500' : 'text-red-500'}`}>{log.score} Star{log.score !== 1 && 's'}</span>
+                            <p className="text-slate-500 mt-0.5">Points: {log.previousPoints} → {log.newPoints}</p>
+                          </div>
+                          <div className="text-right text-slate-400">
+                            {new Date(log.createdAt).toLocaleDateString()}
+                            {log.actionTriggered && <span className="block text-orange-500 font-black mt-0.5">{log.actionTriggered}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
 
             {/* ── 5. Vehicle (Owners only) ── */}
             {user.role === UserRole.OWNER && (
@@ -378,13 +459,13 @@ const UserDossierModal: React.FC<UserDossierModalProps> = ({
             <button
               onClick={() => { onBlockUser(user.id, !user.isBlocked); onClose(); }}
               className={`font-black py-3.5 rounded-2xl transition-all active:scale-[0.97] flex items-center justify-center gap-2 text-sm border-2 ${
-                user.isBlocked
+                user.isBlocked && !user.suspendedUntil
                   ? 'border-green-500/40 text-green-600 hover:bg-green-500/5'
                   : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
               }`}
             >
-              <span className="material-symbols-outlined text-base">{user.isBlocked ? 'lock_open' : 'block'}</span>
-              {user.isBlocked ? 'RESTORE' : 'SUSPEND'}
+              <span className="material-symbols-outlined text-base">{user.isBlocked && !user.suspendedUntil ? 'lock_open' : 'block'}</span>
+              {user.isBlocked && !user.suspendedUntil ? 'RESTORE' : 'BLOCK'}
             </button>
             <button
               onClick={onClose}
@@ -393,6 +474,28 @@ const UserDossierModal: React.FC<UserDossierModalProps> = ({
               CLOSE
             </button>
           </div>
+
+          {/* Rating Engine Actions (Drivers Only) */}
+          {user.role === UserRole.DRIVER && (
+            <div className="grid grid-cols-2 gap-3 border-t border-slate-100 dark:border-slate-800 pt-3">
+              <button
+                onClick={handleLiftSuspension}
+                disabled={!user.suspendedUntil || lifting}
+                className="font-black py-3.5 rounded-2xl border-2 border-orange-500/40 text-orange-500 hover:bg-orange-500/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.97] flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest"
+              >
+                <span className="material-symbols-outlined text-base">gavel</span>
+                {lifting ? 'LIFTING...' : 'LIFT SUSPENSION'}
+              </button>
+              <button
+                onClick={handleTerminate}
+                disabled={terminating}
+                className="font-black py-3.5 rounded-2xl border-2 border-red-500/40 text-red-500 hover:bg-red-500/5 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.97] flex items-center justify-center gap-2 text-[10px] uppercase tracking-widest"
+              >
+                <span className="material-symbols-outlined text-base">person_remove</span>
+                {terminating ? 'TERMINATING...' : 'TERMINATE DRIVER'}
+              </button>
+            </div>
+          )}
 
           {/* ── Reset Internal Ledger Balance (DRIVER only) ── */}
           {user.role === UserRole.DRIVER && (

@@ -109,7 +109,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
       )}
 
       {/* Main Stats Grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {/* Revenue */}
         <div className="bg-surface-light dark:bg-surface-dark p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm group">
           <div className="flex items-center justify-between mb-3">
@@ -157,6 +157,30 @@ const OverviewSection: React.FC<OverviewSectionProps> = ({
           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Owners</p>
           <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{displayTotalOwners}</p>
         </div>
+
+        {/* Suspended Drivers */}
+        <button onClick={() => onJump('drivers', 'Suspended')} className="bg-surface-light dark:bg-surface-dark p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm group text-left hover:border-red-500 transition-all active:scale-[0.98]">
+          <div className="flex items-center justify-between mb-3">
+            <span className="size-10 bg-red-500/10 rounded-xl flex items-center justify-center text-red-500 transition-transform group-hover:scale-110">
+              <span className="material-symbols-outlined">block</span>
+            </span>
+            <span className="text-[9px] font-black text-red-500 px-2 py-0.5 bg-red-500/10 rounded-full italic">Review</span>
+          </div>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Suspended Drivers</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{stats?.suspendedDriversCount ?? 0}</p>
+        </button>
+
+        {/* Warning Drivers */}
+        <button onClick={() => onJump('drivers', 'Warning')} className="bg-surface-light dark:bg-surface-dark p-6 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-sm group text-left hover:border-orange-500 transition-all active:scale-[0.98]">
+          <div className="flex items-center justify-between mb-3">
+            <span className="size-10 bg-orange-500/10 rounded-xl flex items-center justify-center text-orange-500 transition-transform group-hover:scale-110">
+              <span className="material-symbols-outlined">warning</span>
+            </span>
+            <span className="text-[9px] font-black text-orange-500 px-2 py-0.5 bg-orange-500/10 rounded-full italic">Alert</span>
+          </div>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Rating Warnings</p>
+          <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{stats?.warningDriversCount ?? 0}</p>
+        </button>
       </div>
 
 

@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { loadGoogleMaps } from '@/services/GoogleMapsLoader';
+import { useUIStore } from '@/stores/uiStore';
 
 interface InteractiveMapProps {
   center?: [number, number]; // [lat, lng]
@@ -37,6 +38,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const { mapTheme } = useUIStore();
 
   const toLatLngLiteral = ([lat, lng]: [number, number]) => ({ lat, lng });
 
@@ -84,7 +86,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
           scale: 5,
           fillColor: '#ffffff',
           fillOpacity: 0.95,
-          strokeColor: '#94a3b8',
+          strokeColor: mapTheme === 'dark' ? '#cbd5e1' : '#94a3b8',
           strokeOpacity: 1,
           strokeWeight: 1,
         };
@@ -148,13 +150,13 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
           center: toLatLngLiteral(center as [number, number]),
           zoom,
           mapTypeId: 'roadmap',
-          colorScheme: coreLibrary.ColorScheme.DARK,
+          colorScheme: mapTheme === 'dark' ? coreLibrary.ColorScheme.DARK : coreLibrary.ColorScheme.LIGHT,
           disableDefaultUI: true,
           clickableIcons: false,
           keyboardShortcuts: false,
           gestureHandling: 'greedy',
           tilt: 0,
-          backgroundColor: '#101622',
+          backgroundColor: mapTheme === 'dark' ? '#101622' : '#ffffff',
         });
 
         setMapReady(true);
@@ -177,7 +179,27 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
       clearAllMapObjects();
       map.current = null;
     };
-  }, []);
+  }, []); // Only initialize once
+
+  useEffect(() => {
+    if (!map.current || !window.google?.maps) return;
+    
+    const updateTheme = async () => {
+      try {
+        const googleMaps = await loadGoogleMaps();
+        const coreLibrary = await googleMaps.importLibrary('core');
+        
+        map.current.setOptions({
+          colorScheme: mapTheme === 'dark' ? coreLibrary.ColorScheme.DARK : coreLibrary.ColorScheme.LIGHT,
+          backgroundColor: mapTheme === 'dark' ? '#101622' : '#ffffff',
+        });
+      } catch (e) {
+        console.error('Failed to update map theme:', e);
+      }
+    };
+    
+    updateTheme();
+  }, [mapTheme]);
 
   useEffect(() => {
     if (!mapReady || !map.current) return;
@@ -267,10 +289,10 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
             center: latLng,
             radius: accuracy,
             strokeColor: '#f17606',
-            strokeOpacity: 0.7,
+            strokeOpacity: mapTheme === 'dark' ? 0.4 : 0.7,
             strokeWeight: 1,
             fillColor: '#f17606',
-            fillOpacity: 0.15,
+            fillOpacity: mapTheme === 'dark' ? 0.08 : 0.15,
           });
         }
       } else if (circlesRef.current[id]) {
@@ -278,10 +300,10 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         delete circlesRef.current[id];
       }
     });
-  }, [markers, mapReady]);
+  }, [markers, mapReady, mapTheme]);
 
   return (
-    <div className={`w-full h-full relative overflow-hidden bg-[#101622] ${className}`}>
+    <div className={`w-full h-full relative overflow-hidden ${mapTheme === 'dark' ? 'bg-[#101622]' : 'bg-white'} ${className}`}>
       <div ref={mapContainer} className="absolute inset-0 w-full h-full z-0" />
       {(isLoading || loadError) && (
         <div className="absolute inset-0 flex items-center justify-center text-white bg-black/50 px-6 text-center">

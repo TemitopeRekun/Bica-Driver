@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+
 import { ToastItem, ToastVariant } from '@/types/toast';
 
 import { SupportContext } from '@/types';
@@ -10,7 +12,9 @@ interface UIState {
   supportContext: SupportContext | null;
   addToast: (message: string, variant?: ToastVariant, options?: Partial<Omit<ToastItem, 'id' | 'message' | 'variant'>>) => string;
   removeToast: (id: string) => void;
+  mapTheme: 'light' | 'dark';
   setGlobalLoading: (isLoading: boolean) => void;
+  toggleMapTheme: () => void;
   setSupportOpen: (open: boolean) => void;
   setSupportContext: (ctx: SupportContext | null) => void;
   // Deprecated: migrate to setSupportOpen/setSupportContext
@@ -18,13 +22,16 @@ interface UIState {
   closeSupport: () => void;
 }
 
-export const useUIStore = create<UIState>((set, get) => ({
-  toasts: [],
-  isGlobalLoading: false,
-  supportOpen: false,
-  supportContext: null,
+export const useUIStore = create<UIState>()(
+  persist(
+    (set, get) => ({
+      toasts: [],
+      isGlobalLoading: false,
+      supportOpen: false,
+      supportContext: null,
+      mapTheme: typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
 
-  addToast: (message, variant = 'info', options = {}) => {
+      addToast: (message, variant = 'info', options = {}) => {
     const id = Math.random().toString(36).substring(2, 9);
     
     set((state) => ({
@@ -51,6 +58,10 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   setGlobalLoading: (isLoading) => set({ isGlobalLoading: isLoading }),
 
+  toggleMapTheme: () => set((state) => ({ 
+    mapTheme: state.mapTheme === 'dark' ? 'light' : 'dark' 
+  })),
+
   setSupportOpen: (open) => set({ supportOpen: open }),
   
   setSupportContext: (ctx) => set({ supportContext: ctx }),
@@ -60,8 +71,14 @@ export const useUIStore = create<UIState>((set, get) => ({
     supportContext: context || null 
   }),
 
-  closeSupport: () => set({ 
-    supportOpen: false, 
-    supportContext: null 
+    closeSupport: () => set({ 
+      supportOpen: false, 
+      supportContext: null 
+    }),
   }),
-}));
+  {
+    name: 'bica-ui-storage',
+    storage: createJSONStorage(() => localStorage),
+    partialize: (state) => ({ mapTheme: state.mapTheme }),
+  }
+));

@@ -32,8 +32,12 @@ const DriversSection: React.FC<DriversSectionProps> = ({
           return driver.approvalStatus === 'PENDING';
         case 'Active':
           return !driver.isBlocked && driver.isOnline && driver.approvalStatus === 'APPROVED';
+        case 'Suspended':
+          return !!driver.suspendedUntil;
+        case 'Warning':
+          return driver.ratingPoints !== undefined && ((driver.ratingPoints >= 400 && driver.ratingPoints <= 415) || (driver.ratingPoints >= 450 && driver.ratingPoints <= 455));
         case 'Blocked':
-          return !!driver.isBlocked;
+          return !!driver.isBlocked && !driver.suspendedUntil;
         default:
           return true;
       }
@@ -44,8 +48,8 @@ const DriversSection: React.FC<DriversSectionProps> = ({
     <div className="space-y-6 animate-slide-up">
       <div className="flex flex-wrap items-center justify-between gap-4 px-1">
         {/* Filter Tabs */}
-        <div className="flex gap-2 p-1 bg-slate-100 dark:bg-white/5 rounded-2xl w-fit">
-           {(['All', 'Pending', 'Active', 'Blocked'] as const).map((filter) => (
+        <div className="flex gap-2 p-1 bg-slate-100 dark:bg-white/5 rounded-2xl w-fit flex-wrap">
+           {(['All', 'Pending', 'Active', 'Suspended', 'Warning', 'Blocked'] as const).map((filter) => (
              <button
                key={filter}
                onClick={() => setDriverFilter(filter)}
@@ -84,6 +88,8 @@ const DriversSection: React.FC<DriversSectionProps> = ({
         )}
       </div>
 
+
+
       {/* Driver List */}
       <div className="grid grid-cols-1 gap-3">
         {filteredDrivers.map(driver => {
@@ -115,7 +121,8 @@ const DriversSection: React.FC<DriversSectionProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <h4 className="font-black text-sm text-slate-900 dark:text-white truncate">{driver.name}</h4>
-                    {isBlocked && <span className="shrink-0 text-[8px] font-black bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded-full uppercase border border-red-500/20">Blocked</span>}
+                    {!!driver.suspendedUntil && <span className="shrink-0 text-[8px] font-black bg-red-500/10 text-red-500 px-1.5 py-0.5 rounded-full uppercase border border-red-500/20">Suspended</span>}
+                    {isBlocked && !driver.suspendedUntil && <span className="shrink-0 text-[8px] font-black bg-slate-500/10 text-slate-500 px-1.5 py-0.5 rounded-full uppercase border border-slate-500/20">Blocked</span>}
                     {driver.isOnline && !isBlocked && <span className="shrink-0 text-[8px] font-black bg-green-500/10 text-green-600 px-1.5 py-0.5 rounded-full uppercase border border-green-500/20">Online</span>}
                   </div>
                   <p className="text-[11px] text-slate-500 font-medium truncate">{driver.email}</p>

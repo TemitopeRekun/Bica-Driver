@@ -4,6 +4,7 @@ import { UserProfile, UserRole } from '@/types';
 import { IMAGES } from '@/constants';
 import { CapacitorService } from '@/services/CapacitorService';
 import { Skeleton } from '@/components/Common/Skeleton';
+import { useUIStore } from '@/stores/uiStore';
 
 interface ProfileScreenProps {
   user: UserProfile;
@@ -18,6 +19,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
   
   const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+  const { mapTheme, toggleMapTheme } = useUIStore();
 
   if (!user) {
     return (
@@ -200,6 +202,33 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
             </div>
           </div>
         )}
+        
+        <div className="px-4 flex flex-col gap-4">
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] px-1">Preferences</h3>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between p-5 rounded-2xl bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800">
+               <div className="flex items-center gap-4">
+                  <div className="size-10 rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-lg">{mapTheme === 'dark' ? 'dark_mode' : 'light_mode'}</span>
+                  </div>
+                  <div>
+                    <p className="font-black text-sm uppercase tracking-widest">Map Theme</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{mapTheme === 'dark' ? 'Dark Mode' : 'Light Mode'}</p>
+                  </div>
+               </div>
+               <button 
+                 onClick={() => { CapacitorService.triggerHaptic(); toggleMapTheme(); }}
+                 className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${mapTheme === 'dark' ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'}`}
+               >
+                 <span
+                   className={`${
+                     mapTheme === 'dark' ? 'translate-x-6' : 'translate-x-1'
+                   } inline-block h-5 w-5 transform rounded-full bg-white transition-transform`}
+                 />
+               </button>
+            </div>
+          </div>
+        </div>
 
         <div className="px-4 pt-4 flex flex-col gap-3">
           <button onClick={() => handleFeatureAlert("System Settings")} className="flex items-center justify-between w-full p-5 rounded-2xl bg-surface-light dark:bg-surface-dark hover:bg-slate-100 dark:hover:bg-white/5 transition-all group active:scale-[0.98]">

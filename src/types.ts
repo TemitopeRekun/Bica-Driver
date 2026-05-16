@@ -26,7 +26,11 @@ export interface UserProfile {
   phone: string;
   password?: string;       // only used locally during signup flow
   role: UserRole;
-  rating: number;
+  rating?: number;
+  ratingPoints?: number;
+  consecutiveFiveStars?: number;
+  suspensionTier?: number;
+  suspendedUntil?: string | null;
   ratingCount?: number;
   trips: number;           // maps to totalTrips from backend
   totalTrips?: number;     // backend field name
@@ -249,7 +253,7 @@ export type OwnerActivityTab = 'trips' | 'payments';
 export type DriverActivityTab = 'trips' | 'settlements';
 
 // Admin-specific types
-export type DriverFilter = 'All' | 'Pending' | 'Active' | 'Blocked';
+export type DriverFilter = 'All' | 'Pending' | 'Active' | 'Blocked' | 'Suspended' | 'Warning';
 export type AdminSection = 'overview' | 'drivers' | 'owners' | 'trips' | 'finance' | 'tickets' | 'settings';
 
 
@@ -314,6 +318,22 @@ export interface AdminDashboardStats {
   totalTrips: number;
   pendingDriversCount: number;
   totalEarnings: number; // Platform Total Commission
+  suspendedDriversCount: number;
+  warningDriversCount: number;
+}
+
+export interface RatingAuditEntry {
+  id: string;
+  tripId: string;
+  ownerId: string;
+  score: number;
+  previousPoints: number;
+  newPoints: number;
+  delta: number;
+  streakBefore: number;
+  streakAfter: number;
+  actionTriggered: string | null;
+  createdAt: string;
 }
 
 // --- Payments Summary Types ---
