@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IMAGES } from '@/constants';
+import { IMAGES, LOGO } from '@/constants';
 import { CapacitorService } from '@/services/CapacitorService';
 
 const WelcomeScreen: React.FC = () => {
@@ -23,12 +23,7 @@ const WelcomeScreen: React.FC = () => {
 
       {/* Top Header / Logo */}
       <div className="flex items-center justify-center pt-8 pb-4 z-10 animate-slide-up">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary text-white shadow-lg shadow-primary/30">
-            <span style={{ fontFamily: "'TAN MIGNON', 'Playfair Display', Georgia, serif", fontSize: '1.25rem', lineHeight: 1, paddingBottom: '2px' }} className="font-normal">B</span>
-          </div>
-          <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight italic">BICA<span className="text-primary NOT-italic">DRIVE</span></span>
-        </div>
+        <img src={LOGO} alt="Bica Driver" className="h-10 w-auto object-contain rounded-lg" />
       </div>
 
       {/* Main Content Area - Responsive flex column */}

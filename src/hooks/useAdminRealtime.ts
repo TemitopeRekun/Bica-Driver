@@ -60,6 +60,14 @@ export const useAdminRealtime = ({ adminId, onNewDriver, onTripCompleted, onDash
       onDashboardUpdate?.('admin:driver:suspended');
     });
 
+    // Listen for sub-account creation failures
+    socketRef.current.on('admin:driver:subaccount_failed', (data: any) => {
+      console.warn('📡 [AdminWS] Sub-account failed:', data);
+      sounds.playAlert();
+      addToast(`⚠️ Payout setup failed for ${data.driverName}: ${data.error}`, 'error');
+      onDashboardUpdate?.('admin:driver:subaccount_failed');
+    });
+
     // General dashboard update signal
     socketRef.current.on('admin:dashboard:update', (data: any) => {
       onDashboardUpdate?.(data.event ?? 'unknown');

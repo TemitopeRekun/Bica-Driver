@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserRole } from '@/types';
 import { CapacitorService } from '@/services/CapacitorService';
-import { IMAGES } from '@/constants';
+import { IMAGES, LOGO } from '@/constants';
 
 const RoleSelectionScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -31,7 +31,7 @@ const RoleSelectionScreen: React.FC = () => {
         >
           <span className="material-symbols-outlined text-slate-900 dark:text-white">arrow_back</span>
         </button>
-        <h1 className="text-lg font-bold leading-tight tracking-tight text-center">Bicadriver</h1>
+        <img src={LOGO} alt="Bica Driver" className="h-8 w-auto object-contain rounded-lg" />
         <div className="size-10"></div>
       </header>
 

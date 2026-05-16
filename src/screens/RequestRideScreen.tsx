@@ -21,7 +21,7 @@ import DriverStatusCard from '@/components/RequestRide/DriverStatusCard';
 import { InlineError } from '@/components/Common/InlineError';
 import { Skeleton } from '@/components/Common/Skeleton';
 
-import { IMAGES } from '@/constants';
+import { IMAGES, LOGO } from '@/constants';
 import { UserRole, Trip } from '@/types';
 import { getLocationShortText } from '@/services/LocationService';
 import { CapacitorService } from '@/services/CapacitorService';
@@ -332,7 +332,7 @@ const RequestRideScreen: React.FC = () => {
         </div>
 
         <div className="flex flex-col items-center pointer-events-none">
-           <span className="text-lg font-bold text-white tracking-tight italic drop-shadow-lg">BICA<span className="text-primary NOT-italic">DRIVE</span></span>
+           <img src={LOGO} alt="Bica Driver" className="h-7 w-auto object-contain rounded-lg drop-shadow-lg" />
            <p className="text-[8px] font-black text-white/60 uppercase tracking-[0.3em] leading-none">Premium Owner Console</p>
         </div>
 

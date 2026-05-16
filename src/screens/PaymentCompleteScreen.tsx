@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { LOGO } from '@/constants';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/services/api.service';
@@ -528,9 +529,7 @@ const PaymentCompleteScreen: React.FC = () => {
         <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.4em]">
           Secure Verification
         </p>
-        <span className="text-xs font-black text-slate-600 dark:text-slate-300 italic tracking-tighter">
-          BICA<span className="text-primary not-italic">DRIVE</span>
-        </span>
+        <img src={LOGO} alt="Bica Driver" className="h-6 w-auto object-contain rounded-lg" />
       </div>
     </div>
   );

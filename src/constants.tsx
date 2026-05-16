@@ -1,4 +1,7 @@
 
+import logo from '@/assets/images/logo.png';
+export { logo as LOGO };
+
 export const IMAGES = {
   WELCOME_HERO: "https://lh3.googleusercontent.com/aida-public/AB6AXuAfBiTSfNhyhqSP_l41ehI8hy_DokR16iXu69GYL7ON_TcJa_XmayaE_4uUC-jaK7jLD5X8Amq0Wxxf4gtskcvhxh4uSMee73EsB-ETfrxV5n6mxnPky2do1MxK5ILwFdlDvKElKpbV-Bq2O6ZXWcw4ser7UuFI0EJ90RXVGlOD0pUoHKVQl3QyMLA0JF5zz21mpTEhCZbx3-D0xZuZD87FdDD0KBZKN8IF5CVxhdfzeF1W33LgfjzfbXXSZcH_GnGRFPh9m-pYw0M",
   OWNER_CARD: "https://lh3.googleusercontent.com/aida-public/AB6AXuCE_cxTeH7mlcOAPn8EVLrlCIE0iDMnsxpAbzvE1JN9j9Zt24orismAYviceomGctEcS-S9cd0T624zTP05S41tVn6vZlJ9NCehC9x2UFlzOumxnUqjGbyNvGo_kXE6S2KN3jf2lwr5ioJCxzGonLrKUdc2GMJxVU0b3B7bBlxL30VVvu-ENElRdpjaamic7A0tnkFEeN_6VtXm7YYZEUqXx8kU7T_DZD9PsbMoXIec3fLEM7O__iy1oYeZmrBncFN1fB4dMD2EHzU",

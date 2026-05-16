@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserProfile, UserRole, ApprovalStatus, RatingAuditEntry } from '@/types';
-import api from '@/services/api.service';
+import { api } from '@/services/api.service';
 
 interface UserDossierModalProps {
   user: UserProfile;
@@ -146,7 +146,7 @@ const UserDossierModal: React.FC<UserDossierModalProps> = ({
     if (user.role === UserRole.DRIVER) {
       setLoadingHistory(true);
       api.get(`/admin/drivers/${user.id}/rating-history`)
-         .then(res => setRatingHistory(res.data))
+         .then(res => setRatingHistory(Array.isArray(res) ? res : []))
          .catch(console.error)
          .finally(() => setLoadingHistory(false));
     }

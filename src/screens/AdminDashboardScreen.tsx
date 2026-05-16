@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { LOGO } from '@/constants';
 import { UserProfile, UserRole, ApprovalStatus, Trip, TripStatus, SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminDashboardStats, AdminSection, DriverFilter, AdminPaymentsSummaryResponse, SummaryPeriod, DateRangeFilter } from '@/types';
 import { mapUser } from '@/mappers/appMappers';
 import { useToast } from '@/hooks/useToast';
@@ -107,8 +108,6 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   const [driverFilter, setDriverFilter] = useState<DriverFilter>('All');
   const [retryingSubAccountIds, setRetryingSubAccountIds] = useState<Set<string>>(new Set());
   const [localSettings, setLocalSettings] = useState<SystemSettings>(settings);
-  const [relativeTime, setRelativeTime] = useState<string>('just now');
-
   const { isRefreshing, pullHandlers } = usePullToRefresh(async () => {
     if (onRetry) await onRetry();
   });
@@ -124,22 +123,6 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
     setSearchTerm(tripId);
     jumpToSection('trips');
   }, [jumpToSection]);
-
-  // Relative Time Logic
-  useEffect(() => {
-    if (!lastUpdated) return;
-
-    const updateRelative = () => {
-      const diff = Math.floor((new Date().getTime() - lastUpdated.getTime()) / 60000);
-      if (diff < 1) setRelativeTime('just now');
-      else if (diff === 1) setRelativeTime('1 min ago');
-      else setRelativeTime(`${diff} mins ago`);
-    };
-
-    updateRelative();
-    const interval = setInterval(updateRelative, 60000);
-    return () => clearInterval(interval);
-  }, [lastUpdated]);
 
   // Merge pendingDrivers (dedicated list) with paginated users.
   // users is always authoritative — it overwrites pendingDrivers so a freshly
@@ -232,33 +215,16 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
           </button>
         )}
         <div className="flex-1">
-          <h1 className="font-black text-lg uppercase tracking-tight">Admin Console</h1>
-          <div className="flex items-center gap-2">
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Bicadriver v1.1.0</p>
-            {lastUpdated && (
-              <>
-                <span className="text-[10px] text-slate-300">•</span>
-                <p className="text-[10px] text-primary/70 font-black uppercase tracking-widest italic animate-pulse">
-                  Last updated {relativeTime}
-                </p>
-              </>
-            )}
-          </div>
+          <img src={LOGO} alt="Bica Driver" className="h-7 w-auto object-contain rounded-lg" />
         </div>
         <div className="flex items-center gap-2">
-          {activeSection === 'overview' && (
-            <button 
-              onClick={onBack} 
-              className="px-4 py-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 flex items-center gap-2 transition-all border border-red-500/10"
-              title="Exit Admin"
-            >
-              <span className="text-[10px] font-black uppercase tracking-wider">Exit Admin</span>
-              <span className="material-symbols-outlined text-sm">exit_to_app</span>
-            </button>
-          )}
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-            <span className="material-symbols-outlined filled">admin_panel_settings</span>
-          </div>
+          <button
+            onClick={onBack}
+            className="px-4 py-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 flex items-center gap-2 transition-all border border-red-500/10"
+          >
+            <span className="material-symbols-outlined text-sm">logout</span>
+            <span className="text-[10px] font-black uppercase tracking-wider">Logout</span>
+          </button>
         </div>
       </header>
 
