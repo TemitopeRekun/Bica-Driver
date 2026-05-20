@@ -333,7 +333,6 @@ const RequestRideScreen: React.FC = () => {
 
         <div className="flex flex-col items-center pointer-events-none">
            <img src={LOGO} alt="Bica Driver" className="h-7 w-auto object-contain rounded-lg drop-shadow-lg" />
-           <p className="text-[8px] font-black text-white/60 uppercase tracking-[0.3em] leading-none">Premium Owner Console</p>
         </div>
 
         <div className="flex-1 flex justify-end gap-3 pointer-events-auto">

@@ -99,7 +99,7 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
 
   const loadWalletSummary = async () => {
     try {
-      const summary = await api.get<WalletSummary>('/wallet/summary');
+      const summary = await api.get<WalletSummary>('/payments/wallet');
       setWalletSummary(summary);
       return summary;
     } catch (e) {

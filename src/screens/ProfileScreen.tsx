@@ -188,14 +188,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h4 className="font-black text-base truncate">Toyota Prius</h4>
-                      <p className="text-slate-500 text-xs font-bold">Dark Grey • Sedan</p>
+                      <h4 className="font-black text-base truncate">
+                        {user.carType ? `${user.carType} ${user.carModel || ''}`.trim() : 'Toyota Prius'}
+                      </h4>
+                      <p className="text-slate-500 text-xs font-bold">
+                        {user.carYear ? `${user.carYear} • ` : ''}{user.transmission || 'Automatic'}
+                      </p>
                     </div>
                     <span className="bg-emerald-500/10 text-emerald-500 text-[10px] font-black uppercase px-2 py-1 rounded-full">Active</span>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 bg-background-light dark:bg-background-dark rounded-xl px-3 py-1.5 w-fit border border-slate-100 dark:border-white/5">
-                    <span className="material-symbols-outlined text-slate-400 text-base">directions_car</span>
-                    <span className="text-xs font-mono font-black tracking-widest uppercase">ABC 1234</span>
                   </div>
                 </div>
               </div>

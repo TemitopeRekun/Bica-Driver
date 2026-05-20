@@ -80,11 +80,9 @@ const ProfileWrapper: React.FC = () => {
   if (!currentUser) return <Navigate to="/login" replace />;
 
   const handleUpdateAvatar = async (newAvatar: string) => {
-    // Optimistically update or wait for API - here we wait for safety
-    await import('@/services/api.service').then(async ({ api }) => {
-      await api.patch('/users/profile', { avatarUrl: newAvatar });
-    });
-    updateProfile({ avatar: newAvatar });
+    const { api } = await import('@/services/api.service');
+    const response = await api.patch<{ id: string; avatarUrl: string }>('/users/avatar', { image: newAvatar });
+    updateProfile({ avatar: response.avatarUrl, avatarUrl: response.avatarUrl });
   };
 
   return (
