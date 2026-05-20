@@ -195,6 +195,18 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
     }
   }, []);
 
+  const recoverTransaction = useCallback(async (transactionReference: string, tripId: string) => {
+    const result = await api.recoverTransaction(transactionReference, tripId);
+    await loadPendingPaymentsPage(0);
+    return result;
+  }, [loadPendingPaymentsPage]);
+
+  const finalizeTrip = useCallback(async (tripId: string) => {
+    const result = await api.finalizeTrip(tripId);
+    await loadPendingPaymentsPage(0);
+    return result;
+  }, [loadPendingPaymentsPage]);
+
   return {
     adminUsers,
     setAdminUsers,
@@ -222,5 +234,7 @@ export const useAdminDashboard = (options: UseAdminDashboardOptions = {}) => {
     loadPendingPaymentsPage,
     loadPaymentHistoryPage,
     loadTicketsPage,
+    recoverTransaction,
+    finalizeTrip,
   };
 };

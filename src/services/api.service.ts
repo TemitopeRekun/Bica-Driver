@@ -317,6 +317,19 @@ export const api = {
   resetWalletBalance: (driverId: string): Promise<{ message: string }> =>
     request<{ message: string }>('POST', `/payments/wallet/reset`, { driverId }, true),
 
+  // Admin — Payment Recovery
+  getOrphanedTransactions: (): Promise<import('@/types').OrphanedTransactionsResponse> =>
+    request<import('@/types').OrphanedTransactionsResponse>('GET', '/payments/orphaned-transactions', undefined, true),
+
+  recoverTransaction: (transactionReference: string, tripId: string): Promise<import('@/types').RecoveryResult> =>
+    request<import('@/types').RecoveryResult>('POST', `/payments/recover/${encodeURIComponent(transactionReference)}`, { tripId }, true),
+
+  finalizeTrip: (tripId: string): Promise<import('@/types').FinalizeResult> =>
+    request<import('@/types').FinalizeResult>('POST', `/payments/finalize/${tripId}`, undefined, true),
+
+  getTripById: (tripId: string): Promise<any> =>
+    request<any>('GET', `/admin/trips/${tripId}`, undefined, true),
+
   // Support
   createSupportTicket: (payload: {
     category: import('@/types').SupportCategory;

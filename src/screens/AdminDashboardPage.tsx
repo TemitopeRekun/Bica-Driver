@@ -22,7 +22,7 @@ const AdminDashboardPage: React.FC = () => {
     adminSettings, adminDashboardLoading, adminDashboardError, lastUpdated,
     loadAdminDashboard, loadUsersPage, loadTripsPage, loadPendingDrivers,
     loadPendingPaymentsPage, loadPaymentHistoryPage, loadTicketsPage,
-    setAdminDashboardError
+    setAdminDashboardError, recoverTransaction, finalizeTrip,
   } = useAdminDashboard();
   const { currentUser } = useAuthStore();
 
@@ -194,6 +194,8 @@ const AdminDashboardPage: React.FC = () => {
       onRetrySubAccount={handleRetrySubAccount}
       onUpdateSettings={handleUpdateSettings}
       onResetWalletBalance={handleResetWalletBalance}
+      onRecover={recoverTransaction}
+      onFinalize={finalizeTrip}
       onForcedLogout={() => logout()}
       onRetry={() => loadAdminDashboard()}
       onClearError={() => setAdminDashboardError(null)}

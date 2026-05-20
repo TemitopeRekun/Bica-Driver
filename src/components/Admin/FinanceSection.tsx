@@ -1,6 +1,7 @@
 import React from 'react';
-import { SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminPaymentsSummaryResponse, SummaryPeriod, DateRangeFilter } from '@/types';
+import { SystemSettings, PendingPaymentTrip, PaymentHistoryRecord, AdminPaymentsSummaryResponse, SummaryPeriod, DateRangeFilter, RecoveryResult } from '@/types';
 import { PaginationMeta } from '@/services/api.service';
+import PaymentRecoveryPanel from './PaymentRecoveryPanel';
 
 interface FinanceSectionProps {
   platformFees: number;
@@ -21,6 +22,8 @@ interface FinanceSectionProps {
   setHistoryStatusFilter: (status: 'ALL' | 'PAID' | 'FAILED') => void;
   historyDateRange: DateRangeFilter;
   setHistoryDateRange: (range: DateRangeFilter) => void;
+  onRecover?: (txRef: string, tripId: string) => Promise<RecoveryResult>;
+  onFinalize?: (tripId: string) => Promise<any>;
 }
 
 const FinanceSection: React.FC<FinanceSectionProps> = ({
@@ -41,15 +44,19 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
   historyStatusFilter,
   setHistoryStatusFilter,
   historyDateRange,
-  setHistoryDateRange
+  setHistoryDateRange,
+  onRecover,
+  onFinalize,
 }) => {
   const [expandedHistoryId, setExpandedHistoryId] = React.useState<string | null>(null);
   const [filterOpen, setFilterOpen] = React.useState(false);
+  const [recoveryPanelOpen, setRecoveryPanelOpen] = React.useState(false);
   const displayPlatformRevenue = adminSummary?.totals.platformRevenue ?? platformFees;
   const displayGrossThroughput = adminSummary?.totals.grossThroughput ?? totalRevenue;
   const displayDriverPayouts = adminSummary?.totals.driverPayouts;
 
   return (
+    <>
     <div className="space-y-8 animate-slide-up font-display">
        {/* Platform Financial Summary */}
        <div className="relative overflow-hidden p-8 rounded-[3rem] bg-slate-900 shadow-2xl group">
@@ -185,10 +192,27 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
             <div className="flex items-center gap-2">
               <span className="size-2 rounded-full bg-orange-500 animate-pulse"></span>
               <h3 className="font-black text-[11px] uppercase tracking-[0.2em] text-slate-500">Settlement Watchlist (Anomalies)</h3>
+              {pendingPayments.length > 0 && (
+                <span className="size-4 rounded-full bg-orange-500 text-white text-[8px] font-black flex items-center justify-center">
+                  {pendingPayments.length > 9 ? '9+' : pendingPayments.length}
+                </span>
+              )}
             </div>
-            
-            {/* Pagination Controls */}
-            {pendingPaymentsMeta && pendingPaymentsMeta.totalPages > 1 && (
+
+            <div className="flex items-center gap-2">
+              {/* Recovery Console button */}
+              {onRecover && onFinalize && (
+                <button
+                  onClick={() => setRecoveryPanelOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-white text-[9px] font-black uppercase tracking-widest shadow-sm shadow-primary/20 hover:bg-primary/90 active:scale-95 transition-all"
+                >
+                  <span className="material-symbols-outlined text-sm">manage_search</span>
+                  Recovery Console
+                </button>
+              )}
+
+              {/* Pagination Controls */}
+              {pendingPaymentsMeta && pendingPaymentsMeta.totalPages > 1 && (
               <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/5 p-1 rounded-xl border border-slate-200 dark:border-slate-800">
                 <button 
                   disabled={pendingPaymentsMeta.page === 0}
@@ -209,8 +233,9 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
                 </button>
               </div>
             )}
+            </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {pendingPayments.map((payment) => (
               <div key={payment.id} className="bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 p-6 rounded-[2rem] shadow-lg shadow-black/5 hover:border-orange-500/30 transition-all group">
@@ -511,6 +536,18 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
           </div>
        </section>
     </div>
+
+    {/* Recovery Console Panel */}
+    {recoveryPanelOpen && onRecover && onFinalize && (
+      <PaymentRecoveryPanel
+        pendingPayments={pendingPayments}
+        onRecover={onRecover}
+        onFinalize={onFinalize}
+        onClose={() => setRecoveryPanelOpen(false)}
+        formatCurrency={formatCurrency}
+      />
+    )}
+    </>
   );
 };
 

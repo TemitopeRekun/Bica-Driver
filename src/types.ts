@@ -428,6 +428,38 @@ export interface SupportTicket {
   user: { name: string; email: string; phone: string };
 }
 
+export interface OrphanedTransaction {
+  transactionReference: string;
+  paymentReference: string;
+  paymentStatus: string;
+  amount: number;
+  createdOn: string;
+  customerEmail: string;
+  customerName: string;
+}
+
+export interface OrphanedTransactionsResponse {
+  orphaned: OrphanedTransaction[];
+  total: number;
+  checkedAt: string;
+  monnifyTotal?: number;
+}
+
+export interface RecoveryResult {
+  tripId: string;
+  transactionReference: string;
+  monnifyStatus: string;
+  amountPaid: string | number;
+  paymentMethod: string | null;
+  tripPaymentStatus: string;
+  message: string;
+}
+
+export interface FinalizeResult {
+  alreadySettled: boolean;
+  driverCredited?: number;
+}
+
 export interface EmergencyHelpContext {
   tripId?: string;
   tripStatus?: string;

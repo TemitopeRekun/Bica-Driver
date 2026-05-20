@@ -39,6 +39,8 @@ interface AdminDashboardScreenProps {
   onRetrySubAccount: (userId: string) => Promise<any>;
   onUpdateSettings: (settings: SystemSettings) => Promise<void>;
   onResetWalletBalance: (driverId: string) => Promise<void>;
+  onRecover?: (txRef: string, tripId: string) => Promise<import('@/types').RecoveryResult>;
+  onFinalize?: (tripId: string) => Promise<any>;
   onForcedLogout: () => void;
   onRetry: () => Promise<void> | void;
   onBack: () => void;
@@ -92,7 +94,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   pendingPayments, pendingPaymentsMeta, paymentHistory, paymentHistoryMeta,
   settings, isLoading, error, lastUpdated,
   onUpdateStatus, onBlockUser, onRetrySubAccount, onUpdateSettings, onForcedLogout,
-  onRetry, onBack, onSimulate, onPageChange,
+  onRetry, onBack, onSimulate, onPageChange, onRecover, onFinalize,
   adminSummary, adminSummaryPeriod, setAdminSummaryPeriod, adminSummaryLoading,
   historyStatusFilter, setHistoryStatusFilter, historyDateRange, setHistoryDateRange,
   onResetWalletBalance,
@@ -387,7 +389,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
             )}
 
             {activeSection === 'finance' && (
-              <FinanceSection 
+              <FinanceSection
                 platformFees={platformFees} totalRevenue={totalRevenue} settings={settings}
                 pendingPayments={pendingPayments} pendingPaymentsMeta={pendingPaymentsMeta}
                 paymentHistory={paymentHistory} paymentHistoryMeta={paymentHistoryMeta}
@@ -401,6 +403,8 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
                 setHistoryStatusFilter={setHistoryStatusFilter}
                 historyDateRange={historyDateRange}
                 setHistoryDateRange={setHistoryDateRange}
+                onRecover={onRecover}
+                onFinalize={onFinalize}
               />
             )}
 
