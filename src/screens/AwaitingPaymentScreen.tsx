@@ -104,7 +104,7 @@ const AwaitingPaymentScreen: React.FC = () => {
           </p>
 
           {/* Payment Roadmap Visual */}
-          <div className="mt-10 w-full grid grid-cols-4 gap-2 px-2 opacity-80">
+          <div className="mt-6 w-full grid grid-cols-4 gap-2 px-2 opacity-80">
              <div className="flex flex-col items-center gap-2">
                 <div className="size-8 rounded-xl bg-emerald-500 flex items-center justify-center text-white">
                    <span className="material-symbols-outlined text-sm">check</span>
@@ -131,7 +131,7 @@ const AwaitingPaymentScreen: React.FC = () => {
              </div>
           </div>
 
-          <div className="mt-12 p-5 bg-slate-900/80 rounded-3xl border border-slate-800 backdrop-blur-md">
+          <div className="mt-8 p-4 bg-slate-900/80 rounded-3xl border border-slate-800 backdrop-blur-md">
              <p className="text-[10px] font-bold text-slate-400 leading-relaxed">
                <strong className="text-slate-200">Safety Policy:</strong> Please do not leave the drop-off point until verification is complete.
              </p>

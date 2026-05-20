@@ -433,11 +433,11 @@ const DriverMainScreen: React.FC = () => {
                 )}
              </div>
           ) : (
-             <div className="flex flex-col gap-6 animate-slide-up">
+             <div className="flex flex-col gap-4 animate-slide-up">
                 <TripProgressTimeline milestone={rideMilestone as any} />
-                <div className="bg-white/5 p-5 rounded-3xl space-y-4">
-                   <div className="flex items-center justify-between mb-6">
-                      <div className="flex flex-col items-start gap-2">
+                <div className="bg-white/5 p-4 rounded-3xl space-y-3">
+                   <div className="flex items-center justify-between mb-4">
+                      <div className="flex flex-col items-start gap-1.5">
                         <div className="flex items-center gap-3">
                           <img src={activeRide.avatar} className="size-12 rounded-full border-2 border-primary" alt="" />
                           <h4 className="font-bold text-white text-lg">{activeRide.ownerName}</h4>
@@ -470,9 +470,9 @@ const DriverMainScreen: React.FC = () => {
                         </button>
                       </div>
                    </div>
-                   {rideMilestone === 'assigned' && <button onClick={() => handleUpdateStatus('ARRIVED')} className="w-full bg-primary py-5 rounded-2xl text-white font-black text-lg">I Have Arrived</button>}
-                   {rideMilestone === 'arrived' && <button onClick={() => setShowConditionModal(true)} className="w-full bg-accent py-5 rounded-2xl text-white font-black text-lg">Upload Car Photos</button>}
-                   {rideMilestone === 'in_progress' && <button onClick={() => handleUpdateStatus('COMPLETED')} className="w-full bg-red-500 py-5 rounded-2xl text-white font-black text-lg">Complete Trip</button>}
+                   {rideMilestone === 'assigned' && <button onClick={() => handleUpdateStatus('ARRIVED')} className="w-full bg-primary py-3.5 rounded-2xl text-white font-black text-sm uppercase tracking-wide">I Have Arrived</button>}
+                   {rideMilestone === 'arrived' && <button onClick={() => setShowConditionModal(true)} className="w-full bg-accent py-3.5 rounded-2xl text-white font-black text-sm uppercase tracking-wide">Upload Car Photos</button>}
+                   {rideMilestone === 'in_progress' && <button onClick={() => handleUpdateStatus('COMPLETED')} className="w-full bg-red-500 py-3.5 rounded-2xl text-white font-black text-sm uppercase tracking-wide">Complete Trip</button>}
                 </div>
              </div>
            )}
@@ -516,7 +516,7 @@ const DriverMainScreen: React.FC = () => {
                 <button
                   onClick={verifyOtpAndStart}
                   disabled={otpValue.length < 4 || isVerifyingOtp || isLockedOut}
-                  className="w-full bg-primary disabled:bg-slate-700 py-5 rounded-2xl text-white font-black text-xl flex items-center justify-center gap-3 transition-all"
+                  className="w-full bg-primary disabled:bg-slate-700 py-4 rounded-2xl text-white font-black text-base flex items-center justify-center gap-3 transition-all"
                 >
                   {isVerifyingOtp ? <div className="size-6 border-3 border-white/30 border-t-white rounded-full animate-spin" /> : 'Start Trip'}
                 </button>

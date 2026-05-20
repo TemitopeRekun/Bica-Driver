@@ -43,7 +43,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in font-display">
       <div className="w-full max-w-sm bg-white dark:bg-surface-dark rounded-[3rem] shadow-2xl overflow-hidden animate-slide-up border border-white/10">
         {/* Header */}
-        <div className="px-8 py-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-white/5">
+        <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-white/5">
           <div>
             <h3 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter italic uppercase">
               {isDriver ? 'Earnings' : (isPaid ? 'Settled!' : 'Trip Bill')}
@@ -62,7 +62,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
           )}
         </div>
 
-        <div className="p-8 space-y-8">
+        <div className="p-6 space-y-5">
           {/* Route Overview */}
           {(pickup || destination) && (
             <div className="space-y-4 pb-6 border-b border-slate-100 dark:border-slate-800">
@@ -103,16 +103,16 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">BICA Commission</span>
                     <span className="text-sm font-black text-red-500">- ₦{commission.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between items-center p-5 rounded-3xl bg-emerald-500/5 border border-emerald-500/10 mt-2">
+                  <div className="flex justify-between items-center p-4 rounded-3xl bg-emerald-500/5 border border-emerald-500/10 mt-2">
                     <span className="text-[11px] font-black text-emerald-600 uppercase tracking-widest">Net Earnings</span>
-                    <span className="text-3xl font-black text-emerald-600 tracking-tighter italic">₦{earnings.toLocaleString()}</span>
+                    <span className="text-2xl font-black text-emerald-600 tracking-tighter italic">₦{earnings.toLocaleString()}</span>
                   </div>
                </div>
               ) : (
                 <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                   <div className="flex justify-between items-center p-6 rounded-[2.5rem] bg-primary/5 border border-primary/10">
+                   <div className="flex justify-between items-center p-4 rounded-3xl bg-primary/5 border border-primary/10">
                       <span className="text-[11px] font-black text-primary uppercase tracking-widest">Total Fare</span>
-                      <span className="text-4xl font-black text-primary tracking-tighter italic">₦{total.toLocaleString()}</span>
+                      <span className="text-3xl font-black text-primary tracking-tighter italic">₦{total.toLocaleString()}</span>
                    </div>
                 </div>
               )}
