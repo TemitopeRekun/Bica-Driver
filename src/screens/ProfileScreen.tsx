@@ -117,10 +117,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
               <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">
                 {activeRole === UserRole.DRIVER ? 'Professional Driver' : 'Car Owner'}
               </span>
-              <span className="text-slate-500 text-xs font-bold flex items-center gap-1">
-                <span className="material-symbols-outlined text-yellow-500 filled" style={{ fontSize: '14px' }}>star</span>
-                {user.rating} ({user.trips})
-              </span>
+              {activeRole === UserRole.DRIVER && (
+                <span className="text-slate-500 text-xs font-bold flex items-center gap-1">
+                  <span className="material-symbols-outlined text-yellow-500 filled" style={{ fontSize: '14px' }}>star</span>
+                  {user.rating != null ? (user.rating > 5 ? (user.rating / 100).toFixed(1) : user.rating.toFixed(1)) : '5.0'} ({user.trips})
+                </span>
+              )}
             </div>
           </div>
         </div>

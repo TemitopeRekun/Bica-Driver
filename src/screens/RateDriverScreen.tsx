@@ -83,7 +83,7 @@ const RateDriverScreen: React.FC = () => {
             {driver?.rating && (
               <div className="flex items-center gap-1 bg-slate-800/50 px-2 py-1 rounded-full border border-slate-700/50">
                 <span className="material-symbols-outlined text-[14px] text-amber-400 fill-current">star</span>
-                <span>{driver.rating.toFixed(1)}</span>
+                <span>{driver.rating > 5 ? (driver.rating / 100).toFixed(1) : driver.rating.toFixed(1)}</span>
               </div>
             )}
             {driver?.totalTrips && (

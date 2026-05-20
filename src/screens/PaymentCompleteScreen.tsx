@@ -6,6 +6,7 @@ import { api } from '@/services/api.service';
 import { useRatingGateStore } from '@/stores/ratingGateStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useOwnerRealtime } from '@/hooks/useOwnerRealtime';
+import { Capacitor } from '@capacitor/core';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 2500;
@@ -74,6 +75,11 @@ const PaymentCompleteScreen: React.FC = () => {
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasStartedRef = useRef(false);
 
+  // Pull-to-refresh state
+  const [pullY, setPullY] = useState(0);
+  const touchStartYRef = useRef(0);
+  const isPullingRef = useRef(false);
+
   const handleSuccess = (data: any) => {
     clearInterval_();
     localStorage.removeItem(STORAGE_KEY);
@@ -104,6 +110,41 @@ const PaymentCompleteScreen: React.FC = () => {
       if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
     };
   }, []);
+
+  // Block hardware back button on Android — going back mid-payment is illogical
+  useEffect(() => {
+    if (Capacitor.getPlatform() === 'web') return;
+    let handle: any;
+    import('@capacitor/app').then(({ App }) => {
+      handle = App.addListener('backButton', () => { /* intentionally blocked */ });
+    });
+    return () => { handle?.then?.((h: any) => h.remove()); };
+  }, []);
+
+  // Pull-to-refresh handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartYRef.current = e.touches[0].clientY;
+    isPullingRef.current = true;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPullingRef.current) return;
+    const delta = e.touches[0].clientY - touchStartYRef.current;
+    if (delta > 0) setPullY(Math.min(delta, 72));
+  };
+
+  const handleTouchEnd = () => {
+    if (pullY >= 60 && (screenState === 'polling' || screenState === 'timeout' || screenState === 'error')) {
+      hasStartedRef.current = false;
+      pollCountRef.current = 0;
+      setPollCount(0);
+      setErrorMsg(null);
+      const tripId = localStorage.getItem(STORAGE_KEY) || tripIdRef.current;
+      if (tripId) startPolling(tripId);
+    }
+    setPullY(0);
+    isPullingRef.current = false;
+  };
 
   // 🛡️ Real-time Success Handshake
   useOwnerRealtime({
@@ -238,7 +279,28 @@ const PaymentCompleteScreen: React.FC = () => {
   }, [isInitializing, isAuthenticated]);
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-start bg-background-light dark:bg-background-dark px-6 pt-32 pb-12 font-display">
+    <div
+      className="min-h-screen w-full flex flex-col items-center justify-start bg-background-light dark:bg-background-dark px-6 pt-32 pb-12 font-display"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull-to-refresh indicator */}
+      {pullY > 0 && (
+        <div
+          className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center transition-all"
+          style={{ height: pullY }}
+        >
+          <div className={`flex items-center gap-2 transition-opacity ${pullY >= 60 ? 'opacity-100' : 'opacity-40'}`}>
+            <span className={`material-symbols-outlined text-primary text-lg ${pullY >= 60 ? 'animate-spin' : ''}`}>
+              refresh
+            </span>
+            <span className="text-[10px] font-black text-primary uppercase tracking-widest">
+              {pullY >= 60 ? 'Release to refresh' : 'Pull to refresh'}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── WAITING FOR SESSION ─────────────────────────────────────────── */}
       {(screenState === 'waiting_session') && (

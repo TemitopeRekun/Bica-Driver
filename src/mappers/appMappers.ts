@@ -61,7 +61,7 @@ export const mapAvailableDriver = (driver: any): UserProfile => ({
   email: '',
   phone: '',
   role: UserRole.DRIVER,
-  rating: driver.rating ?? 0,
+  rating: driver.rating != null ? (driver.rating > 5 ? +(driver.rating / 100).toFixed(1) : +driver.rating) : 0,
   trips: driver.totalTrips ?? 0,
   totalTrips: driver.totalTrips ?? 0,
   avatar: driver.avatarUrl || IMAGES.DRIVER_CARD,

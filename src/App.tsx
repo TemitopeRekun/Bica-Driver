@@ -12,6 +12,7 @@ import { mapUser } from '@/mappers/appMappers';
 import { CapacitorService } from '@/services/CapacitorService';
 import { UserRole } from '@/types';
 import { useRatingGateStore } from './stores/ratingGateStore';
+import { useRideStore } from './stores/rideStore';
 import { useAppResume } from '@/hooks/useAppResume';
 
 // Components
@@ -56,8 +57,14 @@ const App: React.FC = () => {
       });
     }
     
-    // Centralized 401 listener
+    // Centralized 401 listener — suppressed during active trips to prevent
+    // the car owner from being ejected when a driver accepts/starts a ride
+    // (socket reconnects can briefly trigger spurious 401s).
     setOnUnauthorizedListener((message) => {
+      const rideState = useRideStore.getState().rideState;
+      if (rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS') {
+        return;
+      }
       addToast(message || 'Session expired', 'error');
       logout();
     });

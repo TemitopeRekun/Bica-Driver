@@ -66,10 +66,10 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
 
   const timeAway = getDynamicTimeAway();
   return (
-    <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 animate-slide-up">
+    <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-4 shadow-2xl border border-slate-200 dark:border-slate-800 animate-slide-up">
       <RideStoryTimeline milestone={rideMilestone} lastUpdate={lastMilestoneUpdate} />
-      
-      <div className="flex items-center justify-between mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+
+      <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-100 dark:border-slate-800">
         <div className="flex items-center gap-2">
           <span className="relative flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -114,12 +114,12 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
         </div>
       )}
 
-      <div className="flex items-center gap-5 mb-6">
+      <div className="flex items-center gap-3 mb-4">
         <div className="relative group/avatar">
-          <img 
-            src={driverInfo.avatar || IMAGES.DRIVER_CARD} 
-            className="w-20 h-20 rounded-[1.5rem] object-cover ring-4 ring-slate-100 dark:ring-white/5 transition-transform group-hover/avatar:scale-105" 
-            alt="Driver" 
+          <img
+            src={driverInfo.avatar || IMAGES.DRIVER_CARD}
+            className="w-14 h-14 rounded-2xl object-cover ring-2 ring-slate-100 dark:ring-white/5 transition-transform group-hover/avatar:scale-105"
+            alt="Driver"
           />
           {driverInfo.acceptanceImageUrl && (
             <div 
@@ -134,42 +134,44 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-xl font-black leading-tight truncate">{driverInfo.name}</h3>
+          <h3 className="text-base font-black leading-tight truncate">{driverInfo.name}</h3>
           <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{driverInfo.car} • <span className="text-slate-900 dark:text-slate-300">{driverInfo.plate}</span></p>
           <div className="flex items-center gap-2 mt-2">
             <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-0.5 rounded-lg border border-yellow-500/20">
               <span className="material-symbols-outlined text-yellow-500 text-[14px] filled">star</span>
-              <span className="text-[11px] font-black text-yellow-700 dark:text-yellow-500">{driverInfo.rating}</span>
+              <span className="text-[11px] font-black text-yellow-700 dark:text-yellow-500">
+                {driverInfo.rating > 5 ? (driverInfo.rating / 100).toFixed(1) : driverInfo.rating.toFixed(1)}
+              </span>
             </div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{driverInfo.trips} Trips</span>
           </div>
         </div>
-        <div className="flex flex-col gap-2">
-          <button onClick={onCall} className="size-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm">
-            <span className="material-symbols-outlined text-xl">call</span>
+        <div className="flex flex-col gap-1.5">
+          <button onClick={onCall} className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm">
+            <span className="material-symbols-outlined text-lg">call</span>
           </button>
-          <button onClick={onChat} className="size-11 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 transition-all">
-            <span className="material-symbols-outlined text-xl">chat</span>
+          <button onClick={onChat} className="size-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-slate-200 transition-all">
+            <span className="material-symbols-outlined text-lg">chat</span>
           </button>
-          <button onClick={onSupport} className="size-11 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-500 flex items-center justify-center hover:bg-amber-500 hover:text-white transition-all">
-            <span className="material-symbols-outlined text-xl">support_agent</span>
+          <button onClick={onSupport} className="size-10 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-500 flex items-center justify-center hover:bg-amber-500 hover:text-white transition-all">
+            <span className="material-symbols-outlined text-lg">support_agent</span>
           </button>
         </div>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex gap-2">
         <button
           onClick={onTrack}
-          className="flex-1 py-4 rounded-2xl bg-slate-100 dark:bg-slate-800 font-black text-[10px] uppercase tracking-widest text-slate-700 dark:text-slate-200 flex items-center justify-center gap-2"
+          className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 font-black text-[10px] uppercase tracking-widest text-slate-700 dark:text-slate-200 flex items-center justify-center gap-1.5"
         >
-          <span className="material-symbols-outlined text-lg">map</span>
+          <span className="material-symbols-outlined text-base">map</span>
           Track
         </button>
-        <button 
-          onClick={onSOS} 
-          className="flex-1 py-4 rounded-2xl bg-red-500/10 font-black text-[10px] uppercase tracking-widest text-red-500 flex items-center justify-center gap-2 border border-red-500/20 active:scale-95 transition-all"
+        <button
+          onClick={onSOS}
+          className="flex-1 py-3 rounded-xl bg-red-500/10 font-black text-[10px] uppercase tracking-widest text-red-500 flex items-center justify-center gap-1.5 border border-red-500/20 active:scale-95 transition-all"
         >
-          <span className="material-symbols-outlined text-lg">emergency</span>
+          <span className="material-symbols-outlined text-base">emergency</span>
           Get Help
         </button>
       </div>
@@ -177,7 +179,7 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
       {(rideState === 'ASSIGNED' || rideState === 'SEARCHING') && onCancel && (
         <button
           onClick={onCancel}
-          className="mt-4 w-full py-4 rounded-xl bg-red-600 text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-red-500/30 hover:bg-red-700 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+          className="mt-3 w-full py-3 rounded-xl bg-red-600 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-red-500/30 hover:bg-red-700 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
         >
           <span className="material-symbols-outlined text-lg">close</span>
           Cancel Ride Request

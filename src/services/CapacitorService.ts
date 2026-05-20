@@ -300,12 +300,19 @@ export const CapacitorService = {
 
   async initBackButton(onBack?: () => void) {
     if (Capacitor.getPlatform() === 'web') return;
-    
+
+    // Routes where pressing back should exit the app rather than navigate backward.
+    // This prevents users from accidentally going back to the login/welcome screen
+    // while they are on their "home" dashboard.
+    const HOME_ROUTES = ['/owner', '/driver', '/admin', '/'];
+
     try {
       const { App } = await import('@capacitor/app');
       App.addListener('backButton', ({ canGoBack }) => {
-        if (!canGoBack) {
-          // If at the root of the app, we can exit or show a toast
+        const hash = window.location.hash.replace('#', '').split('?')[0] || '/';
+        const isHomeRoute = HOME_ROUTES.some(r => hash === r || hash === r + '/');
+
+        if (!canGoBack || isHomeRoute) {
           App.exitApp();
         } else if (onBack) {
           onBack();
