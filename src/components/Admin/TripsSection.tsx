@@ -20,6 +20,7 @@ const TripsSection: React.FC<TripsSectionProps> = ({
   searchTerm = '',
 }) => {
   const [localSearch, setLocalSearch] = useState(searchTerm);
+  const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
 
   const filtered = trips.filter(t =>
     !localSearch ||
@@ -67,52 +68,110 @@ const TripsSection: React.FC<TripsSectionProps> = ({
       ) : (
         <>
           <div className="space-y-4">
-            {filtered.map((trip) => (
-              <div
-                key={trip.id}
-                className="bg-white dark:bg-surface-dark p-6 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col gap-5 hover:shadow-md transition-all active:scale-[0.98]"
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-4">
-                    <div className={`size-12 rounded-2xl flex items-center justify-center ${getTripStatusClass(trip.status)}`}>
-                      <span className="material-symbols-outlined">trip_origin</span>
-                    </div>
-                    <div>
-                      <h4 className="font-black text-base text-slate-900 dark:text-white leading-tight">
-                        {trip.location}
-                      </h4>
-                      <p className="text-xs text-slate-500 font-medium">#{trip.id.slice(0, 8)} · {trip.date}</p>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest ${getTripStatusClass(trip.status)}`}>
-                    {trip.status.replace(/_/g, ' ')}
-                  </span>
-                </div>
+            {filtered.map((trip) => {
+              const isExpanded = expandedTripId === trip.id;
+              const hasPhotos = trip.carFrontUrl || trip.carBackUrl || trip.carLeftUrl || trip.carRightUrl;
 
-                <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-white/5">
-                  <div className="flex items-center gap-3">
-                    <div className="flex -space-x-3">
-                      <div className="size-10 rounded-2xl bg-primary/10 border-4 border-white dark:border-surface-dark flex items-center justify-center text-[10px] font-black text-primary overflow-hidden shadow-sm">
-                        {trip.ownerName?.[0] ?? '?'}
+              return (
+                <div
+                  key={trip.id}
+                  onClick={() => setExpandedTripId(isExpanded ? null : trip.id)}
+                  className={`bg-white dark:bg-surface-dark p-6 rounded-[2.5rem] border ${isExpanded ? 'border-primary shadow-md' : 'border-slate-100 dark:border-slate-800 shadow-sm'} flex flex-col gap-5 cursor-pointer hover:shadow-md transition-all active:scale-[0.98]`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-4">
+                      <div className={`size-12 rounded-2xl flex items-center justify-center ${getTripStatusClass(trip.status)}`}>
+                        <span className="material-symbols-outlined">trip_origin</span>
                       </div>
-                      <div className="size-10 rounded-2xl bg-indigo-500/10 border-4 border-white dark:border-surface-dark flex items-center justify-center text-[10px] font-black text-indigo-500 overflow-hidden shadow-sm">
-                        {trip.driverName?.[0] ?? '?'}
+                      <div>
+                        <h4 className="font-black text-base text-slate-900 dark:text-white leading-tight">
+                          {trip.location}
+                        </h4>
+                        <p className="text-xs text-slate-500 font-medium">#{trip.id.slice(0, 8)} · {trip.date}</p>
                       </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Participants</p>
-                      <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[150px]">
-                        {trip.ownerName} & {trip.driverName || 'UNASSIGNED'}
-                      </p>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className={`text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest ${getTripStatusClass(trip.status)}`}>
+                        {trip.status.replace(/_/g, ' ')}
+                      </span>
+                      <span className="material-symbols-outlined text-slate-400 text-sm">
+                        {isExpanded ? 'expand_less' : 'expand_more'}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Fare Value</p>
-                    <p className="font-black text-lg text-slate-900 dark:text-white">{formatCurrency(trip.amount)}</p>
+
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-white/5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex -space-x-3">
+                        <div className="size-10 rounded-2xl bg-primary/10 border-4 border-white dark:border-surface-dark flex items-center justify-center text-[10px] font-black text-primary overflow-hidden shadow-sm">
+                          {trip.ownerName?.[0] ?? '?'}
+                        </div>
+                        <div className="size-10 rounded-2xl bg-indigo-500/10 border-4 border-white dark:border-surface-dark flex items-center justify-center text-[10px] font-black text-indigo-500 overflow-hidden shadow-sm">
+                          {trip.driverName?.[0] ?? '?'}
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Participants</p>
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[150px]">
+                          {trip.ownerName} & {trip.driverName || 'UNASSIGNED'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Fare Value</p>
+                      <p className="font-black text-lg text-slate-900 dark:text-white">{formatCurrency(trip.amount)}</p>
+                    </div>
                   </div>
+
+                  {isExpanded && (
+                    <div className="mt-2 pt-4 border-t border-slate-100 dark:border-slate-800 animate-slide-up" onClick={e => e.stopPropagation()}>
+                      <h5 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-[0.15em] mb-4">Car Condition Photos</h5>
+                      
+                      {!hasPhotos ? (
+                        <div className="p-6 text-center border border-dashed border-slate-200 dark:border-slate-700 rounded-2xl">
+                          <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 mb-2 text-3xl">no_photography</span>
+                          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">No Photos Recorded</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { label: 'Front', url: trip.carFrontUrl },
+                            { label: 'Back', url: trip.carBackUrl },
+                            { label: 'Left', url: trip.carLeftUrl },
+                            { label: 'Right', url: trip.carRightUrl }
+                          ].map((photo, i) => (
+                            <div key={i} className="flex flex-col gap-1">
+                              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest pl-1">{photo.label}</span>
+                              {photo.url ? (
+                                <a 
+                                  href={photo.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="block w-full aspect-video bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden group relative"
+                                >
+                                  <img 
+                                    src={photo.url} 
+                                    alt={`Car ${photo.label}`} 
+                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                  />
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                    <span className="material-symbols-outlined text-white opacity-0 group-hover:opacity-100 transition-opacity">open_in_new</span>
+                                  </div>
+                                </a>
+                              ) : (
+                                <div className="w-full aspect-video bg-slate-50 dark:bg-slate-800/50 rounded-xl flex items-center justify-center border border-dashed border-slate-200 dark:border-slate-700">
+                                  <span className="text-[10px] font-bold text-slate-400">Missing</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Pagination */}

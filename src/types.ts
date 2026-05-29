@@ -118,6 +118,7 @@ export interface Trip {
   estimatedMins?: number | null;
   driverEarnings?: number;
   commissionAmount?: number;
+  commissionPercent?: number;
   monnifyTxRef?: string;
   fareBreakdown?: Record<string, unknown> | null;
   progressMilestone?: 'assigned' | 'arrived' | 'in_progress' | 'completed';

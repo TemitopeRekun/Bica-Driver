@@ -119,7 +119,7 @@ const EmergencyHelpSheet: React.FC<EmergencyHelpSheetProps> = ({ context, onClos
             className="w-full py-5 rounded-2xl bg-red-600 text-white flex items-center justify-center gap-3 shadow-lg shadow-red-900/40 active:scale-95 transition-all"
           >
             <span className="material-symbols-outlined">call</span>
-            <span className="font-black uppercase tracking-widest italic">Call BicaDrive Support</span>
+            <span className="font-black uppercase tracking-widest italic">Call BicaDriver Support</span>
           </a>
 
           {(context.locationLat !== undefined && context.locationLng !== undefined) ? (
@@ -130,7 +130,7 @@ const EmergencyHelpSheet: React.FC<EmergencyHelpSheetProps> = ({ context, onClos
               className="w-full py-5 rounded-2xl bg-green-700 text-white flex items-center justify-center gap-3 shadow-lg shadow-green-900/40 active:scale-95 transition-all"
             >
               <span className="material-symbols-outlined">chat</span>
-              <span className="font-black uppercase tracking-widest italic">WhatsApp BicaDrive</span>
+              <span className="font-black uppercase tracking-widest italic">WhatsApp BicaDriver</span>
             </a>
           ) : (
             <button 
@@ -147,7 +147,7 @@ const EmergencyHelpSheet: React.FC<EmergencyHelpSheetProps> = ({ context, onClos
       {/* Disclaimer Footer */}
       <div className="px-6 pb-8 text-center space-y-4">
         <p className="text-[10px] text-red-200/60 font-medium leading-relaxed max-w-[280px] mx-auto">
-          This opens your phone's native call or message app. BicaDrive does not have a live dispatch service.
+          BicaDriver does not have a live dispatch service. If you are in immediate physical danger, always contact the national emergency number (112) or the nearest police station.
         </p>
         <div className="flex items-center justify-center gap-6">
           <div className="text-center">

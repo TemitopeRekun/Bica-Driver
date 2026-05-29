@@ -291,7 +291,7 @@ const UserDossierModal: React.FC<UserDossierModalProps> = ({
                   <p className="font-mono font-black text-sm text-slate-900 dark:text-white">
                     {userDetailsLoading && !user.nin
                       ? <span className="inline-block w-28 h-4 bg-slate-200 dark:bg-slate-700 rounded animate-pulse" />
-                      : (user.nin || <span className="text-slate-400 font-normal text-xs italic">Not provided</span>)
+                      : (user.nin ? (user.nin.length > 4 ? '*'.repeat(user.nin.length - 4) + user.nin.slice(-4) : user.nin) : <span className="text-slate-400 font-normal text-xs italic">Not provided</span>)
                     }
                   </p>
                 </div>

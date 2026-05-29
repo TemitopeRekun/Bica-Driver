@@ -44,7 +44,7 @@ const SupportChatbot: React.FC<{ user: UserProfile, context?: SupportContext }> 
         {
           id: 'welcome',
           role: 'model',
-          text: `Hello ${user.name}! I'm the BicaDrive Support Assistant. Please select a category below to start.`
+          text: `Hello ${user.name}! I'm the BicaDriver Support Assistant. Please select a category below to start.`
         }
       ]);
     }
@@ -79,7 +79,7 @@ const SupportChatbot: React.FC<{ user: UserProfile, context?: SupportContext }> 
   }, [messages, supportOpen]);
 
   const buildSystemPrompt = (u: UserProfile, ctx: SupportContext | null, cat: SupportCategory) => {
-    let prompt = `You are a helpful support assistant for BicaDrive, a luxury ride-hailing app in Nigeria.
+    let prompt = `You are a helpful support assistant for BicaDriver, a luxury ride-hailing app in Nigeria.
 You help drivers and car owners with inquiries and complaints.
 User: ${u.name} | Role: ${u.role} | Category: ${cat}`;
 
@@ -212,7 +212,7 @@ User: ${u.name} | Role: ${u.role} | Category: ${cat}`;
                <span className="material-symbols-outlined">support_agent</span>
             </div>
             <div>
-               <h3 className="font-black text-lg uppercase tracking-tight italic">Bica Support</h3>
+               <h3 className="font-black text-lg uppercase tracking-tight italic">BicaDriver Support</h3>
                <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Always at your service</p>
             </div>
           </div>

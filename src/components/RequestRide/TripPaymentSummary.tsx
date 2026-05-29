@@ -12,6 +12,7 @@ interface TripPaymentSummaryProps {
     totalAmount?: number;
     driverEarnings?: number;
     platformFee?: number;
+    commissionPercent?: number;
   } | null;
   paymentStatus?: 'UNPAID' | 'SUCCESS' | 'FAILED' | 'PENDING' | 'PAID' | 'PARTIALLY_PAID' | 'CANCELLED';
   paymentMessage?: string | null;
@@ -38,6 +39,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
   const total = fareBreakdown?.totalAmount || fareBreakdown?.finalFare || 0;
   const earnings = fareBreakdown?.driverEarnings || 0;
   const commission = fareBreakdown?.platformFee || (total - earnings);
+  const commissionPercentDisplay = fareBreakdown?.commissionPercent || 25;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in font-display">
@@ -100,7 +102,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                     <span className="text-sm font-black text-slate-900 dark:text-white">₦{total.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center opacity-60">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">BICA Commission</span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">BicaDriver Commission ({commissionPercentDisplay}%)</span>
                     <span className="text-sm font-black text-red-500">- ₦{commission.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center p-4 rounded-3xl bg-emerald-500/5 border border-emerald-500/10 mt-2">
@@ -125,7 +127,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                <div>
                   <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Payment Confirmed</h4>
                   <p className="text-[10px] text-emerald-700/70 font-bold leading-relaxed">
-                    {isDriver ? 'Funds have been credited to your internal ledger and will be settled automatically.' : 'Trip settlement has been verified by Monnify and BICA.'}
+                    {isDriver ? 'Funds have been credited to your internal ledger and will be settled automatically.' : 'Trip settlement has been verified by Monnify and BicaDriver.'}
                   </p>
                </div>
             </div>
@@ -135,7 +137,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
                <div>
                   <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{isDriver ? 'Awaiting Confirmation' : 'Safe Checkout'}</h4>
                   <p className="text-[10px] text-slate-400 font-bold leading-relaxed italic">
-                    {isDriver ? 'Verification is required before earnings are credited to your active wallet.' : 'BICA uses bank-grade encryption to secure every transaction.'}
+                    {isDriver ? 'Verification is required before earnings are credited to your active wallet.' : 'BicaDriver uses bank-grade encryption to secure every transaction.'}
                   </p>
                </div>
             </div>

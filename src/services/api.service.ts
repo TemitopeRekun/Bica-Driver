@@ -330,6 +330,10 @@ export const api = {
   getTripById: (tripId: string): Promise<any> =>
     request<any>('GET', `/admin/trips/${tripId}`, undefined, true),
 
+  // Account Management
+  deleteAccount: (password: string) =>
+    request<{ message: string; success: boolean }>('DELETE', '/users/me', { password }, true),
+
   // Support
   createSupportTicket: (payload: {
     category: import('@/types').SupportCategory;

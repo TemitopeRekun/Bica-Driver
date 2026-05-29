@@ -5,6 +5,8 @@ import { IMAGES } from '@/constants';
 import { CapacitorService } from '@/services/CapacitorService';
 import { Skeleton } from '@/components/Common/Skeleton';
 import { useUIStore } from '@/stores/uiStore';
+import { api } from '@/services/api.service';
+import { useAuthStore } from '@/stores/authStore';
 
 interface ProfileScreenProps {
   user: UserProfile;
@@ -20,6 +22,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
   const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
   const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
   const { mapTheme, toggleMapTheme } = useUIStore();
+
+  // Delete Account modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   if (!user) {
     return (
@@ -48,6 +57,47 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
   const handleFeatureAlert = (feature: string) => {
     CapacitorService.triggerHaptic();
     toast.info(`Great news! ${feature} is coming very soon to your BICA experience.`);
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      setDeleteError('');
+      
+      // Validate inputs
+      if (!deletePassword.trim()) {
+        setDeleteError('Password is required');
+        return;
+      }
+      
+      if (deleteConfirmation !== 'DELETE') {
+        setDeleteError('Type DELETE to confirm');
+        return;
+      }
+      
+      CapacitorService.triggerHaptic();
+      setIsDeletingAccount(true);
+      
+      // Call deletion API
+      await api.deleteAccount(deletePassword);
+      
+      // On success: logout and redirect
+      toast.success('Your account has been permanently deleted.');
+      const authStore = useAuthStore.getState();
+      authStore.logout();
+      
+      // Redirect to login/welcome
+      setTimeout(() => {
+        window.location.href = '/auth/welcome'; // Adjust path as needed
+      }, 1500);
+      
+    } catch (error: any) {
+      CapacitorService.triggerHaptic();
+      const message = error.message || 'Failed to delete account. Please try again.';
+      setDeleteError(message);
+      toast.error(message);
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   const handleCameraUpdate = async () => {
@@ -243,10 +293,118 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
             <span className="material-symbols-outlined text-slate-400" style={{ fontSize: '20px' }}>chevron_right</span>
           </button>
 
-          <button onClick={onLogout} className="mt-6 w-full h-16 rounded-2xl bg-red-500/5 text-red-500 font-black uppercase tracking-[0.2em] text-xs hover:bg-red-500/10 transition-colors flex items-center justify-center gap-3 active:scale-[0.98] border border-red-500/10">
+          <button 
+            onClick={() => {
+              CapacitorService.triggerHaptic();
+              setShowDeleteModal(true);
+            }} 
+            className="w-full h-16 rounded-2xl bg-red-500/10 text-red-500 font-black uppercase tracking-[0.2em] text-xs hover:bg-red-500/20 transition-colors flex items-center justify-center gap-3 active:scale-[0.98] border border-red-500/20"
+          >
+            <span className="material-symbols-outlined text-lg">delete</span>
+            Delete Account Permanently
+          </button>
+
+          <button 
+            onClick={onLogout} 
+            className="mt-3 w-full h-16 rounded-2xl bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white font-black uppercase tracking-[0.2em] text-xs hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-3 active:scale-[0.98]"
+          >
             <span className="material-symbols-outlined text-lg">logout</span>
             Sign Out Securely
           </button>
+
+          {/* Delete Account Modal */}
+          {showDeleteModal && (
+            <div className="fixed inset-0 bg-black/40 flex items-end z-50">
+              <div className="w-full bg-background-light dark:bg-background-dark rounded-t-3xl p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-black uppercase tracking-tight">Delete Account?</h2>
+                  <button 
+                    onClick={() => {
+                      setShowDeleteModal(false);
+                      setDeletePassword('');
+                      setDeleteConfirmation('');
+                      setDeleteError('');
+                    }}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    <span className="material-symbols-outlined">close</span>
+                  </button>
+                </div>
+
+                <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 space-y-2">
+                  <p className="text-sm font-bold text-red-600 dark:text-red-400">
+                    ⚠️ This action cannot be undone.
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    Your account and all personal data will be permanently deleted. Your trip history will be retained for legal and safety reasons.
+                  </p>
+                </div>
+
+                {deleteError && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-3">
+                    <p className="text-xs text-red-600 dark:text-red-400">{deleteError}</p>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-500 block mb-2">Password Confirmation</label>
+                    <input
+                      type="password"
+                      placeholder="Enter your password"
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                      disabled={isDeletingAccount}
+                      className="w-full px-4 py-3 rounded-xl bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm font-bold placeholder-slate-400 focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-500 block mb-2">Type "DELETE" to confirm</label>
+                    <input
+                      type="text"
+                      placeholder="Type DELETE"
+                      value={deleteConfirmation}
+                      onChange={(e) => setDeleteConfirmation(e.target.value.toUpperCase())}
+                      disabled={isDeletingAccount}
+                      className="w-full px-4 py-3 rounded-xl bg-surface-light dark:bg-surface-dark border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-sm font-bold placeholder-slate-400 focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={isDeletingAccount || !deletePassword || deleteConfirmation !== 'DELETE'}
+                  className="w-full h-14 rounded-2xl bg-red-500 text-white font-black uppercase tracking-[0.2em] text-xs hover:bg-red-600 transition-colors flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isDeletingAccount ? (
+                    <>
+                      <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-lg">delete</span>
+                      Permanently Delete
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeletePassword('');
+                    setDeleteConfirmation('');
+                    setDeleteError('');
+                  }}
+                  disabled={isDeletingAccount}
+                  className="w-full h-14 rounded-2xl bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white font-black uppercase tracking-[0.2em] text-xs hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors active:scale-[0.98] disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

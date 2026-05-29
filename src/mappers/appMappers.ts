@@ -4,7 +4,9 @@ import { PaymentHistoryRecord, PendingPaymentTrip, Trip, UserProfile, UserRole }
 export const mapUser = (backendUser: any): UserProfile => ({
   ...backendUser,
   trips: backendUser.totalTrips ?? 0,
-  avatar: backendUser.avatarUrl || (backendUser.role === UserRole.DRIVER ? IMAGES.DRIVER_CARD : IMAGES.USER_AVATAR),
+  // avatar: prefer explicit avatarUrl, then selfieImageUrl (covers existing drivers whose
+  // avatarUrl was null before this batch), then role-appropriate placeholder.
+  avatar: backendUser.avatarUrl || backendUser.selfieImageUrl || (backendUser.role === UserRole.DRIVER ? IMAGES.DRIVER_CARD : IMAGES.USER_AVATAR),
   licenseImage: backendUser.licenseImageUrl,
   selfieImage: backendUser.selfieImageUrl,
   ninImage: backendUser.ninImageUrl,
