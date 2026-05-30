@@ -199,7 +199,6 @@ export const CapacitorService = {
 
     // On plain web (not native Capacitor), skip the Capacitor plugin entirely
     // so the browser's native permission prompt appears immediately
-    const isNative = Capacitor.isNativePlatform();
 
     if (!isNative) {
       const webResult = await tryWebLocation();
