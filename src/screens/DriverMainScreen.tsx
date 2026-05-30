@@ -215,9 +215,18 @@ const DriverMainScreen: React.FC = () => {
 
   const handleToggleOnline = useCallback(() => {
     CapacitorService.triggerHaptic();
+    if (!isOnline && currentUser?.approvalStatus !== 'APPROVED') {
+      addToast(
+        currentUser?.approvalStatus === 'REJECTED'
+          ? 'Your driver application was rejected. Please contact support.'
+          : 'Your account is awaiting admin approval. You\'ll be notified once approved.',
+        'error'
+      );
+      return;
+    }
     if (isOnline) disableOnline();
     else enableOnline();
-  }, [isOnline, disableOnline, enableOnline]);
+  }, [isOnline, disableOnline, enableOnline, currentUser?.approvalStatus, addToast]);
 
   const handleAcceptRide = useCallback((ride: DriverRideRequest) => {
     setPendingRide(ride);
@@ -368,6 +377,20 @@ const DriverMainScreen: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Pending/rejected approval banner */}
+          {currentUser?.approvalStatus && currentUser.approvalStatus !== 'APPROVED' && (
+            <div className={`flex items-start gap-2 px-3 py-2 rounded-2xl backdrop-blur-md border ${currentUser.approvalStatus === 'REJECTED' ? 'bg-red-500/20 border-red-500/30' : 'bg-amber-500/20 border-amber-500/30'}`}>
+              <span className={`material-symbols-outlined text-base mt-0.5 shrink-0 ${currentUser.approvalStatus === 'REJECTED' ? 'text-red-400' : 'text-amber-400'}`}>
+                {currentUser.approvalStatus === 'REJECTED' ? 'cancel' : 'hourglass_top'}
+              </span>
+              <p className={`text-[10px] font-bold leading-snug ${currentUser.approvalStatus === 'REJECTED' ? 'text-red-300' : 'text-amber-300'}`}>
+                {currentUser.approvalStatus === 'REJECTED'
+                  ? 'Your driver application was rejected. Please contact support.'
+                  : 'Your account is awaiting admin approval. You\'ll be notified once approved.'}
+              </p>
+            </div>
+          )}
 
           {/* Suspension banner */}
           {(currentUser?.isBlocked && currentUser?.suspendedUntil) && (
