@@ -86,8 +86,12 @@ export const useRideManager = () => {
       const drivers = await api.get<any[]>(
         `/users/drivers/available?pickupLat=${pickup.lat}&pickupLng=${pickup.lon}${transmissionParam}`
       );
-      setAvailableDrivers(drivers);
-      return drivers;
+      const normalized = drivers.map((d: any) => ({
+        ...d,
+        rating: d.rating != null ? (d.rating > 5 ? +(d.rating / 100).toFixed(1) : +d.rating) : 5.0,
+      }));
+      setAvailableDrivers(normalized);
+      return normalized;
     } catch (error) {
       console.error('Failed to fetch drivers:', error);
       setAvailableDrivers([]);

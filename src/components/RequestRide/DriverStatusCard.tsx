@@ -140,7 +140,7 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
             <div className="flex items-center gap-1 bg-yellow-500/10 px-2 py-0.5 rounded-lg border border-yellow-500/20">
               <span className="material-symbols-outlined text-yellow-500 text-[14px] filled">star</span>
               <span className="text-[11px] font-black text-yellow-700 dark:text-yellow-500">
-                {driverInfo.rating > 5 ? (driverInfo.rating / 100).toFixed(1) : driverInfo.rating.toFixed(1)}
+                {driverInfo.rating == null ? '5.0' : driverInfo.rating > 5 ? (driverInfo.rating / 100).toFixed(1) : driverInfo.rating.toFixed(1)}
               </span>
             </div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{driverInfo.trips} Trips</span>
