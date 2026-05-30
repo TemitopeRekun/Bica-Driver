@@ -48,7 +48,7 @@ const LoginScreen: React.FC = () => {
         return;
       }
 
-      await login(mapped, response.token);
+      await login(mapped, response.token, response.refreshToken);
       addToast(`Welcome back, ${mapped.name}!`, 'success');
 
       if (mapped.role === UserRole.ADMIN) navigate('/admin');

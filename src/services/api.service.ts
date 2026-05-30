@@ -23,13 +23,56 @@ export const generateUUID = () => {
   }
 };
 
-// Listener for 401 errors to trigger global logout
+// Listener for 401 errors to trigger global logout (only fires when refresh also fails)
 type UnauthorizedListener = (message?: string) => void;
 let unauthorizedListener: UnauthorizedListener | null = null;
 
 export const setOnUnauthorizedListener = (listener: UnauthorizedListener) => {
   unauthorizedListener = listener;
 };
+
+// Refresh token helpers
+export const saveRefreshToken = (token: string): void => {
+  localStorage.setItem('bica_refresh_token', token);
+};
+
+export const getRefreshToken = (): string | null => {
+  return localStorage.getItem('bica_refresh_token');
+};
+
+export const clearRefreshToken = (): void => {
+  localStorage.removeItem('bica_refresh_token');
+};
+
+// In-flight refresh promise — prevents multiple simultaneous refresh calls
+let refreshPromise: Promise<string> | null = null;
+
+async function attemptTokenRefresh(): Promise<string> {
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = (async () => {
+    const rawRefreshToken = getRefreshToken();
+    if (!rawRefreshToken) throw new Error('No refresh token');
+
+    const baseUrl = requireApiUrl();
+    const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: rawRefreshToken }),
+    });
+
+    if (!response.ok) throw new Error('Refresh failed');
+
+    const data = await response.json();
+    saveToken(data.token);
+    if (data.refreshToken) saveRefreshToken(data.refreshToken);
+    return data.token;
+  })().finally(() => {
+    refreshPromise = null;
+  });
+
+  return refreshPromise;
+}
 
 // Rate limiting state
 let throttleCoolDownUntil = 0;
@@ -134,11 +177,21 @@ async function request<T>(
       useConnectivityStore.getState().setOnline(true);
     }
 
-    // Handle centralized 401 Unauthorized
-    if (response.status === 401 && requiresAuth) {
-      if (unauthorizedListener) {
-        unauthorizedListener('Your session has expired. Please log in again.');
+    // Handle 401: try silent refresh once, then fall back to logout
+    if (response.status === 401 && requiresAuth && retryCount === 0) {
+      try {
+        await attemptTokenRefresh();
+        // Retry the original request with the new access token
+        return request<T>(method, path, body, requiresAuth, options, 1, currentIdempotencyKey);
+      } catch {
+        clearRefreshToken();
+        if (unauthorizedListener) {
+          unauthorizedListener('Your session has expired. Please log in again.');
+        }
+        throw new Error('Unauthorized');
       }
+    }
+    if (response.status === 401 && requiresAuth) {
       throw new Error('Unauthorized');
     }
 

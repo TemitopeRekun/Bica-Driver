@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { UserProfile } from '@/types';
-import { clearToken, saveToken, api } from '@/services/api.service';
+import { clearToken, saveToken, saveRefreshToken, clearRefreshToken, api } from '@/services/api.service';
 import { telemetry } from '@/services/TelemetryService';
 import localforage from 'localforage';
 import { authForageStorage } from '@/utils/storage';
@@ -12,7 +12,7 @@ interface AuthState {
   isInitializing: boolean;
   setCurrentUser: (user: UserProfile | null) => void;
   updateProfile: (updates: Partial<UserProfile>) => void;
-  login: (user: UserProfile, token: string) => Promise<void>;
+  login: (user: UserProfile, token: string, refreshToken?: string) => Promise<void>;
   logout: () => Promise<void>;
   setInitializing: (val: boolean) => void;
 }
@@ -35,12 +35,13 @@ export const useAuthStore = create<AuthState>()(
 
       setInitializing: (val) => set({ isInitializing: val }),
 
-      login: async (user, token) => {
+      login: async (user, token, refreshToken?: string) => {
         // Clear any stale ride data that may belong to a previous user on this device
         const { useRideStore } = await import('./rideStore');
         useRideStore.getState().resetRide();
 
         saveToken(token);
+        if (refreshToken) saveRefreshToken(refreshToken);
         await localforage.setItem('bicadriver_current_user', user);
         set({ currentUser: user, isAuthenticated: true });
         
@@ -57,6 +58,7 @@ export const useAuthStore = create<AuthState>()(
         } catch (e) {}
 
         clearToken();
+        clearRefreshToken();
         await localforage.removeItem('bicadriver_current_user');
         set({ currentUser: null, isAuthenticated: false });
         

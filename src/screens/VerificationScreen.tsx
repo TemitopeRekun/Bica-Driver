@@ -94,7 +94,7 @@ const VerificationScreen: React.FC = () => {
       
       if (response.token) {
         const mapped = mapUser(response.user);
-        await login(mapped, response.token);
+        await login(mapped, response.token, response.refreshToken);
         addToast('Email verified successfully!', 'success');
         navigate(mapped.role === UserRole.DRIVER ? '/driver' : '/owner');
       } else {

@@ -77,11 +77,13 @@ export type AuthUser = UserProfile | any;
 export type AuthResponse =
   | {
       token: string;
+      refreshToken?: string;
       user: AuthUser;
       message?: string;
     }
   | {
       token?: undefined;
+      refreshToken?: undefined;
       user: AuthUser;
       message: string; // used for driver registration pending approval
     };
@@ -247,7 +249,7 @@ export interface PaymentStatusResponse {
   message?: string;
 }
 
-export interface PendingPaymentTrip extends Trip {
+export interface PendingPaymentTrip extends Omit<Trip, 'owner' | 'driver'> {
   owner: {
     id: string;
     name: string;
@@ -257,7 +259,10 @@ export interface PendingPaymentTrip extends Trip {
   driver: {
     id: string;
     name: string;
-  } | null;
+    avatarUrl?: string;
+    phone?: string;
+    rating?: number;
+  } | null | undefined;
 }
 
 export interface PendingRatingTrip {
