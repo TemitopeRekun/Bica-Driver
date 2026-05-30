@@ -1,19 +1,11 @@
 import React from 'react';
+import { TripFareBreakdown } from '@/types';
 
 interface TripPaymentSummaryProps {
   role?: 'OWNER' | 'DRIVER';
   pickup?: string;
   destination?: string;
-  fareBreakdown: {
-    distanceKm?: number;
-    actualMins?: number;
-    totalMins?: number;
-    finalFare: number;
-    totalAmount?: number;
-    driverEarnings?: number;
-    platformFee?: number;
-    commissionPercent?: number;
-  } | null;
+  fareBreakdown: (TripFareBreakdown & { finalFare: number }) | null;
   paymentStatus?: 'UNPAID' | 'SUCCESS' | 'FAILED' | 'PENDING' | 'PAID' | 'PARTIALLY_PAID' | 'CANCELLED';
   paymentMessage?: string | null;
   onPayNow?: () => void;
@@ -92,7 +84,7 @@ const TripPaymentSummary: React.FC<TripPaymentSummaryProps> = ({
           <div className="space-y-4">
              <div className="flex justify-between items-center opacity-70">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Distance / Time</span>
-                <span className="text-xs font-black text-slate-900 dark:text-white italic">{fareBreakdown?.distanceKm || 0}km · {fareBreakdown?.actualMins || fareBreakdown?.totalMins || 0}m</span>
+                <span className="text-xs font-black text-slate-900 dark:text-white italic">{fareBreakdown?.billableDistanceKm ?? fareBreakdown?.estimatedDistanceKm ?? 0}km · {fareBreakdown?.actualMins || fareBreakdown?.totalMins || 0}m</span>
              </div>
 
               {isDriver ? (

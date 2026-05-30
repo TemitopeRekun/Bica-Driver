@@ -87,6 +87,31 @@ export type AuthResponse =
     };
 
 
+export interface TripFareBreakdown {
+  // Amounts
+  totalAmount?: number;
+  finalFare?: number;
+  baseFare?: number;
+  distanceComponent?: number;
+  timeComponent?: number;
+  // Distance
+  estimatedDistanceKm?: number;
+  billableDistanceKm?: number;
+  distanceSource?: 'ROADS_API' | 'HAVERSINE_FALLBACK' | 'ESTIMATE_FALLBACK';
+  // Time
+  estimatedMins?: number;
+  actualMins?: number;
+  totalMins?: number;
+  // Meta
+  isEstimate?: boolean;
+  isSnapshotUsed?: boolean;
+  pricingBranch?: string;
+  commissionPercent?: number;
+  // Driver split
+  driverEarnings?: number;
+  platformFee?: number;
+}
+
 export interface Trip {
   id: string;
   driverId?: string;
@@ -120,7 +145,7 @@ export interface Trip {
   commissionAmount?: number;
   commissionPercent?: number;
   monnifyTxRef?: string;
-  fareBreakdown?: Record<string, unknown> | null;
+  fareBreakdown?: TripFareBreakdown | null;
   progressMilestone?: 'assigned' | 'arrived' | 'in_progress' | 'completed';
   coords?: [number, number];   // [lat, lng] for pickup
   destCoords?: [number, number]; // [lat, lng] for destination

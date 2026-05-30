@@ -571,10 +571,13 @@ const DriverMainScreen: React.FC = () => {
           <TripPaymentSummary
             role="DRIVER" pickup={completedTripSummary.pickup} destination={completedTripSummary.destination}
             fareBreakdown={{
-              distanceKm: completedTripSummary.distanceKm || completedTripSummary.fareBreakdown?.distanceKm || 0,
-              actualMins: completedTripSummary.totalMins || completedTripSummary.fareBreakdown?.totalMins || completedTripSummary.actualMins || 0,
+              billableDistanceKm: completedTripSummary.fareBreakdown?.billableDistanceKm ?? completedTripSummary.distanceKm ?? 0,
+              estimatedDistanceKm: completedTripSummary.fareBreakdown?.estimatedDistanceKm ?? completedTripSummary.distanceKm ?? 0,
+              distanceSource: completedTripSummary.fareBreakdown?.distanceSource,
+              actualMins: completedTripSummary.fareBreakdown?.actualMins ?? completedTripSummary.totalMins ?? completedTripSummary.actualMins ?? 0,
               finalFare: completedTripSummary.amount || completedTripSummary.finalFare || 0,
-              driverEarnings: completedTripSummary.driverEarnings || 0
+              driverEarnings: completedTripSummary.driverEarnings || 0,
+              commissionPercent: completedTripSummary.fareBreakdown?.commissionPercent,
             }}
             paymentStatus={completedTripSummary.paymentStatus || 'UNPAID'}
             paymentMessage={completedTripSummary.paymentStatus === 'PAID' ? 'Payment confirmed! Thank you.' : ''}

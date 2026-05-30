@@ -288,9 +288,12 @@ const TripStatusScreen: React.FC = () => {
              destination={destination ? getLocationShortText(destination) : (completedTripData?.destAddress || undefined)}
              onClose={() => { resetRide(); navigate('/owner'); }}
              fareBreakdown={{
-               distanceKm: completedTripData?.distanceKm || completedTripData?.fareBreakdown?.distanceKm || 0,
-               actualMins: completedTripData?.totalMins || completedTripData?.fareBreakdown?.totalMins || 0,
+               billableDistanceKm: completedTripData?.fareBreakdown?.billableDistanceKm ?? completedTripData?.distanceKm ?? 0,
+               estimatedDistanceKm: completedTripData?.fareBreakdown?.estimatedDistanceKm ?? completedTripData?.distanceKm ?? 0,
+               distanceSource: completedTripData?.fareBreakdown?.distanceSource,
+               actualMins: completedTripData?.fareBreakdown?.actualMins ?? completedTripData?.totalMins ?? 0,
                finalFare: completedTripData?.amount || completedTripData?.finalFare || 0,
+               commissionPercent: completedTripData?.fareBreakdown?.commissionPercent,
              }}
              paymentStatus={completedTripData?.paymentStatus || 'UNPAID'}
              onPayNow={() => {
