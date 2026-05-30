@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { RouterProvider } from 'react-router-dom';
 import localforage from 'localforage';
+import { Geolocation } from '@capacitor/geolocation';
+import { Capacitor } from '@capacitor/core';
 
 // Stores & Config
 import { router } from './routes/AppRouter';
@@ -24,6 +26,28 @@ import { telemetry } from '@/services/TelemetryService';
 import { useConnectivityStore } from './stores/connectivityStore';
 import ConnectivityBanner from '@/components/Common/ConnectivityBanner';
 
+// Request location permissions early on app start (native platforms only)
+const initializeLocationPermissions = async () => {
+  try {
+    if (!Capacitor.isNativePlatform()) {
+      return; // Skip on web
+    }
+
+    const permissions = await Geolocation.checkPermissions();
+    console.log('[Permissions] Initial location permission status:', permissions.location);
+
+    // If permission is not yet granted, request it
+    if (permissions.location === 'prompt' || permissions.location === 'denied') {
+      console.log('[Permissions] Requesting location permission...');
+      const result = await Geolocation.requestPermissions();
+      console.log('[Permissions] Location permission result:', result.location);
+    }
+  } catch (error) {
+    console.warn('[Permissions] Failed to initialize location permissions:', error);
+    // Don't throw — let the app continue even if permission request fails
+  }
+};
+
 const App: React.FC = () => {
   const { currentUser, setCurrentUser, logout, isAuthenticated, setInitializing } = useAuthStore();
   const { loadSettings } = useSettingsStore();
@@ -36,6 +60,7 @@ const App: React.FC = () => {
   useEffect(() => {
     initStatusBar();
     CapacitorService.initBackButton();
+    initializeLocationPermissions(); // Request location permission early
     
     const handleRejection = (event: PromiseRejectionEvent) => {
       telemetry.error('Unhandled Promise Rejection', event.reason);

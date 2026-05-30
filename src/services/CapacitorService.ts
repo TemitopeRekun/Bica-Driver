@@ -74,6 +74,21 @@ const logGeolocationIssue = (context: string, error: unknown) => {
 
 export const CapacitorService = {
   async getCurrentLocation(forPickup = false): Promise<any> {
+    // Proactively ensure permission is requested on native platforms
+    const isNative = Capacitor.isNativePlatform();
+    if (isNative) {
+      try {
+        const permissions = await Geolocation.checkPermissions();
+        if (permissions.location === 'prompt' || permissions.location === 'denied') {
+          console.log('[Geolocation] Permission not granted, requesting...');
+          await Geolocation.requestPermissions();
+        }
+      } catch (error) {
+        console.warn('[Geolocation] Permission check failed, continuing anyway:', error);
+        // Continue — let the actual location fetch attempt handle any permission errors
+      }
+    }
+
     const shouldRetryForAccuracy = (position: any) =>
       Boolean(
         position?.coords &&
