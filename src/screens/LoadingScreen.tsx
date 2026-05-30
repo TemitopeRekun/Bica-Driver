@@ -8,7 +8,7 @@ interface LoadingScreenProps {
 
 const LoadingScreen: React.FC<LoadingScreenProps> = ({ 
   onComplete, 
-  message = 'Initializing BICA Secure Environment',
+  message = 'Initializing BicaDriver Secure Environment',
   autoCompleteMs 
 }) => {
   useEffect(() => {

@@ -181,7 +181,7 @@ const FinanceSection: React.FC<FinanceSectionProps> = ({
           <div>
             <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest mb-1">Autonomous Settlement Policy</h4>
             <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
-              BICA utilizes Monnify Split Payments for real-time driver settlement. <strong>No manual payout approval is required</strong> for standard trips. This ledger serves for reconciliation and operational monitoring only.
+              BicaDriver utilizes Monnify Split Payments for real-time driver settlement. <strong>No manual payout approval is required</strong> for standard trips. This ledger serves for reconciliation and operational monitoring only.
             </p>
           </div>
        </div>

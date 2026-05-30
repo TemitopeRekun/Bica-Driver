@@ -23,7 +23,7 @@ const WelcomeScreen: React.FC = () => {
 
       {/* Top Header / Logo */}
       <div className="flex items-center justify-center pt-8 pb-4 z-10 animate-slide-up">
-        <img src={LOGO} alt="Bica Driver" className="h-10 w-auto object-contain rounded-lg" />
+        <img src={LOGO} alt="BicaDriver" className="h-10 w-auto object-contain rounded-lg" />
       </div>
 
       {/* Main Content Area - Responsive flex column */}

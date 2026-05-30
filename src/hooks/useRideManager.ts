@@ -42,7 +42,7 @@ export const useRideManager = () => {
         setCurrentTripId(trip.id);
         setDriverInfo({
           ...trip.driver,
-          car: `${trip.carModel || ''} ${trip.carYear || ''}`.trim() || 'BICA Chauffeur',
+          car: `${trip.carModel || ''} ${trip.carYear || ''}`.trim() || 'BicaDriver Chauffeur',
           plate: trip.plate || '---',
           avatar: trip.driver?.avatarUrl || IMAGES.DRIVER_CARD,
           otp: trip.otp,
@@ -157,7 +157,7 @@ export const useRideManager = () => {
         setCurrentTripId(trip.id);
         setDriverInfo({
           ...trip.driver,
-          car: `${trip.carModel || ''} ${trip.carYear || ''}`.trim() || 'BICA Chauffeur',
+          car: `${trip.carModel || ''} ${trip.carYear || ''}`.trim() || 'BicaDriver Chauffeur',
           plate: trip.plate || '---',
           avatar: trip.driver?.avatarUrl || IMAGES.DRIVER_CARD,
           timeAway: driver.estimatedArrivalMins || 5,

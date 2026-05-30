@@ -321,7 +321,7 @@ const PaymentCompleteScreen: React.FC = () => {
              <div className="flex items-center justify-center gap-2 mb-2">
                 <span className="bg-primary/10 text-primary text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-widest border border-primary/20">Step 1: Checkout Done</span>
                 <span className="material-symbols-outlined text-slate-300 text-xs">arrow_forward</span>
-                <span className="bg-slate-100 dark:bg-white/10 text-slate-500 text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-widest animate-pulse">Step 2: BICA Verification</span>
+                <span className="bg-slate-100 dark:bg-white/10 text-slate-500 text-[9px] font-black uppercase px-2 py-0.5 rounded-full tracking-widest animate-pulse">Step 2: BicaDriver Verification</span>
              </div>
             <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight italic uppercase tracking-tighter">
               Verifying Payment
@@ -562,7 +562,7 @@ const PaymentCompleteScreen: React.FC = () => {
               Network Issue
             </h1>
             <p className="mt-2 text-sm text-slate-500 dark:text-slate-400 leading-relaxed font-bold">
-              {errorMsg || 'Unable to reach the BICA verification server. Please check your connection.'}
+              {errorMsg || 'Unable to reach the BicaDriver verification server. Please check your connection.'}
             </p>
           </div>
 
@@ -591,7 +591,7 @@ const PaymentCompleteScreen: React.FC = () => {
         <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.4em]">
           Secure Verification
         </p>
-        <img src={LOGO} alt="Bica Driver" className="h-6 w-auto object-contain rounded-lg" />
+        <img src={LOGO} alt="BicaDriver" className="h-6 w-auto object-contain rounded-lg" />
       </div>
     </div>
   );

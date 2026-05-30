@@ -39,7 +39,7 @@ const GlobalRouteError: React.FC = () => {
           <span className="material-symbols-outlined text-4xl filled">navigation</span>
         </div>
 
-        <h1 className="text-3xl font-black text-white tracking-tighter mb-4 italic">BICA<span className="text-primary NOT-italic"> SAFE MODE</span></h1>
+        <h1 className="text-3xl font-black text-white tracking-tighter mb-4 italic">BicaDriver<span className="text-primary NOT-italic"> SAFE MODE</span></h1>
         
         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-8 text-left">
            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Error Status {errorStatus}</p>

@@ -217,7 +217,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
           </button>
         )}
         <div className="flex-1">
-          <img src={LOGO} alt="Bica Driver" className="h-7 w-auto object-contain rounded-lg" />
+          <img src={LOGO} alt="BicaDriver" className="h-7 w-auto object-contain rounded-lg" />
         </div>
         <div className="flex items-center gap-2">
           <button

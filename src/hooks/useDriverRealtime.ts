@@ -150,7 +150,7 @@ export const useDriverRealtime = ({
       if (isPermDenied) {
         updateOnlineState(false);
         setAvailabilityIssue(
-          '📍 Location permission required. Go to Settings > Apps > Bica Driver > Permissions > Location and enable location access. Then try going online again.',
+          '📍 Location permission required. Go to Settings > Apps > BicaDriver > Permissions > Location and enable location access. Then try going online again.',
         );
         return;
       }
@@ -396,7 +396,7 @@ export const useDriverRealtime = ({
             socketRef.current.disconnect();
           }
           setAvailabilityIssue(
-            '📍 Location permission required. Go to Settings > Apps > Bica Driver > Permissions > Location and enable location access.',
+            '📍 Location permission required. Go to Settings > Apps > BicaDriver > Permissions > Location and enable location access.',
           );
           useConnectivityStore.getState().setLocationStatus('denied');
           updateOnlineState(false);

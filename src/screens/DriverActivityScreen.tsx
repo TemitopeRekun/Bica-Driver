@@ -622,7 +622,7 @@ const DriverActivityScreen: React.FC<DriverActivityScreenProps> = ({
              <div>
                 <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-widest mb-1">Autonomous Settlement Policy</h4>
                 <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
-                  Your current balance tracks cleared earnings for the active period. BICA settles funds <strong>directly to your bank account</strong> via Monnify split-payments. No manual withdrawal is required.
+                  Your current balance tracks cleared earnings for the active period. BicaDriver settles funds <strong>directly to your bank account</strong> via Monnify split-payments. No manual withdrawal is required.
                 </p>
              </div>
           </div>

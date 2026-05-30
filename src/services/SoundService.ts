@@ -1,5 +1,5 @@
 /**
- * BICA Sound Service
+ * BicaDriver Sound Service
  * Programmatic audio synthesis using Web Audio API. 
  * Provides "Premium" chime sounds for notification and interactions.
  */

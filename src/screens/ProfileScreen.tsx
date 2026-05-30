@@ -56,7 +56,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ user, initialRole, onBack
 
   const handleFeatureAlert = (feature: string) => {
     CapacitorService.triggerHaptic();
-    toast.info(`Great news! ${feature} is coming very soon to your BICA experience.`);
+    toast.info(`Great news! ${feature} is coming very soon to your BicaDriver experience.`);
   };
 
   const handleDeleteAccount = async () => {

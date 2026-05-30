@@ -31,7 +31,7 @@ const RoleSelectionScreen: React.FC = () => {
         >
           <span className="material-symbols-outlined text-slate-900 dark:text-white">arrow_back</span>
         </button>
-        <img src={LOGO} alt="Bica Driver" className="h-8 w-auto object-contain rounded-lg" />
+        <img src={LOGO} alt="BicaDriver" className="h-8 w-auto object-contain rounded-lg" />
         <div className="size-10"></div>
       </header>
 

@@ -98,7 +98,7 @@ const Step4Security: React.FC<StepProps> = ({ formData, errors, updateField, onS
         <div className="text-[11px] leading-relaxed text-slate-600 dark:text-slate-400 font-medium" onClick={e => e.stopPropagation()}>
           {isDriver ? (
             <>
-              I have read and agree to BICA's{' '}
+              I have read and agree to BicaDriver's{' '}
               <button
                 type="button"
                 onClick={() => handleLinkOpen(TERMS_URL)}
@@ -114,11 +114,11 @@ const Step4Security: React.FC<StepProps> = ({ formData, errors, updateField, onS
               >
                 Privacy Policy
               </button>
-              . I verify that all information provided is accurate and truthful, and I consent to BICA's <span className="font-black text-slate-700 dark:text-slate-200">Background Check Policy</span> for professional chauffeurs.
+              . I verify that all information provided is accurate and truthful, and I consent to BicaDriver's <span className="font-black text-slate-700 dark:text-slate-200">Background Check Policy</span> for professional chauffeurs.
             </>
           ) : (
             <>
-              I have read and agree to BICA's{' '}
+              I have read and agree to BicaDriver's{' '}
               <button
                 type="button"
                 onClick={() => handleLinkOpen(TERMS_URL)}

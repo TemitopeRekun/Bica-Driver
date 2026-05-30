@@ -3,7 +3,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.bicadriver.app',
-  appName: 'Bica Driver',
+  appName: 'BicaDriver',
   webDir: 'dist',
 
   server: {

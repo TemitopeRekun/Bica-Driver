@@ -91,7 +91,7 @@ class ErrorBoundary extends Component<Props, State> {
            </div>
 
            <div className="mt-20 relative z-10">
-             <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.4em]">Bica Safe Mode</p>
+             <p className="text-[10px] font-black text-slate-600 uppercase tracking-[0.4em]">BicaDriver Safe Mode</p>
            </div>
         </div>
       );

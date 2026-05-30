@@ -360,7 +360,7 @@ const OwnerActivityScreen: React.FC<OwnerActivityScreenProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.payments.metricSurface}`}>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Merchant</p>
-                <p className="mt-1 font-black text-sm text-slate-800 dark:text-slate-100 truncate">BICA · Monnify</p>
+                <p className="mt-1 font-black text-sm text-slate-800 dark:text-slate-100 truncate">BicaDriver · Monnify</p>
               </div>
               <div className={`rounded-2xl border px-4 py-3 ${ACTIVITY_THEME.payments.metricSurface}`}>
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Total Paid</p>
