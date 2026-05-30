@@ -225,18 +225,10 @@ User: ${u.name} | Role: ${u.role} | Category: ${cat}`;
         </div>
 
         {/* Escalation Footer (Always Visible) */}
-        <div className="grid grid-cols-3 gap-2 p-3 bg-slate-100 dark:bg-white/5 border-b border-slate-200 dark:border-slate-800">
-          <a href="tel:+2349038987333" target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 transition-colors">
-            <span className="material-symbols-outlined text-primary text-xl">call</span>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Call</span>
-          </a>
-          <a href="https://wa.me/2349038987333" target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 transition-colors">
-            <span className="material-symbols-outlined text-emerald-500 text-xl">chat_bubble</span>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">WhatsApp</span>
-          </a>
+        <div className="grid grid-cols-1 gap-2 p-3 bg-slate-100 dark:bg-white/5 border-b border-slate-200 dark:border-slate-800">
           <a href="mailto:support@bicadriver.com" target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1 p-2 rounded-xl bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-800 transition-colors">
             <span className="material-symbols-outlined text-amber-500 text-xl">mail</span>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Email</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Email Support</span>
           </a>
         </div>
 

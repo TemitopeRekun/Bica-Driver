@@ -23,15 +23,6 @@ const EmergencyHelpSheet: React.FC<EmergencyHelpSheetProps> = ({ context, onClos
     ? `https://maps.google.com/?q=${context.locationLat},${context.locationLng}`
     : 'Location unavailable';
 
-  const whatsappMsg = encodeURIComponent(
-    `🚨 EMERGENCY HELP REQUEST 🚨\n\n` +
-    `👤 OWNER: ${context.ownerName} (${context.ownerPhone})\n` +
-    `🚕 DRIVER: ${context.driverName} (${context.driverPhone})\n` +
-    `🆔 TRIP ID: ${context.tripId ?? 'N/A'}\n` +
-    `📍 LOCATION: ${locationUrl}\n` +
-    `🚦 STATUS: ${context.tripStatus ?? 'N/A'}`
-  );
-
   return (
     <div className="fixed inset-0 z-50 bg-red-950/95 backdrop-blur-md flex flex-col animate-slide-up overflow-y-auto">
       {/* Header Bar */}
@@ -115,32 +106,12 @@ const EmergencyHelpSheet: React.FC<EmergencyHelpSheetProps> = ({ context, onClos
         {/* Action Buttons */}
         <div className="space-y-3">
           <a 
-            href="tel:+2349038987333" 
-            className="w-full py-5 rounded-2xl bg-red-600 text-white flex items-center justify-center gap-3 shadow-lg shadow-red-900/40 active:scale-95 transition-all"
+            href="mailto:support@bicadriver.com"
+            className="w-full py-5 rounded-2xl bg-amber-600 text-white flex items-center justify-center gap-3 shadow-lg shadow-amber-900/40 active:scale-95 transition-all"
           >
-            <span className="material-symbols-outlined">call</span>
-            <span className="font-black uppercase tracking-widest italic">Call BicaDriver Support</span>
+            <span className="material-symbols-outlined">mail</span>
+            <span className="font-black uppercase tracking-widest italic">Email BicaDriver Support</span>
           </a>
-
-          {(context.locationLat !== undefined && context.locationLng !== undefined) ? (
-            <a 
-              href={`https://wa.me/2349038987333?text=${whatsappMsg}`}
-              target="_blank"
-              rel="noreferrer"
-              className="w-full py-5 rounded-2xl bg-green-700 text-white flex items-center justify-center gap-3 shadow-lg shadow-green-900/40 active:scale-95 transition-all"
-            >
-              <span className="material-symbols-outlined">chat</span>
-              <span className="font-black uppercase tracking-widest italic">WhatsApp BicaDriver</span>
-            </a>
-          ) : (
-            <button 
-              disabled
-              className="w-full py-5 rounded-2xl bg-green-700/50 text-white/50 flex items-center justify-center gap-3 border border-white/10 cursor-not-allowed"
-            >
-              <span className="material-symbols-outlined">chat</span>
-              <span className="font-black uppercase tracking-widest italic">WhatsApp (Location Unavailable)</span>
-            </button>
-          )}
         </div>
       </div>
 
