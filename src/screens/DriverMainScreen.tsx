@@ -24,6 +24,7 @@ import { Skeleton, CardSkeleton } from '@/components/Common/Skeleton';
 import { InlineError } from '@/components/Common/InlineError';
 import EmergencyHelpSheet from '@/components/EmergencyHelpSheet';
 import { EmergencyHelpContext } from '@/types';
+import { getRideRequestPrice } from '@/utils/currencyFormatter';
 
 const DriverMainScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -171,7 +172,7 @@ const DriverMainScreen: React.FC = () => {
                pickup: trip.pickupAddress,
                destination: trip.destAddress,
                distance: `${trip.distanceKm?.toFixed(1)} km`,
-               price: trip.driverEarnings?.toLocaleString() || trip.amount?.toLocaleString(),
+               price: getRideRequestPrice(trip.driverEarnings, trip.amount), // 🛡️ Safe null handling
                timeToPickup: `${trip.estimatedArrivalMins || 5}m to pickup`,
                tripDuration: `${trip.estimatedMins || 10}m trip`,
                avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,

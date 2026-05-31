@@ -8,6 +8,9 @@ import { UserProfile } from '@/types';
 import { sounds } from '@/services/SoundService';
 import { Geolocation } from '@capacitor/geolocation';
 import { useConnectivityStore } from '@/stores/connectivityStore';
+import { LocationPersistenceQueue } from '@/utils/locationPersistenceQueue';
+import { getSocketMetricsCollector } from '@/utils/socketMetrics';
+import { getRideRequestPrice } from '@/utils/currencyFormatter';
 
 const API_URL = Config.apiUrl;
 
@@ -56,6 +59,17 @@ const isPermissionDeniedError = (error: unknown): boolean => {
   );
 };
 
+// 🛡️ GPS Timeout Wrapper — Prevents indefinite hang on location permission
+const getLocationWithTimeout = async (timeoutMs = 5000) => {
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('GPS location request timed out after 5 seconds')), timeoutMs)
+  );
+  return Promise.race([
+    CapacitorService.getCurrentLocation(),
+    timeoutPromise
+  ]);
+};
+
 export const useDriverRealtime = ({
   user,
   approvalStatus,
@@ -76,6 +90,8 @@ export const useDriverRealtime = ({
   const socketRef = useRef<Socket | null>(null);
   const trackingInterval = useRef<any>(null);
   const isInitializing = useRef(false);
+  const locationQueueRef = useRef<LocationPersistenceQueue | null>(null);
+  
   const updateOnlineState = useCallback(
     (nextIsOnline: boolean) => {
       setIsOnline(nextIsOnline);
@@ -92,29 +108,38 @@ export const useDriverRealtime = ({
   const pushDriverLocation = useCallback(async (latitude: number, longitude: number) => {
     if (!user?.id) return;
 
-    // A: Local UI update
+    // A: Local UI update (immediate for responsive UX)
     setDriverPos([latitude, longitude]);
 
-    try {
-      // B: State persistence (canonical path)
-      await api.patch('/users/location', { lat: latitude, lng: longitude });
-
-      // C: Live broadcast (socket distribute state)
-      if (socketRef.current?.connected) {
-        socketRef.current.emit('driverlocation', {
-          driverId: user.id,
-          lat: latitude,
-          lng: longitude,
-        });
-      }
-    } catch (error: any) {
-      if (error.message?.includes('401') || error.message?.includes('403')) {
-        onForcedLogout?.(error.message);
-      } else {
-        console.error('Failed to persist driver location:', error);
-      }
+    // B: 🏢 Enqueue persistence with automatic retry logic
+    // This ensures transient network failures don't cause stale location
+    if (!locationQueueRef.current) {
+      locationQueueRef.current = new LocationPersistenceQueue(
+        async (lat, lng) => {
+          await api.patch('/users/location', { lat, lng });
+        },
+        undefined, // Use default config
+        (update) => {
+          console.log('[LocationQueue] Successfully persisted location:', { lat: update.latitude, lng: update.longitude });
+        },
+        (update, error) => {
+          console.error('[LocationQueue] Failed to persist after retries:', error);
+          // Optionally report to observability/analytics
+        }
+      );
     }
-  }, [user?.id, onForcedLogout]);
+
+    const updateId = locationQueueRef.current.enqueue(latitude, longitude);
+
+    // C: Attempt immediate socket broadcast (fire-and-forget, non-blocking)
+    if (socketRef.current?.connected) {
+      socketRef.current.emit('driverlocation', {
+        driverId: user.id,
+        lat: latitude,
+        lng: longitude,
+      });
+    }
+  }, [user?.id]);
 
   const enableOnline = useCallback(async () => {
     setAvailabilityIssue(null);
@@ -129,7 +154,7 @@ export const useDriverRealtime = ({
     };
 
     try {
-      const pos = await CapacitorService.getCurrentLocation();
+      const pos = await getLocationWithTimeout();
       if (pos?.coords) {
         const { latitude, longitude } = pos.coords;
         await goOnline(latitude, longitude);
@@ -232,17 +257,23 @@ export const useDriverRealtime = ({
       },
     });
 
+    // 🏢 Enterprise metrics collection for socket stability monitoring
+    const metricsCollector = getSocketMetricsCollector();
+
     socketRef.current.on('connect', () => {
+      metricsCollector.recordConnect();
       useConnectivityStore.getState().setSocketStatus(true, false);
       registerDriverSocket();
     });
 
     socketRef.current.on('disconnect', (reason) => {
+      metricsCollector.recordDisconnect(reason);
       const isTransient = reason !== 'io client disconnect' && reason !== 'io server disconnect';
       useConnectivityStore.getState().setSocketStatus(false, isTransient);
     });
 
     socketRef.current.on('reconnect_attempt', () => {
+      metricsCollector.recordReconnectAttempt();
       useConnectivityStore.getState().setSocketStatus(false, true);
     });
 
@@ -254,7 +285,7 @@ export const useDriverRealtime = ({
         pickup: trip.pickupAddress,
         destination: trip.destAddress,
         distance: `${trip.distanceKm?.toFixed(1)} km`,
-        price: trip.driverEarnings?.toLocaleString() || trip.amount?.toLocaleString(),
+        price: getRideRequestPrice(trip.driverEarnings, trip.amount), // 🛡️ Safe null handling
         timeToPickup: `${trip.estimatedArrivalMins || 5}m to pickup`,
         tripDuration: `${trip.estimatedMins || trip.fareBreakdown?.totalMins || 10}m trip`,
         avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
@@ -284,7 +315,8 @@ export const useDriverRealtime = ({
     });
 
     // Boot-time Sync: Recover any pending or active requests after socket is ready
-    const bootSync = async () => {
+    // 🛡️ Enhanced with retry logic to handle transient network failures
+    const bootSync = async (attempt = 1, maxAttempts = 3) => {
       try {
         const trip = await api.get<any>('/rides/current');
         if (!trip) return;
@@ -296,8 +328,21 @@ export const useDriverRealtime = ({
           // It's an active trip, restore state
           onRideProgress?.({ tripId: trip.id, milestone: trip.status.toLowerCase() });
         }
-      } catch (err) {
-        console.warn('[DriverSync] Could not recover active ride:', err);
+      } catch (err: any) {
+        // 🛡️ Retry with exponential backoff on transient failures
+        const isTransientError = 
+          err?.message?.includes('timeout') || 
+          err?.status === 429 || 
+          err?.status === 503 || 
+          err?.status === 504;
+        
+        if (isTransientError && attempt < maxAttempts) {
+          const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+          console.warn(`[DriverSync] Retry ${attempt}/${maxAttempts} in ${delayMs}ms:`, err);
+          setTimeout(() => bootSync(attempt + 1, maxAttempts), delayMs);
+        } else {
+          console.warn('[DriverSync] Could not recover active ride after retries:', err);
+        }
       }
     };
     
@@ -345,7 +390,7 @@ export const useDriverRealtime = ({
       setIsLocationRefreshing(true);
       setAvailabilityIssue(null);
       try {
-        const pos = await CapacitorService.getCurrentLocation();
+        const pos = await getLocationWithTimeout();
         if (
           !pos?.coords ||
           typeof pos.coords.latitude !== 'number' ||
@@ -422,7 +467,7 @@ export const useDriverRealtime = ({
 
     trackingInterval.current = setInterval(async () => {
       try {
-        const pos = await CapacitorService.getCurrentLocation();
+        const pos = await getLocationWithTimeout();
         if (pos) {
           const { latitude, longitude } = pos.coords;
           // Heartbeat: keep online flag fresh + broadcast location in one request
@@ -457,6 +502,44 @@ export const useDriverRealtime = ({
       window.removeEventListener('bica-app-resumed', handleResume);
     };
   }, [isOnline, approvalStatus, user?.id]);
+
+  // 🛡️ Socket Token Refresh: Re-authenticate socket when access token is renewed
+  useEffect(() => {
+    if (!socketRef.current) return;
+
+    // Create an interval to check if token changed (e.g., after 401 refresh)
+    const tokenCheckInterval = setInterval(() => {
+      const currentToken = localStorage.getItem('bica_token');
+      const storedSocketToken = localStorage.getItem('_socket_auth_token');
+      
+      // If token changed, refresh socket auth and reconnect
+      if (currentToken && storedSocketToken !== currentToken) {
+        console.log('[SocketAuth] Token refreshed, re-authenticating socket...');
+        localStorage.setItem('_socket_auth_token', currentToken);
+        
+        if (socketRef.current?.connected) {
+          // Update auth on live connection
+          socketRef.current.auth = { token: currentToken };
+          socketRef.current.disconnect();
+          socketRef.current.connect();
+        } else if (socketRef.current) {
+          // Just update auth for next connection
+          socketRef.current.auth = { token: currentToken };
+        }
+      }
+    }, 2000); // Check every 2 seconds
+
+    return () => clearInterval(tokenCheckInterval);
+  }, []);
+
+  // 🛡️ Cleanup: Stop location queue when hook unmounts
+  useEffect(() => {
+    return () => {
+      if (locationQueueRef.current) {
+        locationQueueRef.current.stop();
+      }
+    };
+  }, []);
 
   return {
     isOnline,

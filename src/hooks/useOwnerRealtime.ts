@@ -212,7 +212,7 @@ export const useOwnerRealtime = ({
     ownerSocketRef.current.on('locationupdated', (data: any) => {
       if (!trackedDriverIdRef.current || data.driverId !== trackedDriverIdRef.current) return;
       if (typeof data.lat === 'number' && typeof data.lng === 'number') {
-        onLocationUpdatedRef.current(data.lat, data.lng);
+        onLocationUpdatedRef.current?.(data.lat, data.lng);
       }
     });
 

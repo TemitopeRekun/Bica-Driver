@@ -31,9 +31,11 @@ export const useRideManager = () => {
 
   const syncCurrentRide = useCallback(async () => {
     try {
+      // 🛡️ Snapshot state BEFORE async fetch to prevent race conditions
+      // If state changes mid-flight (e.g., user cancels), we use the snapshot not the stale value
+      const { rideState: snapshotState, setLastUserId } = useRideStore.getState();
+      
       const trip = await api.get<any>('/rides/current');
-      // Access current state via store to avoid dependency loop
-      const { rideState: currentState, setLastUserId } = useRideStore.getState();
 
       if (trip && currentUser?.id) {
         // Record who this trip belongs to for persistence security
@@ -60,9 +62,10 @@ export const useRideManager = () => {
         }
       } else {
         // IMPORTANT: Only reset if we aren't currently in a "Live" transition state.
+        // Use SNAPSHOT state (pre-fetch) to prevent race conditions.
         // This prevents accidental "automatic cancellations" if the sync call fails or returns null temporarily.
         const PROTECTED_STATES: string[] = ['SEARCHING', 'ASSIGNED', 'IN_PROGRESS', 'SCHEDULED', 'COMPLETED'];
-        if (!PROTECTED_STATES.includes(currentState)) {
+        if (!PROTECTED_STATES.includes(snapshotState)) {
           resetRide();
         }
       }
@@ -104,6 +107,20 @@ export const useRideManager = () => {
       const route = await api.get<any>(
         `/locations/route?originLat=${origin.lat}&originLng=${origin.lon}&destLat=${destination.lat}&destLng=${destination.lon}`
       );
+      
+      // 🛡️ Enterprise validation: Ensure response has required fields
+      // Prevents NaN in fare calculations if API returns malformed data
+      if (
+        typeof route?.distanceKm !== 'number' ||
+        typeof route?.estimatedMins !== 'number' ||
+        route.distanceKm < 0 ||
+        route.estimatedMins < 0
+      ) {
+        throw new Error(
+          `Invalid route response: distanceKm=${route?.distanceKm}, estimatedMins=${route?.estimatedMins}`
+        );
+      }
+
       setRoutePreview({
         distanceKm: route.distanceKm,
         estimatedMins: route.estimatedMins
@@ -111,9 +128,13 @@ export const useRideManager = () => {
       return route;
     } catch (error) {
       console.error('Failed to calculate route:', error);
+      addToast(
+        'Could not calculate route. Please check your locations and try again.',
+        'error'
+      );
       return null;
     }
-  }, [setRoutePreview]);
+  }, [setRoutePreview, addToast]);
 
   const initiatePayment = useCallback(async (tripId: string) => {
     try {

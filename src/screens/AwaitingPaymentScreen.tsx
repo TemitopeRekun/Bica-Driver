@@ -3,10 +3,20 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api.service';
 import { useAuthStore } from '@/stores/authStore';
 import { useDriverRealtime } from '@/hooks/useDriverRealtime';
+import { PollingManager, PollMetrics } from '@/utils/pollingUtil';
 import { sounds } from '@/services/SoundService';
 import { PaymentStatus } from '@/types';
 
 type ScreenState = 'verifying' | 'paid' | 'failed' | 'timeout';
+
+// 🏢 Enterprise polling config for driver payment verification
+const DRIVER_PAYMENT_POLLING_CONFIG = {
+  initialIntervalMs: 2000,
+  maxIntervalMs: 10000,
+  backoffMultiplier: 1.4,
+  maxAttempts: 120, // ~10 minutes with exponential backoff
+  jitterFactor: 0.15,
+};
 
 const AwaitingPaymentScreen: React.FC = () => {
   const { tripId } = useParams<{ tripId: string }>();
@@ -22,19 +32,20 @@ const AwaitingPaymentScreen: React.FC = () => {
   
   const [screenState, setScreenState] = useState<ScreenState>('verifying');
   const [amount, setAmount] = useState<number | null>(null);
+  const [pollCount, setPollCount] = useState(0);
 
-  const pollCountRef = useRef(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingManagerRef = useRef<PollingManager | null>(null);
+  const hasStartedRef = useRef(false);
 
-  const clearInterval_ = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  const clearPolling = () => {
+    if (pollingManagerRef.current) {
+      pollingManagerRef.current.stop();
+      pollingManagerRef.current = null;
     }
   };
 
   const handlePaid = (amt?: number) => {
-    clearInterval_();
+    clearPolling();
     if (amt) setAmount(amt);
     setScreenState('paid');
     sounds.playSuccess();
@@ -50,7 +61,7 @@ const AwaitingPaymentScreen: React.FC = () => {
       if (payload.paymentStatus === 'PAID') {
         handlePaid(payload.amount);
       } else if (payload.paymentStatus === 'FAILED') {
-        clearInterval_();
+        clearPolling();
         setScreenState('failed');
       }
     }
@@ -59,27 +70,47 @@ const AwaitingPaymentScreen: React.FC = () => {
   useEffect(() => {
     if (!tripId) return;
     if (screenState !== 'verifying') return;
+    if (hasStartedRef.current) return;
 
-    const pollStatus = async () => {
-      pollCountRef.current += 1;
-      try {
-        const data = await api.get<{ paymentStatus: PaymentStatus; amount?: number }>(`/payments/status/${tripId}`);
-        if (data.paymentStatus === 'PAID') {
-          handlePaid(data.amount);
-        } else if (data.paymentStatus === 'FAILED') {
-          clearInterval_();
-          setScreenState('failed');
-        } else if (pollCountRef.current > 120) { 
-          clearInterval_();
+    hasStartedRef.current = true;
+
+    // 🏢 Enterprise polling with exponential backoff
+    pollingManagerRef.current = new PollingManager(
+      async () => {
+        try {
+          const data = await api.get<{ paymentStatus: PaymentStatus; amount?: number }>(`/payments/status/${tripId}`);
+          
+          if (data.paymentStatus === 'PAID') {
+            handlePaid(data.amount);
+            return true; // Stop polling
+          }
+          
+          if (data.paymentStatus === 'FAILED') {
+            setScreenState('failed');
+            return true; // Stop polling
+          }
+          
+          return false; // Continue polling
+        } catch (err: any) {
+          console.error('[DriverPaymentPolling] Error:', err.message);
+          return false; // Retry with backoff
+        }
+      },
+      DRIVER_PAYMENT_POLLING_CONFIG,
+      (metrics: PollMetrics) => {
+        setPollCount(metrics.totalAttempts);
+        // After max attempts, timeout
+        if (metrics.totalAttempts >= DRIVER_PAYMENT_POLLING_CONFIG.maxAttempts) {
           setScreenState('timeout');
         }
-      } catch (err) {}
+      }
+    );
+
+    pollingManagerRef.current.start();
+
+    return () => {
+      clearPolling();
     };
-
-    pollStatus();
-    intervalRef.current = setInterval(pollStatus, 5000);
-
-    return () => clearInterval_();
   }, [tripId, screenState]);
 
   return (

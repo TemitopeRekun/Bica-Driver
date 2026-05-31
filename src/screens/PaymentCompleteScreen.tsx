@@ -6,11 +6,21 @@ import { api } from '@/services/api.service';
 import { useRatingGateStore } from '@/stores/ratingGateStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useOwnerRealtime } from '@/hooks/useOwnerRealtime';
+import { PollingManager, DEFAULT_POLLING_CONFIG, PollMetrics } from '@/utils/pollingUtil';
 import { Capacitor } from '@capacitor/core';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const POLL_INTERVAL_MS = 2500;
-const MAX_POLLS = 48; // 2 minutes total
+// 🏢 Enterprise polling config: Spread load across distributed users
+// - Start at 1s, back off to max 16s
+// - Jitter prevents thundering herd when Monnify is slow
+const PAYMENT_POLLING_CONFIG = {
+  initialIntervalMs: 1000,
+  maxIntervalMs: 16000,
+  backoffMultiplier: 1.5,
+  maxAttempts: 48, // ~5 min total with exponential backoff
+  jitterFactor: 0.2, // ±20% jitter
+};
+
 const STORAGE_KEY = 'bica_pending_payment_tripId';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -70,10 +80,11 @@ const PaymentCompleteScreen: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const pollCountRef = useRef(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingManagerRef = useRef<PollingManager | null>(null);
   const tripIdRef = useRef<string | null>(null);
   const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasStartedRef = useRef(false);
+  const isSuccessHandledRef = useRef(false);  // 🛡️ Idempotency guard: prevent double handleSuccess
 
   // Pull-to-refresh state
   const [pullY, setPullY] = useState(0);
@@ -81,7 +92,11 @@ const PaymentCompleteScreen: React.FC = () => {
   const isPullingRef = useRef(false);
 
   const handleSuccess = (data: any) => {
-    clearInterval_();
+    // 🛡️ Idempotency check: if already handled, ignore subsequent calls
+    if (isSuccessHandledRef.current) return;
+    isSuccessHandledRef.current = true;
+
+    clearPolling();
     localStorage.removeItem(STORAGE_KEY);
     setResult(data);
     setScreenState('paid');
@@ -106,7 +121,7 @@ const PaymentCompleteScreen: React.FC = () => {
 
   useEffect(() => {
     return () => {
-      clearInterval_();
+      clearPolling();
       if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
     };
   }, []);
@@ -136,6 +151,7 @@ const PaymentCompleteScreen: React.FC = () => {
   const handleTouchEnd = () => {
     if (pullY >= 60 && (screenState === 'polling' || screenState === 'timeout' || screenState === 'error')) {
       hasStartedRef.current = false;
+      isSuccessHandledRef.current = false;  // 🛡️ Reset idempotency guard for retry
       pollCountRef.current = 0;
       setPollCount(0);
       setErrorMsg(null);
@@ -166,10 +182,10 @@ const PaymentCompleteScreen: React.FC = () => {
     }
   });
 
-  const clearInterval_ = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  const clearPolling = () => {
+    if (pollingManagerRef.current) {
+      pollingManagerRef.current.stop();
+      pollingManagerRef.current = null;
     }
   };
 
@@ -177,57 +193,56 @@ const PaymentCompleteScreen: React.FC = () => {
     if (hasStartedRef.current) return;
     hasStartedRef.current = true;
     setScreenState('polling');
-
-    const poll = async () => {
-      pollCountRef.current += 1;
-      setPollCount(pollCountRef.current);
-
-      try {
-        const data: PollResult = await api.get(`/payments/status/${tripId}`);
-
-        if (data.paymentStatus === 'PAID' || data.paymentStatus === 'OVERPAID') {
-          if (data.postTripAction === 'REQUIRE_RATING') {
+    
+    // 🏢 Enterprise polling: exponential backoff prevents API spike
+    pollingManagerRef.current = new PollingManager(
+      async () => {
+        // Poll function: returns true to stop polling, false to continue
+        try {
+          const data: PollResult = await api.get(`/payments/status/${tripId}`);
+          
+          if (data.paymentStatus === 'PAID' || data.paymentStatus === 'OVERPAID') {
             handleSuccess(data);
-          } else {
-            handleSuccess(data); // fallback: still navigate away
+            return true; // Stop polling
           }
-          return;
-        }
 
-        if (data.paymentStatus === 'PARTIALLY_PAID') {
-          clearInterval_();
-          localStorage.removeItem(STORAGE_KEY);
-          setResult(data);
-          setScreenState('partial');
-          return;
-        }
+          if (data.paymentStatus === 'PARTIALLY_PAID') {
+            localStorage.removeItem(STORAGE_KEY);
+            setResult(data);
+            setScreenState('partial');
+            return true; // Stop polling
+          }
 
-        if (data.paymentStatus === 'FAILED' || data.paymentStatus === 'CANCELLED') {
-          clearInterval_();
-          localStorage.removeItem(STORAGE_KEY);
-          setResult(data);
-          setScreenState('failed');
-          return;
-        }
+          if (data.paymentStatus === 'FAILED' || data.paymentStatus === 'CANCELLED') {
+            localStorage.removeItem(STORAGE_KEY);
+            setResult(data);
+            setScreenState('failed');
+            return true; // Stop polling
+          }
 
-        if (pollCountRef.current >= MAX_POLLS) {
-          clearInterval_();
-          setScreenState('timeout');
+          return false; // Continue polling
+        } catch (err: any) {
+          const msg = err?.message || 'Could not verify payment status.';
+          if (err?.status === 401) {
+            navigate('/login', { replace: true });
+            return true; // Stop polling
+          }
+          setErrorMsg(msg);
+          return false; // Retry with backoff
         }
-      } catch (err: any) {
-        clearInterval_();
-        const msg = err?.message || 'Could not verify payment status.';
-        if (err?.status === 401) {
-          navigate('/login', { replace: true });
-          return;
-        }
-        setErrorMsg(msg);
-        setScreenState('error');
+      },
+      PAYMENT_POLLING_CONFIG,
+      (metrics: PollMetrics) => {
+        // Update UI with current poll count
+        setPollCount(metrics.totalAttempts);
+      },
+      (error: Error, attemptNumber: number) => {
+        // Log backoff attempts (for observability)
+        console.warn(`[PaymentPolling] Attempt ${attemptNumber} failed:`, error.message);
       }
-    };
+    );
 
-    poll();
-    intervalRef.current = setInterval(poll, POLL_INTERVAL_MS);
+    pollingManagerRef.current.start();
   };
 
   useEffect(() => {
@@ -263,7 +278,7 @@ const PaymentCompleteScreen: React.FC = () => {
     startInitialization();
 
     const handleResume = () => {
-      clearInterval_();
+      clearPolling();
       hasStartedRef.current = false;
       pollCountRef.current = 0;
       setPollCount(0);
@@ -273,7 +288,7 @@ const PaymentCompleteScreen: React.FC = () => {
     window.addEventListener('bica-app-resumed', handleResume);
 
     return () => {
-      clearInterval_();
+      clearPolling();
       window.removeEventListener('bica-app-resumed', handleResume);
     };
   }, [isInitializing, isAuthenticated]);
