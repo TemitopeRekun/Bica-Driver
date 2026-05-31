@@ -152,10 +152,17 @@ const RequestRideScreen: React.FC = () => {
     syncCurrentRide,
     onRideProgress: (payload) => {
        const m = payload.milestone?.toLowerCase();
-       if (m === 'inprogress' || m === 'in_progress' || m === 'trip') setRideMilestone('in_progress');
+       if (m === 'inprogress' || m === 'in_progress' || m === 'trip') {
+          setRideState('IN_PROGRESS');
+          setRideMilestone('in_progress');
+       }
        else if (m === 'arrived') setRideMilestone('arrived');
-       else if (m === 'assigned') setRideMilestone('assigned');
+       else if (m === 'assigned') {
+          setRideState('ASSIGNED');
+          setRideMilestone('assigned');
+       }
        else if (m === 'completed') {
+          setRideState('COMPLETED');
           setRideMilestone('completed');
           if (rideStateRef.current !== 'COMPLETED') {
             syncCurrentRide();

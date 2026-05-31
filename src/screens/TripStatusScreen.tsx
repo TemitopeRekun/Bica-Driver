@@ -79,6 +79,7 @@ const TripStatusScreen: React.FC = () => {
   const [isPolling, setIsPolling] = React.useState(false);
   const [showEmergencyHelp, setShowEmergencyHelp] = React.useState(false);
   const isPollingRef = React.useRef(false);
+  const isOwnerPaymentScreen = rideState === 'COMPLETED' && currentUser?.role === 'OWNER';
   
   const { cancelRide, syncCurrentRide, initiatePayment } = useRideManager();
   
@@ -128,10 +129,19 @@ const TripStatusScreen: React.FC = () => {
     syncCurrentRide,
     onRideProgress: (payload) => {
        const m = payload.milestone?.toLowerCase();
-       if (m === 'inprogress' || m === 'in_progress' || m === 'trip') setRideMilestone('in_progress');
+       if (m === 'inprogress' || m === 'in_progress' || m === 'trip') {
+        setRideState('IN_PROGRESS');
+        setRideMilestone('in_progress');
+       }
        else if (m === 'arrived') setRideMilestone('arrived');
-       else if (m === 'assigned') setRideMilestone('assigned');
-       else if (m === 'completed') setRideMilestone('completed');
+       else if (m === 'assigned') {
+        setRideState('ASSIGNED');
+        setRideMilestone('assigned');
+       }
+       else if (m === 'completed') {
+        setRideState('COMPLETED');
+        setRideMilestone('completed');
+       }
 
        if (payload.otp || payload.acceptanceImageUrl) {
          setDriverInfo({
@@ -244,12 +254,16 @@ const TripStatusScreen: React.FC = () => {
     <div className="h-screen w-full flex flex-col bg-background-light dark:bg-background-dark overflow-hidden">
       {/* Dynamic Header */}
       <div className="absolute top-0 left-0 right-0 z-30 p-6 flex items-center justify-between pointer-events-none">
-        <button 
-          onClick={() => navigate('/owner')} 
-          className="pointer-events-auto w-12 h-12 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl flex items-center justify-center shadow-2xl border border-white/20 active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined text-slate-900 dark:text-white">arrow_back</span>
-        </button>
+        {isOwnerPaymentScreen ? (
+          <div className="w-12 h-12" aria-hidden="true" />
+        ) : (
+          <button
+            onClick={() => navigate('/owner')}
+            className="pointer-events-auto w-12 h-12 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl flex items-center justify-center shadow-2xl border border-white/20 active:scale-95 transition-all"
+          >
+            <span className="material-symbols-outlined text-slate-900 dark:text-white">arrow_back</span>
+          </button>
+        )}
         
         <div className="flex flex-col items-center">
            <span className="text-xl font-black text-slate-900 dark:text-white drop-shadow-md">Ride <span className="text-primary">Status</span></span>
@@ -258,15 +272,19 @@ const TripStatusScreen: React.FC = () => {
            </div>
         </div>
 
-        <button 
-          onClick={() => {
-            addToast('Refreshing ride status...', 'info');
-            syncCurrentRide();
-          }} 
-          className="pointer-events-auto w-12 h-12 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl flex items-center justify-center shadow-2xl border border-white/20 active:scale-95 transition-all"
-        >
-          <span className="material-symbols-outlined text-slate-900 dark:text-white">sync</span>
-        </button>
+        {isOwnerPaymentScreen ? (
+          <div className="w-12 h-12" aria-hidden="true" />
+        ) : (
+          <button
+            onClick={() => {
+              addToast('Refreshing ride status...', 'info');
+              syncCurrentRide();
+            }}
+            className="pointer-events-auto w-12 h-12 rounded-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl flex items-center justify-center shadow-2xl border border-white/20 active:scale-95 transition-all"
+          >
+            <span className="material-symbols-outlined text-slate-900 dark:text-white">sync</span>
+          </button>
+        )}
       </div>
 
       {/* Map Header Area */}

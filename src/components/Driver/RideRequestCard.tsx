@@ -34,7 +34,7 @@ const RideRequestCard: React.FC<RideRequestCardProps> = ({ request, onAccept, on
         <div className="text-right">
           <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Reward</p>
           <div className="bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
-            <p className="text-xl font-black text-primary italic">₦{request.price}</p>
+            <p className="text-xl font-black text-primary italic">{request.price}</p>
           </div>
         </div>
       </div>

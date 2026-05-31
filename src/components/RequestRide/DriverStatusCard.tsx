@@ -65,6 +65,17 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
   };
 
   const timeAway = getDynamicTimeAway();
+  const normalizedMilestone = rideMilestone?.toLowerCase();
+  const isTripStarted =
+    normalizedMilestone === 'in_progress' ||
+    normalizedMilestone === 'inprogress' ||
+    normalizedMilestone === 'trip' ||
+    normalizedMilestone === 'completed';
+  const canCancelRideRequest =
+    onCancel &&
+    (rideState === 'SEARCHING' || rideState === 'ASSIGNED') &&
+    !isTripStarted;
+
   return (
     <div className="bg-surface-light dark:bg-surface-dark rounded-3xl p-4 shadow-2xl border border-slate-200 dark:border-slate-800 animate-slide-up">
       <RideStoryTimeline milestone={rideMilestone} lastUpdate={lastMilestoneUpdate} />
@@ -176,7 +187,7 @@ const DriverStatusCard: React.FC<DriverStatusCardProps> = ({
         </button>
       </div>
 
-      {(rideState === 'ASSIGNED' || rideState === 'SEARCHING') && onCancel && (
+      {canCancelRideRequest && (
         <button
           onClick={onCancel}
           className="mt-3 w-full py-3 rounded-xl bg-red-600 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-red-500/30 hover:bg-red-700 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
