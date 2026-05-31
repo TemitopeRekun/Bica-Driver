@@ -12,7 +12,7 @@ import TripPaymentSummary from '@/components/RequestRide/TripPaymentSummary';
 import { IMAGES } from '@/constants';
 import { getLocationShortText } from '@/services/LocationService';
 import { api } from '@/services/api.service';
-import { notificationService } from '@/services/NotificationService';
+import { notificationService, normalizeNotificationType } from '@/services/NotificationService';
 import EmergencyHelpSheet from '@/components/EmergencyHelpSheet';
 
 const ScheduledHoldingCard: React.FC<{
@@ -229,7 +229,7 @@ const TripStatusScreen: React.FC = () => {
   // Handle FCM Push for OTP Regeneration
   useEffect(() => {
     const unsubscribe = notificationService.addListener((payload) => {
-      if (payload.type === 'otp_regenerated' && payload.otp) {
+      if (normalizeNotificationType(payload.type) === 'otpregenerated' && payload.otp) {
         console.log('🔔 [FCM] OTP regenerated received:', payload.otp);
         setDriverInfo({
           ...driverInfo,

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Hardware feature declarations -->
     <uses-feature android:name="android.hardware.location.gps" />
@@ -34,6 +35,10 @@
         android:usesCleartextTraffic="false"
         android:enableOnBackInvokedCallback="true">
 
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="ride_updates" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -57,6 +62,10 @@
             </intent-filter>
 
         </activity>
+
+        <service
+            android:name="com.capacitorjs.plugins.pushnotifications.MessagingService"
+            tools:node="remove" />
 
         <!-- FCM Messaging Service -->
         <service

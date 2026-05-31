@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { useRideStore } from '@/stores/rideStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useDriverManager } from '@/hooks/useDriverManager';
-import { useDriverRealtime, DriverRideRequest } from '@/hooks/useDriverRealtime';
+import { useDriverRealtime, DriverRideRequest, mapTripToDriverRideRequest } from '@/hooks/useDriverRealtime';
 import { useCarVerification } from '@/hooks/useCarVerification';
 import { useConnectivityStore } from '@/stores/connectivityStore';
 
@@ -20,11 +20,20 @@ import { CapacitorService } from '@/services/CapacitorService';
 import { IMAGES } from '@/constants';
 import { CameraSource, CameraDirection } from '@capacitor/camera';
 import { api } from '@/services/api.service';
+import { notificationService, normalizeNotificationType } from '@/services/NotificationService';
 import { Skeleton, CardSkeleton } from '@/components/Common/Skeleton';
 import { InlineError } from '@/components/Common/InlineError';
 import EmergencyHelpSheet from '@/components/EmergencyHelpSheet';
 import { EmergencyHelpContext } from '@/types';
 import { getRideRequestPrice } from '@/utils/currencyFormatter';
+
+const RIDE_OFFER_NOTIFICATION_TYPES = new Set([
+  'newride',
+  'rideassigned',
+  'riderequest',
+  'newriderequest',
+  'newscheduledtrip',
+]);
 
 const DriverMainScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -103,7 +112,7 @@ const DriverMainScreen: React.FC = () => {
   }, [addToast]);
 
   const {
-    isOnline, driverPos, liveRideRequests, enableOnline, disableOnline, removeRideRequest, availabilityIssue,
+    isOnline, driverPos, liveRideRequests, enableOnline, disableOnline, removeRideRequest, restoreRideRequest, availabilityIssue,
   } = useDriverRealtime({
     user: currentUser,
     approvalStatus: currentUser?.approvalStatus || 'PENDING',
@@ -113,6 +122,41 @@ const DriverMainScreen: React.FC = () => {
     onRideCancelled,
     onPaymentUpdated,
   });
+
+  useEffect(() => {
+    const unsubscribe = notificationService.addListener(async (payload) => {
+      const notificationType = normalizeNotificationType(payload.type);
+      if (!RIDE_OFFER_NOTIFICATION_TYPES.has(notificationType) || activeRide) return;
+
+      try {
+        let trip: any = null;
+
+        if (payload.tripId) {
+          try {
+            trip = await api.get<any>(`/rides/${payload.tripId}`);
+          } catch {
+            trip = null;
+          }
+        }
+
+        if (!trip) {
+          trip = await api.get<any>('/rides/current');
+        }
+
+        const status = String(trip?.status || '').toUpperCase();
+        if (trip && (status === 'PENDING_ACCEPTANCE' || status === 'SEARCHING')) {
+          restoreRideRequest(mapTripToDriverRideRequest(trip));
+          setRequestsError(null);
+        }
+      } catch (error) {
+        console.warn('[DriverPush] Failed to restore ride request from push:', error);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [activeRide, restoreRideRequest]);
 
   // ── Effects for Loading State ──
   useEffect(() => {

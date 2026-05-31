@@ -10,6 +10,13 @@ export interface NotificationPayload {
   [key: string]: any;
 }
 
+export const normalizeNotificationType = (type?: string): string =>
+  String(type || '').trim().toLowerCase().replace(/[\s_.:-]+/g, '');
+
+const navigateToAppRoute = (path: string) => {
+  window.location.hash = path.startsWith('/') ? path : `/${path}`;
+};
+
 type NotificationListener = (payload: NotificationPayload) => void;
 
 class NotificationService {
@@ -73,25 +80,35 @@ class NotificationService {
         setTimeout(() => {
           const { currentUser } = useAuthStore.getState();
           const tripId = payload.tripId || payload.id;
+          const notificationType = normalizeNotificationType(payload.type);
 
-          switch (payload.type) {
+          switch (notificationType) {
             case 'rideaccepted':
             case 'otpregenerated':
-              window.location.replace('/owner/status');
+              navigateToAppRoute('/owner/status');
               break;
             case 'dispatchfailed':
-              window.location.replace('/owner');
+              navigateToAppRoute('/owner');
+              break;
+            case 'newride':
+            case 'rideassigned':
+            case 'riderequest':
+            case 'newriderequest':
+            case 'newscheduledtrip':
+              if (currentUser?.role === 'DRIVER') {
+                navigateToAppRoute('/driver');
+              }
               break;
             case 'paymentreceived':
               if (tripId) {
-                window.location.replace(`/driver/awaiting-payment/${tripId}`);
+                navigateToAppRoute(`/driver/awaiting-payment/${tripId}`);
               }
               break;
             case 'ridecancelled':
               if (currentUser?.role === 'DRIVER') {
-                window.location.replace('/driver');
+                navigateToAppRoute('/driver');
               } else {
-                window.location.replace('/owner');
+                navigateToAppRoute('/owner');
               }
               break;
             default:

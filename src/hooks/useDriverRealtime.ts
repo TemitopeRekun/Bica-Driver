@@ -46,6 +46,55 @@ interface UseDriverRealtimeOptions {
 
 const DEFAULT_DRIVER_POS: [number, number] = [6.4549, 3.3896];
 
+const toFiniteNumber = (value: unknown, fallback: number): number => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : fallback;
+};
+
+const firstText = (...values: unknown[]): string => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return '';
+};
+
+export const mapTripToDriverRideRequest = (trip: any): DriverRideRequest => {
+  const pickupAddress = firstText(trip.pickupAddress, trip.pickup, 'Pickup unavailable');
+  const destinationAddress = firstText(trip.destAddress, trip.destinationAddress, trip.destination, 'Destination unavailable');
+  const distance =
+    typeof trip.distanceKm === 'number'
+      ? `${trip.distanceKm.toFixed(1)} km`
+      : firstText(trip.distance, 'Distance pending');
+  const estimatedArrivalMins = toFiniteNumber(trip.estimatedArrivalMins, 5);
+  const estimatedTripMins = toFiniteNumber(trip.estimatedMins ?? trip.fareBreakdown?.totalMins, 10);
+
+  return {
+    id: String(trip.id),
+    ownerName: firstText(trip.owner?.name, trip.ownerName, 'Car Owner'),
+    pickup: pickupAddress,
+    destination: destinationAddress,
+    distance,
+    price: getRideRequestPrice(trip.driverEarnings, trip.amount),
+    timeToPickup: `${estimatedArrivalMins}m to pickup`,
+    tripDuration: `${estimatedTripMins}m trip`,
+    avatar: firstText(trip.owner?.avatarUrl, trip.ownerAvatar, IMAGES.USER_AVATAR),
+    coords: [
+      toFiniteNumber(trip.pickupLat ?? trip.pickupLatitude, DEFAULT_DRIVER_POS[0]),
+      toFiniteNumber(trip.pickupLng ?? trip.pickupLongitude, DEFAULT_DRIVER_POS[1]),
+    ],
+    destCoords: [
+      toFiniteNumber(trip.destLat ?? trip.destinationLat, DEFAULT_DRIVER_POS[0]),
+      toFiniteNumber(trip.destLng ?? trip.destinationLng, DEFAULT_DRIVER_POS[1]),
+    ],
+    acceptanceImageUrl: trip.acceptanceImageUrl,
+    status: firstText(trip.status, 'PENDING_ACCEPTANCE'),
+    pickupAddress,
+    destAddress: destinationAddress,
+    ownerPhone: firstText(trip.owner?.phone, trip.ownerPhone),
+    driverEarnings: trip.driverEarnings,
+  };
+};
+
 const isPermissionDeniedError = (error: unknown): boolean => {
   const typedError = error as { code?: number | string; message?: string; cause?: { code?: number | string } };
   const code = typedError?.code ?? typedError?.cause?.code;
@@ -102,7 +151,7 @@ export const useDriverRealtime = ({
 
   const registerDriverSocket = useCallback(() => {
     if (!socketRef.current?.connected || !user?.id) return;
-    socketRef.current.emit('driverregister', { driverId: user.id });
+    socketRef.current.emit('driver:register', { driverId: user.id });
   }, [user?.id]);
 
   const pushDriverLocation = useCallback(async (latitude: number, longitude: number) => {
@@ -279,27 +328,10 @@ export const useDriverRealtime = ({
 
     const handleIncomingRequest = (trip: any) => {
       sounds.playNotification();
-      const rideRequest: DriverRideRequest = {
-        id: trip.id,
-        ownerName: trip.owner?.name || 'Car Owner',
-        pickup: trip.pickupAddress,
-        destination: trip.destAddress,
-        distance: `${trip.distanceKm?.toFixed(1)} km`,
-        price: getRideRequestPrice(trip.driverEarnings, trip.amount), // 🛡️ Safe null handling
-        timeToPickup: `${trip.estimatedArrivalMins || 5}m to pickup`,
-        tripDuration: `${trip.estimatedMins || trip.fareBreakdown?.totalMins || 10}m trip`,
-        avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
-        coords: [trip.pickupLat, trip.pickupLng],
-        destCoords: [trip.destLat, trip.destLng],
-        status: trip.status,
-        pickupAddress: trip.pickupAddress,
-        destAddress: trip.destAddress,
-        ownerPhone: trip.owner?.phone,
-        driverEarnings: trip.driverEarnings,
-      };
+      const rideRequest = mapTripToDriverRideRequest(trip);
 
       setLiveRideRequests((prev) => {
-        if (prev.some((ride) => ride.id === trip.id)) return prev;
+        if (prev.some((ride) => ride.id === rideRequest.id)) return prev;
         return [rideRequest, ...prev];
       });
     };
