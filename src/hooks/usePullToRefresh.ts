@@ -12,7 +12,9 @@ export const usePullToRefresh = (onRefresh: () => Promise<void>) => {
     // Only track if we are at the top of the scrollable container
     const scrollTop = e.currentTarget.scrollTop;
     if (scrollTop === 0) {
-      startY.current = e.touches[0].pageY;
+      const touch = e.touches[0];
+      if (!touch) return;
+      startY.current = touch.pageY;
       isThresholdMet.current = false;
     }
   }, []);
@@ -20,7 +22,9 @@ export const usePullToRefresh = (onRefresh: () => Promise<void>) => {
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     if (startY.current === null || isRefreshing) return;
 
-    const currentY = e.touches[0].pageY;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const currentY = touch.pageY;
     const diff = currentY - startY.current;
 
     // Only allow pulling down

@@ -38,12 +38,12 @@ const ResetPasswordScreen: React.FC = () => {
     const newOtp = [...otp];
     newOtp[index] = value.substring(value.length - 1);
     setOtp(newOtp);
-    if (value && index < 5) inputRefs[index + 1].current?.focus();
+    if (value && index < 5) inputRefs[index + 1]?.current?.focus();
   };
 
   const handleOtpKeyDown = (index: number, e: React.KeyboardEvent) => {
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs[index - 1].current?.focus();
+      inputRefs[index - 1]?.current?.focus();
     }
   };
 

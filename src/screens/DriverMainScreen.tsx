@@ -160,13 +160,14 @@ const DriverMainScreen: React.FC = () => {
 
   // ── Effects for Loading State ──
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (isOnline && isSocketConnected && liveRideRequests.length === 0) {
       setIsInitialLoading(true);
-      const timer = setTimeout(() => setIsInitialLoading(false), 5000);
-      return () => clearTimeout(timer);
+      timer = setTimeout(() => setIsInitialLoading(false), 5000);
     } else {
       setIsInitialLoading(false);
     }
+    return () => { if (timer) clearTimeout(timer); };
   }, [isOnline, isSocketConnected, liveRideRequests.length]);
 
   // ── Derived memoized values ──────────────────────────────────────────────
@@ -210,24 +211,24 @@ const DriverMainScreen: React.FC = () => {
                destination: trip.destAddress
              });
            } else if (trip.driverId === currentUser?.id && trip.status !== 'PENDING_ACCEPTANCE') {
-             setActiveRide({
-               id: trip.id,
-               ownerName: trip.owner?.name || 'Car Owner',
-               pickup: trip.pickupAddress,
-               destination: trip.destAddress,
-               distance: `${trip.distanceKm?.toFixed(1)} km`,
-               price: getRideRequestPrice(trip.driverEarnings, trip.amount), // 🛡️ Safe null handling
-               timeToPickup: `${trip.estimatedArrivalMins || 5}m to pickup`,
-               tripDuration: `${trip.estimatedMins || 10}m trip`,
-               avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
-               coords: [trip.pickupLat, trip.pickupLng],
-               destCoords: [trip.destLat, trip.destLng],
-               status: trip.status,
-               pickupAddress: trip.pickupAddress,
-               destAddress: trip.destAddress,
-               ownerPhone: trip.owner?.phone,
-               driverEarnings: trip.driverEarnings,
-             });
+              setActiveRide({
+                id: trip.id,
+                ownerName: trip.owner?.name || 'Car Owner',
+                pickup: trip.pickupAddress ?? '',
+                destination: trip.destAddress ?? '',
+                distance: `${trip.distanceKm?.toFixed(1) ?? '0'} km`,
+                price: getRideRequestPrice(trip.driverEarnings, trip.amount),
+                timeToPickup: `${trip.estimatedArrivalMins || 5}m to pickup`,
+                tripDuration: `${trip.estimatedMins || 10}m trip`,
+                avatar: trip.owner?.avatarUrl || IMAGES.USER_AVATAR,
+                coords: [trip.pickupLat ?? 0, trip.pickupLng ?? 0],
+                destCoords: [trip.destLat ?? 0, trip.destLng ?? 0],
+                status: trip.status,
+                pickupAddress: trip.pickupAddress ?? '',
+                destAddress: trip.destAddress ?? '',
+                ownerPhone: trip.owner?.phone,
+                driverEarnings: trip.driverEarnings,
+              });
            }
         }
       } catch (e: any) {

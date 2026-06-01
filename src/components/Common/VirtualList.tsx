@@ -35,7 +35,7 @@ export function VirtualList<T>({
       overscanCount={overscanCount}
       className="no-scrollbar"
     >
-      {({ index, style }) => renderItem(items[index], index, style)}
+      {({ index, style }: { index: number; style: React.CSSProperties }) => renderItem(items[index]!, index, style)}
     </List>
   );
 }

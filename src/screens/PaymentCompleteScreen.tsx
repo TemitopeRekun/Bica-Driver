@@ -138,13 +138,17 @@ const PaymentCompleteScreen: React.FC = () => {
 
   // Pull-to-refresh handlers
   const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartYRef.current = e.touches[0].clientY;
+    const touch = e.touches[0];
+    if (!touch) return;
+    touchStartYRef.current = touch.clientY;
     isPullingRef.current = true;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isPullingRef.current) return;
-    const delta = e.touches[0].clientY - touchStartYRef.current;
+    if (!isPullingRef.current || touchStartYRef.current === null) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const delta = touch.clientY - touchStartYRef.current;
     if (delta > 0) setPullY(Math.min(delta, 72));
   };
 
@@ -346,7 +350,7 @@ const PaymentCompleteScreen: React.FC = () => {
             </p>
           </div>
 
-          <ProgressDots count={pollCount} max={MAX_POLLS} />
+          <ProgressDots count={pollCount} max={PAYMENT_POLLING_CONFIG.maxAttempts} />
 
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center leading-relaxed">

@@ -35,7 +35,7 @@ export const useCarVerification = (tripId: string) => {
           // Auto-advance to next side if available
           const currentIndex = sides.indexOf(side);
           if (currentIndex < sides.length - 1) {
-            setConditionStep(sides[currentIndex + 1]);
+            setConditionStep(sides[currentIndex + 1]!);
           }
         } catch (error: any) {
           addToast('Failed to upload photo. Please try again.', 'error');

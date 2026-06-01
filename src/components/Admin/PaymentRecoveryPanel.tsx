@@ -43,7 +43,7 @@ const tripIdFromPaymentRef = (paymentRef: string): string | null => {
   // paymentReference format: BICA-{tripIdNoHyphens}-{random}
   const match = paymentRef.match(/^BICA-([a-f0-9]{32})-/i);
   if (!match) return null;
-  const raw = match[1];
+  const raw = match[1]!;
   return `${raw.slice(0, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}-${raw.slice(16, 20)}-${raw.slice(20)}`;
 };
 
