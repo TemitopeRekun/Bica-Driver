@@ -315,31 +315,21 @@ export const CapacitorService = {
   async initBackButton(onBack?: () => void) {
     if (Capacitor.getPlatform() === 'web') return;
 
-    // Only exit on pure welcome screen. Dashboards should allow back navigation to trips.
-    const EXIT_ROUTES = ['/'];
-    // These are dashboards where user might have active trips. Allow back to trip screens.
     const HOME_ROUTES = ['/owner', '/driver', '/admin'];
 
     try {
       const { App } = await import('@capacitor/app');
       App.addListener('backButton', ({ canGoBack }) => {
         const hash = window.location.hash.replace('#', '').split('?')[0] || '/';
-        const isExitRoute = EXIT_ROUTES.some(r => hash === r);
         const isHomeRoute = HOME_ROUTES.some(r => hash === r || hash === r + '/');
 
-        // If on exit route and can't go back, exit app
-        if (isExitRoute && !canGoBack) {
+        // On a dashboard home route → always close the app (never navigate back to welcome/login)
+        if (isHomeRoute) {
           App.exitApp();
           return;
         }
 
-        // If on home route (dashboard) but CAN go back (there's a trip screen in stack), go back
-        if (isHomeRoute && canGoBack) {
-          window.history.back();
-          return;
-        }
-
-        // Otherwise: if can't go back, exit. If can go back or has handler, use it.
+        // On any other page: if can't go back, exit. Otherwise navigate back or fire custom handler.
         if (!canGoBack) {
           App.exitApp();
         } else if (onBack) {
