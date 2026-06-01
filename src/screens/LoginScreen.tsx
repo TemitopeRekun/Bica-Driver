@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useUIStore } from '../stores/uiStore';
 import { api } from '../services/api.service';
@@ -8,8 +8,15 @@ import { AuthResponse, UserRole } from '../types';
 
 const LoginScreen: React.FC = () => {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const { login, isAuthenticated, currentUser } = useAuthStore();
   const { addToast } = useUIStore();
+
+  if (isAuthenticated && currentUser) {
+    const role = currentUser.role;
+    if (role === UserRole.ADMIN) return <Navigate to="/admin" replace />;
+    if (role === UserRole.DRIVER) return <Navigate to="/driver" replace />;
+    return <Navigate to="/owner" replace />;
+  }
   
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
@@ -51,9 +58,9 @@ const LoginScreen: React.FC = () => {
       await login(mapped, response.token, response.refreshToken);
       addToast(`Welcome back, ${mapped.name}!`, 'success');
 
-      if (mapped.role === UserRole.ADMIN) navigate('/admin');
-      else if (mapped.role === UserRole.DRIVER) navigate('/driver');
-      else navigate('/owner');
+      if (mapped.role === UserRole.ADMIN) navigate('/admin', { replace: true });
+      else if (mapped.role === UserRole.DRIVER) navigate('/driver', { replace: true });
+      else navigate('/owner', { replace: true });
 
     } catch (error: any) {
       const status = error?.status;
@@ -83,6 +90,7 @@ const LoginScreen: React.FC = () => {
       <header className="flex items-center justify-between px-4 py-3 sticky top-0 z-10 bg-background-light dark:bg-background-dark">
         <button 
           onClick={() => navigate('/')}
+          aria-label="Go back to welcome screen"
           className="flex size-10 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors active:scale-90"
         >
           <span className="material-symbols-outlined text-slate-900 dark:text-white">arrow_back</span>
@@ -106,6 +114,7 @@ const LoginScreen: React.FC = () => {
               <span className="material-symbols-outlined text-slate-400 mr-3">mail</span>
               <input 
                 required
+                aria-label="Email address"
                 className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0" 
                 placeholder="email@example.com" 
                 type="email" 
@@ -130,6 +139,7 @@ const LoginScreen: React.FC = () => {
               <span className="material-symbols-outlined text-slate-400 mr-3">lock</span>
               <input 
                 required
+                aria-label="Password"
                 className="bg-transparent border-none text-slate-900 dark:text-white placeholder-slate-400 text-base font-medium w-full focus:ring-0 p-0" 
                 placeholder="Enter your password" 
                 type={showPassword ? "text" : "password"}
@@ -138,6 +148,7 @@ const LoginScreen: React.FC = () => {
               />
               <button 
                 type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
                 onClick={() => setShowPassword(!showPassword)}
                 className="flex items-center justify-center p-1 hover:text-primary transition-colors focus:outline-none"
               >
@@ -150,7 +161,7 @@ const LoginScreen: React.FC = () => {
 
           {/* Inline error banner */}
           {inlineError && (
-            <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-500/10 rounded-xl border border-red-200 dark:border-red-500/20">
+            <div role="alert" className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-500/10 rounded-xl border border-red-200 dark:border-red-500/20">
               <span className="material-symbols-outlined text-red-500 text-sm mt-0.5 shrink-0">error</span>
               <p className="text-red-600 dark:text-red-400 text-sm font-semibold leading-relaxed">{inlineError}</p>
             </div>
@@ -159,6 +170,7 @@ const LoginScreen: React.FC = () => {
           <button 
             type="submit"
             disabled={isLoading}
+            aria-label={isLoading ? 'Logging in' : 'Log in'}
             className="w-full bg-primary hover:bg-opacity-90 active:bg-opacity-100 text-white font-bold text-lg h-14 rounded-xl shadow-lg shadow-primary/25 mt-2 transition-all transform active:scale-[0.98] disabled:opacity-50"
           >
             {isLoading ? 'Logging in...' : 'Log In'}

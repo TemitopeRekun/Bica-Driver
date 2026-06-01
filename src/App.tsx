@@ -214,15 +214,18 @@ const App: React.FC = () => {
     const showLocationIssue = isOnline && locationStatus !== 'available' && locationStatus !== 'unavailable';
     const isSocketStale = isOnline && socketEverConnected && isReconnecting;
 
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
     // Padding debounce matches ConnectivityBanner's BANNER_DEBOUNCE_MS to prevent layout jumps before banner appears
     if (showOffline || isSocketStale) {
-      const timer = setTimeout(() => setShowBannerPadding(true), 2500);
-      return () => clearTimeout(timer);
+      timer = setTimeout(() => setShowBannerPadding(true), 2500);
     } else if (showLocationIssue) {
       setShowBannerPadding(true);
     } else {
       setShowBannerPadding(false);
     }
+
+    return () => { if (timer) clearTimeout(timer); };
   }, [isOnline, isReconnecting, socketEverConnected, locationStatus]);
 
   return (
@@ -241,7 +244,7 @@ const App: React.FC = () => {
 
             {/* Global Overlays */}
             {(() => {
-              const currentHash = window.location.hash.split('?')[0].replace('#', '') || '/';
+              const currentHash = (window.location.hash.split('?')[0] ?? '').replace('#', '') || '/';
               const isPublicRoute = ['/', '/login', '/register', '/role-selection', '/verify-email', '/forgot-password', '/reset-password'].includes(currentHash);
               
               if (isAuthenticated && currentUser && !isPublicRoute) {

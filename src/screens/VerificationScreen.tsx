@@ -69,13 +69,13 @@ const VerificationScreen: React.FC = () => {
     newOtp[index] = value.substring(value.length - 1);
     setOtp(newOtp);
     if (value && index < 5) {
-      inputRefs[index + 1].current?.focus();
+      inputRefs[index + 1]?.current?.focus();
     }
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
     if (e.key === 'Backspace' && !otp[index] && index > 0) {
-      inputRefs[index - 1].current?.focus();
+      inputRefs[index - 1]?.current?.focus();
     }
   };
 
@@ -96,10 +96,10 @@ const VerificationScreen: React.FC = () => {
         const mapped = mapUser(response.user);
         await login(mapped, response.token, response.refreshToken);
         addToast('Email verified successfully!', 'success');
-        navigate(mapped.role === UserRole.DRIVER ? '/driver' : '/owner');
+        navigate(mapped.role === UserRole.DRIVER ? '/driver' : '/owner', { replace: true });
       } else {
         addToast('Verification successful! Please log in.', 'success');
-        navigate('/login');
+        navigate('/login', { replace: true });
       }
     } catch (error: any) {
       const message = error?.message || 'Invalid verification code. Please try again.';

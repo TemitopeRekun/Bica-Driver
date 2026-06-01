@@ -102,7 +102,11 @@ export class SocketMetricsCollector {
 
     let totalTime = 0;
     for (let i = 1; i < this.reconnectAttemptTimes.length; i++) {
-      totalTime += this.reconnectAttemptTimes[i] - this.reconnectAttemptTimes[i - 1];
+      const curr = this.reconnectAttemptTimes[i];
+      const prev = this.reconnectAttemptTimes[i - 1];
+      if (curr !== undefined && prev !== undefined) {
+        totalTime += curr - prev;
+      }
     }
 
     this.metrics.averageReconnectTime = Math.round(totalTime / (this.reconnectAttemptTimes.length - 1));

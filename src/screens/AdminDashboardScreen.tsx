@@ -347,7 +347,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
 
             {activeSection === 'overview' && (
               <OverviewSection 
-                lastUpdated={lastUpdated} 
+                lastUpdated={lastUpdated ?? null} 
                 pendingDrivers={pendingDrivers} 
                 stats={stats}
                 pendingPayments={pendingPayments}

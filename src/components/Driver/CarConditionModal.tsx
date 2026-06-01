@@ -103,7 +103,7 @@ const CarConditionModal: React.FC<CarConditionModalProps> = ({
               <button 
                 onClick={() => {
                   const prevIndex = sides.indexOf(conditionStep) - 1;
-                  setConditionStep(sides[prevIndex]);
+                  if (prevIndex >= 0) setConditionStep(sides[prevIndex]!);
                 }} 
                 className="flex-1 py-5 rounded-2xl bg-white/5 text-white font-bold hover:bg-white/10 transition-colors uppercase tracking-widest text-xs"
               >Previous</button>
@@ -120,13 +120,13 @@ const CarConditionModal: React.FC<CarConditionModalProps> = ({
                 </button>
               ) : (
                 <button 
-                  onClick={() => {
-                    const nextIndex = sides.indexOf(conditionStep) + 1;
-                    setConditionStep(sides[nextIndex]);
-                  }} 
+                onClick={() => {
+                  const nextIndex = sides.indexOf(conditionStep) + 1;
+                  if (nextIndex < sides.length) setConditionStep(sides[nextIndex]!);
+                }} 
                   className="flex-[2] py-5 rounded-2xl bg-primary text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 shadow-xl shadow-primary/20"
                 >
-                   Next: {sides[sides.indexOf(conditionStep) + 1]}
+                   Next: {sides[(sides.indexOf(conditionStep) + 1)] ?? ''}
                    <span className="material-symbols-outlined text-sm">arrow_forward</span>
                 </button>
               )

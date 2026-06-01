@@ -38,7 +38,7 @@ export const useSignUpForm = (initialRole: UserRole) => {
       4: ['password', 'confirmPassword', 'backgroundCheckAccepted'],
     };
 
-    const currentFields = stepFields[step];
+    const currentFields = stepFields[step] ?? [];
     const newErrors: Record<string, string> = {};
     let isValid = true;
 
