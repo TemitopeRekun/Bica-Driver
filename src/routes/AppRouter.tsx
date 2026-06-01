@@ -4,6 +4,7 @@ import { useRatingGateStore } from '../stores/ratingGateStore';
 import { UserRole } from '@/types';
 import GlobalRouteError from '@/components/Common/GlobalRouteError';
 import ErrorBoundary from '@/components/Common/ErrorBoundary';
+import { AuthorityGate } from '@/components/Common/AuthorityGate';
 
 // Screens
 import WelcomeScreen from '../screens/WelcomeScreen';
@@ -155,9 +156,11 @@ export const router = createHashRouter([
     path: '/owner',
     element: (
       <ProtectedRoute roles={[UserRole.OWNER, UserRole.ADMIN]} strictOwnerGate>
-        <RouteErrorBoundary>
-          <RequestRideScreen />
-        </RouteErrorBoundary>
+        <AuthorityGate>
+          <RouteErrorBoundary>
+            <RequestRideScreen />
+          </RouteErrorBoundary>
+        </AuthorityGate>
       </ProtectedRoute>
     ),
   },
@@ -184,9 +187,11 @@ export const router = createHashRouter([
     path: '/driver',
     element: (
       <ProtectedRoute roles={[UserRole.DRIVER, UserRole.ADMIN]}>
-        <RouteErrorBoundary>
-          <DriverMainScreen />
-        </RouteErrorBoundary>
+        <AuthorityGate>
+          <RouteErrorBoundary>
+            <DriverMainScreen />
+          </RouteErrorBoundary>
+        </AuthorityGate>
       </ProtectedRoute>
     ),
   },

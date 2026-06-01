@@ -92,7 +92,7 @@ const RequestRideScreen: React.FC = () => {
     }
   }, [completedTripData?.id, currentTripId, initiatePayment]);
 
-  // Auto-Sync on Mount to recover any active ride
+  // Auto-Sync on Mount to recover any active ride (with retry logic)
   useEffect(() => {
     const initSync = async () => {
       // 🛡️ [SENIOR_FIX] Session Identity Validation
@@ -100,17 +100,35 @@ const RequestRideScreen: React.FC = () => {
       if (lastUserId && currentUser?.id && lastUserId !== currentUser.id) {
         console.warn(`🕵️ Session mismatch detected (${lastUserId} !== ${currentUser.id}). Isolating accounts...`);
         clearStaleRide();
-        return; 
+        return;
       }
 
-      try {
-        await syncCurrentRide();
-      } catch (e) {
-        console.error('Initial ride sync failed:', e);
+      const MAX_RETRIES = 2;
+      let attempt = 0;
+
+      while (attempt < MAX_RETRIES) {
+        try {
+          const trip = await syncCurrentRide();
+          // If we found an active trip, recovery succeeded
+          if (trip && ['ASSIGNED', 'IN_PROGRESS', 'ARRIVED', 'SCHEDULED', 'PENDING_ACCEPTANCE'].includes(trip.status)) {
+            console.log(`✅ [BOOT_RECOVERY] Owner recovered trip ${trip.id} [${trip.status}]`);
+            return;
+          }
+          // No active trip, that's OK
+          break;
+        } catch (e) {
+          attempt++;
+          if (attempt < MAX_RETRIES) {
+            console.warn(`[BOOT_RECOVERY] Sync attempt ${attempt} failed, retrying in 1s...`);
+            await new Promise(r => setTimeout(r, 1000));
+          } else {
+            console.error(`[BOOT_RECOVERY] Sync failed after ${MAX_RETRIES} attempts:`, e);
+          }
+        }
       }
     };
     initSync();
-  }, []); 
+  }, [syncCurrentRide]);
 
   // Sync refs for the Realtime hook
   useEffect(() => {

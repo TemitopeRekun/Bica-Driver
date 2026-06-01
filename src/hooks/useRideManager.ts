@@ -34,13 +34,13 @@ export const useRideManager = () => {
       // 🛡️ Snapshot state BEFORE async fetch to prevent race conditions
       // If state changes mid-flight (e.g., user cancels), we use the snapshot not the stale value
       const { rideState: snapshotState, setLastUserId } = useRideStore.getState();
-      
+
       const trip = await api.get<any>('/rides/current');
 
       if (trip && currentUser?.id) {
         // Record who this trip belongs to for persistence security
         setLastUserId(currentUser.id);
-        
+
         setCurrentTripId(trip.id);
         setDriverInfo({
           ...trip.driver,
@@ -52,7 +52,7 @@ export const useRideManager = () => {
           timeAway: trip.estimatedArrivalMins || 5,
           tripId: trip.id,
         });
-        
+
         if (trip.status === 'SEARCHING') setRideState('SEARCHING');
         else if (trip.status === 'ASSIGNED') setRideState('ASSIGNED');
         else if (trip.status === 'IN_PROGRESS') setRideState('IN_PROGRESS');
@@ -70,11 +70,11 @@ export const useRideManager = () => {
         }
       }
       return trip;
-    } catch (e) {
-      console.error('Ride sync failed (server error):', e);
-      // Resilience: If the server is 500ing, we don't wipe local state blindly. 
-      // We keep the current UI but return null to the caller.
-      return null;
+    } catch (e: any) {
+      console.error('[SYNC_ERROR] Ride sync failed (server error):', e);
+      // Throw error so callers can retry or handle gracefully
+      // Don't silently return null — that loses error context
+      throw e;
     }
   }, [setCurrentTripId, setDriverInfo, setRideState, setCompletedTripData, resetRide, currentUser?.id]);
 

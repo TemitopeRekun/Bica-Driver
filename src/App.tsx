@@ -118,29 +118,54 @@ const App: React.FC = () => {
             await localforage.setItem('bicadriver_current_user', mapped);
             telemetry.info('Session restored successfully', { userId: mapped.id });
 
-            // Enforce post-trip payment/rating routing guards
+            // 🛡️ SESSION RECOVERY GATE: Restore active trips and enforce routing
             try {
                const activeRide = await api.get<any>('/rides/current');
-               if (activeRide && activeRide.postTripAction) {
-                  const { postTripAction, id } = activeRide;
+               if (activeRide) {
+                  const { status, id, postTripAction } = activeRide;
                   const currentHash = window.location.hash;
-                  
-                  if (postTripAction === 'AWAITING_PAYMENT' && mapped.role === UserRole.DRIVER && !currentHash.includes('/driver/awaiting-payment/')) {
-                     window.location.hash = `/driver/awaiting-payment/${id}`;
-                  } else if (postTripAction === 'REQUIRE_PAYMENT' && mapped.role === UserRole.OWNER) {
-                     const { setRideState, setCompletedTripData, setCurrentTripId } = await import('@/stores/rideStore').then(m => m.useRideStore.getState());
-                     setCompletedTripData(activeRide);
-                     setCurrentTripId(activeRide.id);
-                     setRideState('COMPLETED');
-                     
-                     // Only redirect if not already on status or payment complete page
-                     const isSafePage = currentHash.includes('/owner/status') || currentHash.includes('/payment/complete');
-                     if (!isSafePage) {
+                  const { setRideState, setCurrentTripId } = await import('@/stores/rideStore').then(m => m.useRideStore.getState());
+
+                  // Handle ACTIVE trip states (recovery gate)
+                  const activeTripsOwner = ['PENDING_ACCEPTANCE', 'ASSIGNED', 'ARRIVED', 'IN_PROGRESS', 'SCHEDULED'];
+                  const activeTripsDriver = ['ASSIGNED', 'ARRIVED', 'IN_PROGRESS'];
+
+                  const isOwnerActiveTrip = mapped.role === UserRole.OWNER && activeTripsOwner.includes(status);
+                  const isDriverActiveTrip = mapped.role === UserRole.DRIVER && activeTripsDriver.includes(status);
+
+                  if (isOwnerActiveTrip) {
+                     console.log(`🔄 [BOOT_RECOVERY] Owner has active trip ${id} [${status}] — restoring to status screen`);
+                     setCurrentTripId(id);
+                     setRideState(status as any);
+                     const isSafePage = currentHash.includes('/owner/status');
+                     if (!isSafePage && !currentHash.includes('/payment/complete')) {
                         window.location.hash = '/owner/status';
                      }
-                  } else if (postTripAction === 'REQUIRE_RATING' && mapped.role === UserRole.OWNER) {
-                     // If they owe a rating, send them to the rating screen
-                     window.location.hash = `/rate-driver/${id}`;
+                  } else if (isDriverActiveTrip) {
+                     console.log(`🔄 [BOOT_RECOVERY] Driver has active trip ${id} [${status}] — restoring to main screen`);
+                     setCurrentTripId(id);
+                     setRideState(status as any);
+                     const isSafePage = currentHash.includes('/driver');
+                     if (!isSafePage) {
+                        window.location.hash = '/driver';
+                     }
+                  }
+                  // Handle POST-TRIP actions (payment/rating)
+                  else if (postTripAction) {
+                     if (postTripAction === 'AWAITING_PAYMENT' && mapped.role === UserRole.DRIVER && !currentHash.includes('/driver/awaiting-payment/')) {
+                        window.location.hash = `/driver/awaiting-payment/${id}`;
+                     } else if (postTripAction === 'REQUIRE_PAYMENT' && mapped.role === UserRole.OWNER) {
+                        const { setCompletedTripData } = await import('@/stores/rideStore').then(m => m.useRideStore.getState());
+                        setCompletedTripData(activeRide);
+                        setCurrentTripId(id);
+                        setRideState('COMPLETED');
+                        const isSafePage = currentHash.includes('/owner/status') || currentHash.includes('/payment/complete');
+                        if (!isSafePage) {
+                           window.location.hash = '/owner/status';
+                        }
+                     } else if (postTripAction === 'REQUIRE_RATING' && mapped.role === UserRole.OWNER) {
+                        window.location.hash = `/rate-driver/${id}`;
+                     }
                   }
                }
             } catch (e) {
