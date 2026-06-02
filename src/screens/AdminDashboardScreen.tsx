@@ -221,7 +221,7 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={onBack}
+            onClick={() => onForcedLogout()}
             className="px-4 py-2 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 flex items-center gap-2 transition-all border border-red-500/10"
           >
             <span className="material-symbols-outlined text-sm">logout</span>
