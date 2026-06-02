@@ -2,17 +2,13 @@ export const APP_VERSION = '1.0.0';
 
 export const Config = {
   apiUrl: (function () {
-    // In dev mode (Vite dev server), always use the proxy → no CORS issues
-    if (import.meta.env.DEV) {
-      return 'http://localhost:3001';
-    }
 
     const explicitApiUrl = sanitizeApiUrl(import.meta.env.VITE_API_URL);
     if (explicitApiUrl) {
       return explicitApiUrl;
     }
 
-    return '';
+    return import.meta.env.DEV ? 'http://localhost:3001' : '';;
   })(),
   apiKey: sanitizeEnvValue(import.meta.env.VITE_GEMINI_API_KEY),
   googleMapsApiKey: sanitizeEnvValue(import.meta.env.VITE_GOOGLE_MAPS_API_KEY),
