@@ -7,6 +7,7 @@ import { IMAGES } from '@/constants';
 import { UserProfile } from '@/types';
 import { sounds } from '@/services/SoundService';
 import { Geolocation } from '@capacitor/geolocation';
+import { useAuthStore } from '@/stores/authStore';
 import { useConnectivityStore } from '@/stores/connectivityStore';
 import { LocationPersistenceQueue } from '@/utils/locationPersistenceQueue';
 import { getSocketMetricsCollector } from '@/utils/socketMetrics';
@@ -45,6 +46,9 @@ interface UseDriverRealtimeOptions {
 }
 
 const DEFAULT_DRIVER_POS: [number, number] = [6.4549, 3.3896];
+const DRIVER_ONLINE_GPS_TIMEOUT_MS = 25000;
+const DRIVER_LOCATION_RETRY_MESSAGE =
+  'We could not get your live location yet. Please make sure Location is enabled, wait a moment, and try going online again.';
 
 const toFiniteNumber = (value: unknown, fallback: number): number => {
   const numericValue = Number(value);
@@ -108,13 +112,17 @@ const isPermissionDeniedError = (error: unknown): boolean => {
   );
 };
 
-// 🛡️ GPS Timeout Wrapper — Prevents indefinite hang on location permission
-const getLocationWithTimeout = async (timeoutMs = 5000) => {
+const hasValidCoords = (pos: any): pos is { coords: { latitude: number; longitude: number } } =>
+  Number.isFinite(pos?.coords?.latitude) && Number.isFinite(pos?.coords?.longitude);
+
+// 🛡️ GPS Timeout Wrapper — Prevents indefinite hang on location permission.
+// Native release builds regularly need more than a few seconds for the first GPS fix.
+const getLocationWithTimeout = async (timeoutMs = DRIVER_ONLINE_GPS_TIMEOUT_MS, forPickup = false) => {
   const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('GPS location request timed out after 5 seconds')), timeoutMs)
+    setTimeout(() => reject(new Error(`GPS location request timed out after ${Math.round(timeoutMs / 1000)} seconds`)), timeoutMs)
   );
   return Promise.race([
-    CapacitorService.getCurrentLocation(),
+    CapacitorService.getCurrentLocation(forPickup),
     timeoutPromise
   ]);
 };
@@ -135,6 +143,7 @@ export const useDriverRealtime = ({
     user?.currentLocation ? [user.currentLocation.lat, user.currentLocation.lng] : DEFAULT_DRIVER_POS,
   );
   const [liveRideRequests, setLiveRideRequests] = useState<DriverRideRequest[]>([]);
+  const updateProfile = useAuthStore((state) => state.updateProfile);
 
   const socketRef = useRef<Socket | null>(null);
   const trackingInterval = useRef<any>(null);
@@ -148,6 +157,31 @@ export const useDriverRealtime = ({
     },
     [onOnlineStatusChange],
   );
+
+  const markOnlineConfirmed = useCallback(
+    (updatedUser: any, latitude: number, longitude: number) => {
+      setDriverPos([latitude, longitude]);
+      updateProfile({
+        isOnline: Boolean(updatedUser?.isOnline),
+        currentLocation: { lat: latitude, lng: longitude },
+        locationLat: updatedUser?.locationLat ?? latitude,
+        locationLng: updatedUser?.locationLng ?? longitude,
+      });
+      useConnectivityStore.getState().setLocationStatus('available');
+      updateOnlineState(true);
+    },
+    [updateOnlineState, updateProfile],
+  );
+
+  const markOfflineConfirmed = useCallback(() => {
+    updateProfile({
+      isOnline: false,
+      currentLocation: undefined,
+      locationLat: undefined,
+      locationLng: undefined,
+    });
+    updateOnlineState(false);
+  }, [updateOnlineState, updateProfile]);
 
   const registerDriverSocket = useCallback(() => {
     if (!socketRef.current?.connected || !user?.id) return;
@@ -193,36 +227,30 @@ export const useDriverRealtime = ({
   const enableOnline = useCallback(async () => {
     setAvailabilityIssue(null);
 
-    const goOnline = async (lat?: number, lng?: number) => {
-      const body: Record<string, any> = { isOnline: true };
-      if (lat !== undefined && lng !== undefined) {
-        body.lat = lat;
-        body.lng = lng;
-      }
-      await api.patch('/users/online', body);
+    const goOnline = async (lat: number, lng: number) => {
+      const updated = await api.patch<any>('/users/online', {
+        isOnline: true,
+        lat,
+        lng,
+      });
+      markOnlineConfirmed(updated, lat, lng);
     };
 
     try {
-      const pos = await getLocationWithTimeout();
-      if (pos?.coords) {
-        const { latitude, longitude } = pos.coords;
-        await goOnline(latitude, longitude);
-        setDriverPos([latitude, longitude]);
-        updateOnlineState(true);
-      } else {
-        await goOnline();
-        setAvailabilityIssue(
-          'You are online but your location could not be detected. ' +
-          'Ride requests may not reach you until location is refreshed. ' +
-          'Tap "Refresh Location" to fix this.'
-        );
-        updateOnlineState(true);
+      const pos = await getLocationWithTimeout(DRIVER_ONLINE_GPS_TIMEOUT_MS, true);
+      if (!hasValidCoords(pos)) {
+        setAvailabilityIssue(DRIVER_LOCATION_RETRY_MESSAGE);
+        markOfflineConfirmed();
+        return;
       }
+
+      const { latitude, longitude } = pos.coords;
+      await goOnline(latitude, longitude);
     } catch (error: any) {
       // Check if it's a permission error
       const isPermDenied = isPermissionDeniedError(error);
       if (isPermDenied) {
-        updateOnlineState(false);
+        markOfflineConfirmed();
         setAvailabilityIssue(
           '📍 Location permission required. Go to Settings > Apps > BicaDriver > Permissions > Location and enable location access. Then try going online again.',
         );
@@ -231,43 +259,33 @@ export const useDriverRealtime = ({
 
       // Suspension or permanent block — don't retry, surface the message
       if (error?.status === 403) {
-        updateOnlineState(false);
+        markOfflineConfirmed();
         setAvailabilityIssue(error.message || 'Your account is currently suspended. Please contact support.');
         return;
       }
-      // GPS failed — attempt to go online without coords
-      try {
-        await goOnline();
-        setAvailabilityIssue(
-          'You are online but your location could not be detected. ' +
-          'Ride requests may not reach you until location is refreshed. ' +
-          'Tap "Refresh Location" to fix this.'
-        );
-        updateOnlineState(true);
-      } catch (innerError: any) {
-        if (innerError?.status === 403) {
-          updateOnlineState(false);
-          setAvailabilityIssue(innerError.message || 'Your account is currently suspended. Please contact support.');
-          return;
-        }
-        updateOnlineState(false);
-        setAvailabilityIssue("We couldn't connect to the server. Please check your connection and try again.");
-      }
+
+      markOfflineConfirmed();
+      setAvailabilityIssue(
+        error?.status
+          ? error.message || "We couldn't connect to the server. Please check your connection and try again."
+          : DRIVER_LOCATION_RETRY_MESSAGE,
+      );
     }
-  }, [updateOnlineState]);
+  }, [markOfflineConfirmed, markOnlineConfirmed]);
 
   const disableOnline = useCallback(async () => {
     try {
       await api.patch('/users/online', { isOnline: false });
       await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
+      markOfflineConfirmed();
     } catch (error: any) {
       if (error.message?.includes('401') || error.message?.includes('403')) {
         onForcedLogout?.(error.message);
       }
     }
     setAvailabilityIssue(null);
-    updateOnlineState(false);
-  }, [updateOnlineState, onForcedLogout]);
+    markOfflineConfirmed();
+  }, [markOfflineConfirmed, onForcedLogout]);
 
   const removeRideRequest = useCallback((rideId: string) => {
     setLiveRideRequests((prev) => prev.filter((ride) => ride.id !== rideId));
@@ -422,12 +440,8 @@ export const useDriverRealtime = ({
       setIsLocationRefreshing(true);
       setAvailabilityIssue(null);
       try {
-        const pos = await getLocationWithTimeout();
-        if (
-          !pos?.coords ||
-          typeof pos.coords.latitude !== 'number' ||
-          typeof pos.coords.longitude !== 'number'
-        ) {
+        const pos = await getLocationWithTimeout(DRIVER_ONLINE_GPS_TIMEOUT_MS, true);
+        if (!hasValidCoords(pos)) {
           throw new Error('Live location was unavailable.');
         }
 
@@ -439,14 +453,13 @@ export const useDriverRealtime = ({
 
         const { latitude, longitude } = pos.coords;
         // Send isOnline + lat + lng in ONE atomic request — not two separate calls
-        await api.patch('/users/online', {
+        const updated = await api.patch<any>('/users/online', {
           isOnline: true,
           lat: latitude,
           lng: longitude,
         });
-        setDriverPos([latitude, longitude]);
+        markOnlineConfirmed(updated, latitude, longitude);
         setAvailabilityIssue(null);
-        useConnectivityStore.getState().setLocationStatus('available');
       } catch (error: any) {
         console.error('Initial location failed:', error);
 
@@ -476,18 +489,18 @@ export const useDriverRealtime = ({
             '📍 Location permission required. Go to Settings > Apps > BicaDriver > Permissions > Location and enable location access.',
           );
           useConnectivityStore.getState().setLocationStatus('denied');
-          updateOnlineState(false);
+          markOfflineConfirmed();
         } else {
-          // Transient issues (timeouts/network hiccups) should not force drivers offline.
+          // Transient issues should keep retrying locally, but the backend requires
+          // coordinates before a driver can be marked available.
           if (socketRef.current && !socketRef.current.connected) {
             socketRef.current.connect();
           }
-          // Keep driver online — next heartbeat interval will resend coords
-          await api.patch('/users/online', { isOnline: true }).catch(() => {});
           setAvailabilityIssue(
-            'We could not refresh live location yet. You are still online and retries will continue automatically.',
+            'We could not refresh live location yet. Please wait a moment and try going online again.',
           );
           useConnectivityStore.getState().setLocationStatus('timeout');
+          markOfflineConfirmed();
         }
       } finally {
         setIsLocationRefreshing(false);
@@ -499,18 +512,17 @@ export const useDriverRealtime = ({
 
     trackingInterval.current = setInterval(async () => {
       try {
-        const pos = await getLocationWithTimeout();
-        if (pos) {
+        const pos = await getLocationWithTimeout(DRIVER_ONLINE_GPS_TIMEOUT_MS);
+        if (hasValidCoords(pos)) {
           const { latitude, longitude } = pos.coords;
           // Heartbeat: keep online flag fresh + broadcast location in one request
-          await api.patch('/users/online', {
+          const updated = await api.patch<any>('/users/online', {
             isOnline: true,
             lat: latitude,
             lng: longitude,
           });
-          setDriverPos([latitude, longitude]);
+          markOnlineConfirmed(updated, latitude, longitude);
           setAvailabilityIssue(null);
-          useConnectivityStore.getState().setLocationStatus('available');
         }
       } catch (error) {
         console.error('Location interval failed:', error);
@@ -533,7 +545,7 @@ export const useDriverRealtime = ({
       clearInterval(trackingInterval.current);
       window.removeEventListener('bica-app-resumed', handleResume);
     };
-  }, [isOnline, approvalStatus, user?.id]);
+  }, [isOnline, approvalStatus, user?.id, registerDriverSocket, onForcedLogout, markOfflineConfirmed, markOnlineConfirmed]);
 
   // 🛡️ Socket Token Refresh: Re-authenticate socket when access token is renewed
   useEffect(() => {
