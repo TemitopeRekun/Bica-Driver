@@ -155,6 +155,17 @@ export const useDriverRealtime = ({
     socketRef.current.emit('driver:register', { driverId: user.id });
   }, [user?.id]);
 
+  const connectSocket = useCallback(() => {
+  if (!socketRef.current) return;
+
+  const freshToken = localStorage.getItem('bica-token');
+  socketRef.current.auth = { token: freshToken };
+
+  if (!socketRef.current.connected) {
+    socketRef.current.connect();
+  }
+}, []);
+
   const pushDriverLocation = useCallback(async (latitude: number, longitude: number) => {
     if (!user?.id) return;
 
@@ -202,7 +213,7 @@ export const useDriverRealtime = ({
    let longitude: number
 
    try {
-     const pos = await getLocationWithTimeout(6000)
+     const pos = await getLocationWithTimeout(12000)
 
      if (!pos?.coords || typeof pos.coords.latitude !== 'number') {
        // GPS returned but no usable coords — surface a friendly error, do NOT go online
@@ -315,6 +326,8 @@ export const useDriverRealtime = ({
   useEffect(() => {
     if (approvalStatus !== 'APPROVED' || !user?.id || !API_URL) return;
 
+
+    
     socketRef.current = io(`${API_URL}/rides`, {
       transports: ['websocket'],
       autoConnect: false,
@@ -322,6 +335,7 @@ export const useDriverRealtime = ({
         token: localStorage.getItem('bica_token'),
       },
     });
+  
 
     // 🏢 Enterprise metrics collection for socket stability monitoring
     const metricsCollector = getSocketMetricsCollector();
@@ -438,7 +452,7 @@ export const useDriverRealtime = ({
       
       try {
         if (socketRef.current && !socketRef.current.connected) {
-          socketRef.current.connect();
+          connectSocket();
         } else if (socketRef.current) {
           registerDriverSocket();
         }
@@ -476,7 +490,7 @@ export const useDriverRealtime = ({
 
     const handleResume = () => {
       if (socketRef.current && !socketRef.current.connected) {
-        socketRef.current.connect();
+        connectSocket();
         registerDriverSocket();
       }
       if (isOnline) {
@@ -506,15 +520,12 @@ export const useDriverRealtime = ({
         console.log('[SocketAuth] Token refreshed, re-authenticating socket...');
         localStorage.setItem('_socket_auth_token', currentToken);
         
-        if (socketRef.current?.connected) {
-          // Update auth on live connection
-          socketRef.current.auth = { token: currentToken };
-          socketRef.current.disconnect();
-          socketRef.current.connect();
-        } else if (socketRef.current) {
-          // Just update auth for next connection
-          socketRef.current.auth = { token: currentToken };
-        }
+       if (socketRef.current?.connected) {
+  socketRef.current.disconnect();
+  connectSocket();
+} else if (socketRef.current) {
+  socketRef.current.auth = { token: currentToken };
+}
       }
     }, 2000); // Check every 2 seconds
 

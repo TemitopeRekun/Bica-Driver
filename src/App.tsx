@@ -102,19 +102,22 @@ const App: React.FC = () => {
         // 2. Check for saved session
         const savedUser = await localforage.getItem<any>('bicadriver_current_user');
         if (savedUser && savedUser.id !== 'admin_preview') {
-          try {
-            const freshUser = await api.get<any>('/auth/me');
-            const mapped = mapUser(freshUser);
+         setCurrentUser(mapUser(savedUser));
+           const mappedFromCache = mapUser(savedUser);
+  setCurrentUser(mappedFromCache);
+         try {
+    const freshUser = await api.get<any>('auth/me');
+    const mapped = mapUser(freshUser);
+   
 
-            // Guard: clear any ride state that belonged to a different user (crash/refresh scenario)
-            const { useRideStore } = await import('@/stores/rideStore');
-            const { lastUserId, resetRide } = useRideStore.getState();
-            if (lastUserId && lastUserId !== mapped.id) {
-              console.warn(`[Auth] Stale ride data detected for user ${lastUserId}, clearing before restoring ${mapped.id}`);
-              resetRide();
-            }
 
-            setCurrentUser(mapped);
+    // Stale ride state check (keep this)
+    const { useRideStore } = await import('./stores/rideStore');
+    const { lastUserId, resetRide } = useRideStore.getState();
+    if (lastUserId && lastUserId !== mapped.id) resetRide();
+
+    setCurrentUser(mapped); // now update with fresh data
+    await localforage.setItem('bicadrivercurrentuser', mapped);
             await localforage.setItem('bicadriver_current_user', mapped);
             telemetry.info('Session restored successfully', { userId: mapped.id });
 
