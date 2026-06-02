@@ -6,7 +6,6 @@ import { Config } from '@/services/Config';
 import { IMAGES } from '@/constants';
 import { UserProfile } from '@/types';
 import { sounds } from '@/services/SoundService';
-import { Geolocation } from '@capacitor/geolocation';
 import { useConnectivityStore } from '@/stores/connectivityStore';
 import { LocationPersistenceQueue } from '@/utils/locationPersistenceQueue';
 import { getSocketMetricsCollector } from '@/utils/socketMetrics';
@@ -140,6 +139,8 @@ export const useDriverRealtime = ({
   const trackingInterval = useRef<any>(null);
   const isInitializing = useRef(false);
   const locationQueueRef = useRef<LocationPersistenceQueue | null>(null);
+  const isTogglingRef = useRef(false);
+  const heartbeatAllowedRef = useRef(true);
   
   const updateOnlineState = useCallback(
     (nextIsOnline: boolean) => {
@@ -191,79 +192,87 @@ export const useDriverRealtime = ({
   }, [user?.id]);
 
  const enableOnline = useCallback(async () => {
-  setAvailabilityIssue(null)
+   if (isTogglingRef.current) return
+   isTogglingRef.current = true
+   heartbeatAllowedRef.current = true
+   setAvailabilityIssue(null)
 
-  // ── 1. Acquire GPS with timeout ──────────────────────────────────────────
-  let latitude: number
-  let longitude: number
+   // ── 1. Acquire GPS with timeout ──────────────────────────────────────────
+   let latitude: number
+   let longitude: number
 
-  try {
-    const pos = await getLocationWithTimeout(6000)
+   try {
+     const pos = await getLocationWithTimeout(6000)
 
-    if (!pos?.coords || typeof pos.coords.latitude !== 'number') {
-      // GPS returned but no usable coords — surface a friendly error, do NOT go online
-      setAvailabilityIssue(
-        'Could not detect your location. Please ensure GPS is enabled and try again.',
-      )
-      updateOnlineState(false)
-      return
-    }
+     if (!pos?.coords || typeof pos.coords.latitude !== 'number') {
+       // GPS returned but no usable coords — surface a friendly error, do NOT go online
+       setAvailabilityIssue(
+         'Could not detect your location. Please ensure GPS is enabled and try again.',
+       )
+       updateOnlineState(false)
+       return
+     }
 
-    latitude = pos.coords.latitude
-    longitude = pos.coords.longitude
-  } catch (error: unknown) {
-    // GPS timed out OR permission denied OR any other GPS error
-    if (isPermissionDeniedError(error)) {
-      setAvailabilityIssue(
-        'Location permission required. Go to Settings → Apps → BicaDriver → Permissions → Location and enable it, then try again.',
-      )
-    } else {
-      setAvailabilityIssue(
-        'GPS timed out. Please check that location is on and try going online again.',
-      )
-    }
-    updateOnlineState(false)
-    return  // ← hard stop. never attempt to go online without valid coords
-  }
+     latitude = pos.coords.latitude
+     longitude = pos.coords.longitude
+   } catch (error: unknown) {
+     // GPS timed out OR permission denied OR any other GPS error
+     if (isPermissionDeniedError(error)) {
+       setAvailabilityIssue(
+         'Location permission required. Go to Settings → Apps → BicaDriver → Permissions → Location and enable it, then try again.',
+       )
+     } else {
+       setAvailabilityIssue(
+         'GPS timed out. Please check that location is on and try going online again.',
+       )
+     }
+     updateOnlineState(false)
+     return  // ← hard stop. never attempt to go online without valid coords
+   }
 
-  // ── 2. Send online toggle with coords atomically ─────────────────────────
-  try {
-    await api.patch('users/online', {
-      isOnline: true,
-      lat: latitude,
-      lng: longitude,
-    })
+   // ── 2. Send online toggle with coords atomically ─────────────────────────
+   try {
+     await api.patch('users/online', {
+       isOnline: true,
+       lat: latitude,
+       lng: longitude,
+     })
 
-    setDriverPos([latitude, longitude])
-    setAvailabilityIssue(null)
-    updateOnlineState(true)
+     setDriverPos([latitude, longitude])
+     setAvailabilityIssue(null)
+     updateOnlineState(true)
 
-  } catch (error: unknown) {
-    const typedErr = error as { status?: number; message?: string }
+   } catch (error: unknown) {
+     const typedErr = error as { status?: number; message?: string }
 
-    if (typedErr?.status === 403) {
-      // Suspended or blocked — surface exact backend message
-      updateOnlineState(false)
-      setAvailabilityIssue(
-        typedErr.message ?? 'Your account is currently suspended. Please contact support.',
-      )
-      return
-    }
+     if (typedErr?.status === 403) {
+       // Suspended or blocked — surface exact backend message
+       updateOnlineState(false)
+       setAvailabilityIssue(
+         typedErr.message ?? 'Your account is currently suspended. Please contact support.',
+       )
+       return
+     }
 
-    if (typedErr?.message?.includes('401') || typedErr?.message?.includes('403')) {
-      onForcedLogout?.(typedErr.message)
-      return
-    }
+     if (typedErr?.message?.includes('401') || typedErr?.message?.includes('403')) {
+       onForcedLogout?.(typedErr.message)
+       return
+     }
 
-    // Generic network/server error
-    updateOnlineState(false)
-    setAvailabilityIssue(
-      "We couldn't connect to the server. Please check your connection and try again.",
-    )
-  }
-}, [updateOnlineState, onForcedLogout])
+     // Generic network/server error
+     updateOnlineState(false)
+     setAvailabilityIssue(
+       "We couldn't connect to the server. Please check your connection and try again.",
+     )
+   } finally {
+     isTogglingRef.current = false
+   }
+ }, [updateOnlineState, onForcedLogout])
 
   const disableOnline = useCallback(async () => {
+    if (isTogglingRef.current) return;
+    isTogglingRef.current = true;
+    heartbeatAllowedRef.current = false;
     try {
       await api.patch('/users/online', { isOnline: false });
       await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
@@ -274,6 +283,7 @@ export const useDriverRealtime = ({
     }
     setAvailabilityIssue(null);
     updateOnlineState(false);
+    isTogglingRef.current = false;
   }, [updateOnlineState, onForcedLogout]);
 
   const removeRideRequest = useCallback((rideId: string) => {
@@ -426,78 +436,16 @@ export const useDriverRealtime = ({
       if (isInitializing.current) return;
       isInitializing.current = true;
       
-      setIsLocationRefreshing(true);
-      setAvailabilityIssue(null);
       try {
-        const pos = await getLocationWithTimeout();
-        if (
-          !pos?.coords ||
-          typeof pos.coords.latitude !== 'number' ||
-          typeof pos.coords.longitude !== 'number'
-        ) {
-          throw new Error('Live location was unavailable.');
-        }
-
         if (socketRef.current && !socketRef.current.connected) {
           socketRef.current.connect();
         } else if (socketRef.current) {
           registerDriverSocket();
         }
-
-        const { latitude, longitude } = pos.coords;
-        // Send isOnline + lat + lng in ONE atomic request — not two separate calls
-        await api.patch('/users/online', {
-          isOnline: true,
-          lat: latitude,
-          lng: longitude,
-        });
-        setDriverPos([latitude, longitude]);
-        setAvailabilityIssue(null);
         useConnectivityStore.getState().setLocationStatus('available');
       } catch (error: any) {
-        console.error('Initial location failed:', error);
-
-        if (error.message?.includes('401') || error.message?.includes('403')) {
-          onForcedLogout?.(error.message);
-          return;
-        }
-
-        let permissionDenied = isPermissionDeniedError(error);
-        if (!permissionDenied) {
-          try {
-            const permissions = await Geolocation.checkPermissions();
-            permissionDenied =
-              permissions.location === 'denied' || permissions.coarseLocation === 'denied';
-          } catch {
-            // If permission state cannot be determined, treat as transient.
-          }
-        }
-
-        if (permissionDenied) {
-          await api.patch('/users/online', { isOnline: false }).catch(() => {});
-          await api.patch('/users/location', { lat: null, lng: null }).catch(() => {});
-          if (socketRef.current?.connected) {
-            socketRef.current.disconnect();
-          }
-          setAvailabilityIssue(
-            '📍 Location permission required. Go to Settings > Apps > BicaDriver > Permissions > Location and enable location access.',
-          );
-          useConnectivityStore.getState().setLocationStatus('denied');
-          updateOnlineState(false);
-        } else {
-          // Transient issues (timeouts/network hiccups) should not force drivers offline.
-          if (socketRef.current && !socketRef.current.connected) {
-            socketRef.current.connect();
-          }
-          // Keep driver online — next heartbeat interval will resend coords
-          await api.patch('/users/online', { isOnline: true }).catch(() => {});
-          setAvailabilityIssue(
-            'We could not refresh live location yet. You are still online and retries will continue automatically.',
-          );
-          useConnectivityStore.getState().setLocationStatus('timeout');
-        }
+        console.error('[DriverRealtime] initLocation socket error:', error);
       } finally {
-        setIsLocationRefreshing(false);
         isInitializing.current = false;
       }
     };
@@ -505,8 +453,10 @@ export const useDriverRealtime = ({
     initLocation();
 
     trackingInterval.current = setInterval(async () => {
+      if (!heartbeatAllowedRef.current) return;
       try {
         const pos = await getLocationWithTimeout();
+        if (!heartbeatAllowedRef.current) return;
         if (pos) {
           const { latitude, longitude } = pos.coords;
           // Heartbeat: keep online flag fresh + broadcast location in one request

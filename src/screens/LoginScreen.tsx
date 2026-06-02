@@ -10,6 +10,10 @@ const LoginScreen: React.FC = () => {
   const navigate = useNavigate();
   const { login, isAuthenticated, currentUser } = useAuthStore();
   const { addToast } = useUIStore();
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [inlineError, setInlineError] = useState<string | null>(null);
 
   if (isAuthenticated && currentUser) {
     const role = currentUser.role;
@@ -17,12 +21,6 @@ const LoginScreen: React.FC = () => {
     if (role === UserRole.DRIVER) return <Navigate to="/driver" replace />;
     return <Navigate to="/owner" replace />;
   }
-  
-  const [formData, setFormData] = useState({ email: '', password: '' });
-  const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  // Inline error shown below the form fields — more appropriate than toasts for login failures
-  const [inlineError, setInlineError] = useState<string | null>(null);
 
   const clearError = () => setInlineError(null);
 
