@@ -190,71 +190,78 @@ export const useDriverRealtime = ({
     }
   }, [user?.id]);
 
-  const enableOnline = useCallback(async () => {
-    setAvailabilityIssue(null);
+ const enableOnline = useCallback(async () => {
+  setAvailabilityIssue(null)
 
-    const goOnline = async (lat?: number, lng?: number) => {
-      const body: Record<string, any> = { isOnline: true };
-      if (lat !== undefined && lng !== undefined) {
-        body.lat = lat;
-        body.lng = lng;
-      }
-      await api.patch('/users/online', body);
-    };
+  // ── 1. Acquire GPS with timeout ──────────────────────────────────────────
+  let latitude: number
+  let longitude: number
 
-    try {
-      const pos = await getLocationWithTimeout();
-      if (pos?.coords) {
-        const { latitude, longitude } = pos.coords;
-        await goOnline(latitude, longitude);
-        setDriverPos([latitude, longitude]);
-        updateOnlineState(true);
-      } else {
-        await goOnline();
-        setAvailabilityIssue(
-          'You are online but your location could not be detected. ' +
-          'Ride requests may not reach you until location is refreshed. ' +
-          'Tap "Refresh Location" to fix this.'
-        );
-        updateOnlineState(true);
-      }
-    } catch (error: any) {
-      // Check if it's a permission error
-      const isPermDenied = isPermissionDeniedError(error);
-      if (isPermDenied) {
-        updateOnlineState(false);
-        setAvailabilityIssue(
-          '📍 Location permission required. Go to Settings > Apps > BicaDriver > Permissions > Location and enable location access. Then try going online again.',
-        );
-        return;
-      }
+  try {
+    const pos = await getLocationWithTimeout(6000)
 
-      // Suspension or permanent block — don't retry, surface the message
-      if (error?.status === 403) {
-        updateOnlineState(false);
-        setAvailabilityIssue(error.message || 'Your account is currently suspended. Please contact support.');
-        return;
-      }
-      // GPS failed — attempt to go online without coords
-      try {
-        await goOnline();
-        setAvailabilityIssue(
-          'You are online but your location could not be detected. ' +
-          'Ride requests may not reach you until location is refreshed. ' +
-          'Tap "Refresh Location" to fix this.'
-        );
-        updateOnlineState(true);
-      } catch (innerError: any) {
-        if (innerError?.status === 403) {
-          updateOnlineState(false);
-          setAvailabilityIssue(innerError.message || 'Your account is currently suspended. Please contact support.');
-          return;
-        }
-        updateOnlineState(false);
-        setAvailabilityIssue("We couldn't connect to the server. Please check your connection and try again.");
-      }
+    if (!pos?.coords || typeof pos.coords.latitude !== 'number') {
+      // GPS returned but no usable coords — surface a friendly error, do NOT go online
+      setAvailabilityIssue(
+        'Could not detect your location. Please ensure GPS is enabled and try again.',
+      )
+      updateOnlineState(false)
+      return
     }
-  }, [updateOnlineState]);
+
+    latitude = pos.coords.latitude
+    longitude = pos.coords.longitude
+  } catch (error: unknown) {
+    // GPS timed out OR permission denied OR any other GPS error
+    if (isPermissionDeniedError(error)) {
+      setAvailabilityIssue(
+        'Location permission required. Go to Settings → Apps → BicaDriver → Permissions → Location and enable it, then try again.',
+      )
+    } else {
+      setAvailabilityIssue(
+        'GPS timed out. Please check that location is on and try going online again.',
+      )
+    }
+    updateOnlineState(false)
+    return  // ← hard stop. never attempt to go online without valid coords
+  }
+
+  // ── 2. Send online toggle with coords atomically ─────────────────────────
+  try {
+    await api.patch('users/online', {
+      isOnline: true,
+      lat: latitude,
+      lng: longitude,
+    })
+
+    setDriverPos([latitude, longitude])
+    setAvailabilityIssue(null)
+    updateOnlineState(true)
+
+  } catch (error: unknown) {
+    const typedErr = error as { status?: number; message?: string }
+
+    if (typedErr?.status === 403) {
+      // Suspended or blocked — surface exact backend message
+      updateOnlineState(false)
+      setAvailabilityIssue(
+        typedErr.message ?? 'Your account is currently suspended. Please contact support.',
+      )
+      return
+    }
+
+    if (typedErr?.message?.includes('401') || typedErr?.message?.includes('403')) {
+      onForcedLogout?.(typedErr.message)
+      return
+    }
+
+    // Generic network/server error
+    updateOnlineState(false)
+    setAvailabilityIssue(
+      "We couldn't connect to the server. Please check your connection and try again.",
+    )
+  }
+}, [updateOnlineState, onForcedLogout])
 
   const disableOnline = useCallback(async () => {
     try {
