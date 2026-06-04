@@ -10,6 +10,7 @@ import { Geolocation } from '@capacitor/geolocation';
 import { useAuthStore } from '@/stores/authStore';
 import { useConnectivityStore } from '@/stores/connectivityStore';
 import { LocationPersistenceQueue } from '@/utils/locationPersistenceQueue';
+import { useRideStore } from '@/stores/rideStore';
 import { getSocketMetricsCollector } from '@/utils/socketMetrics';
 import { getRideRequestPrice } from '@/utils/currencyFormatter';
 
@@ -253,13 +254,45 @@ export const useDriverRealtime = ({
     };
 
     try {
+      // ── Stage 1: Coarse/network location (cell towers + WiFi) ──────────────
+      // Returns in 1–3s. Gets the driver online immediately without GPS cold-start
+      // delay, which can block for 30–60s on a fresh device/poor signal.
+      let wentOnlineWithCoarse = false;
+      try {
+        const coarsePos = await Promise.race<any>([
+          Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 5000 }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Coarse location timed out')), 5500)
+          ),
+        ]);
+        if (hasValidCoords(coarsePos)) {
+          await goOnline(coarsePos.coords.latitude, coarsePos.coords.longitude);
+          wentOnlineWithCoarse = true;
+
+          // ── Stage 2: Precise GPS upgrade in background (non-blocking) ──────
+          // Driver is already broadcasting. Silently refines coords once GPS locks.
+          Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 20000 })
+            .then((precisePos) => {
+              if (hasValidCoords(precisePos) && heartbeatAllowedRef.current) {
+                pushDriverLocation(precisePos.coords.latitude, precisePos.coords.longitude);
+              }
+            })
+            .catch(() => {}); // Silent — coarse coords are already active
+        }
+      } catch {
+        // Coarse location unavailable — fall through to full precise GPS
+      }
+
+      if (wentOnlineWithCoarse) return;
+
+      // ── Fallback: Precise GPS with full timeout ───────────────────────────
+      // Only reached if coarse location itself is unavailable (e.g. flight mode).
       const pos = await getLocationWithTimeout(DRIVER_ONLINE_GPS_TIMEOUT_MS, true);
       if (!hasValidCoords(pos)) {
         setAvailabilityIssue(DRIVER_LOCATION_RETRY_MESSAGE);
         markOfflineConfirmed();
         return;
       }
-
       const { latitude, longitude } = pos.coords;
       await goOnline(latitude, longitude);
     } catch (error: any) {
@@ -289,7 +322,7 @@ export const useDriverRealtime = ({
     } finally {
       isTogglingRef.current = false;
     }
-  }, [markOfflineConfirmed, markOnlineConfirmed]);
+  }, [markOfflineConfirmed, markOnlineConfirmed, pushDriverLocation]);
 
   const disableOnline = useCallback(async () => {
     if (isTogglingRef.current) return;
@@ -462,8 +495,53 @@ export const useDriverRealtime = ({
     const initLocation = async () => {
       if (isInitializing.current) return;
       isInitializing.current = true;
-      
+
       try {
+        // ── Stage 1: Coarse/network location — fast socket connect + online flag ─
+        // Returns in 1–3s. Connects the socket and marks the driver available
+        // immediately, without waiting for a GPS cold-start fix.
+        let wentOnlineWithCoarse = false;
+        try {
+          const coarsePos = await Promise.race<any>([
+            Geolocation.getCurrentPosition({ enableHighAccuracy: false, timeout: 5000 }),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Coarse location timed out')), 5500)
+            ),
+          ]);
+          if (hasValidCoords(coarsePos)) {
+            if (socketRef.current && !socketRef.current.connected) {
+              connectSocket();
+            } else if (socketRef.current) {
+              registerDriverSocket();
+            }
+            // Send isOnline + lat + lng in ONE atomic request
+            const updated = await api.patch<any>('/users/online', {
+              isOnline: true,
+              lat: coarsePos.coords.latitude,
+              lng: coarsePos.coords.longitude,
+            });
+            markOnlineConfirmed(updated, coarsePos.coords.latitude, coarsePos.coords.longitude);
+            setAvailabilityIssue(null);
+            wentOnlineWithCoarse = true;
+
+            // ── Stage 2: Precise GPS upgrade in background (non-blocking) ────
+            // Driver is already online. Silently refines coords once GPS locks in.
+            Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 20000 })
+              .then((precisePos) => {
+                if (hasValidCoords(precisePos) && heartbeatAllowedRef.current) {
+                  pushDriverLocation(precisePos.coords.latitude, precisePos.coords.longitude);
+                }
+              })
+              .catch(() => {}); // Silent — driver is already broadcasting with coarse coords
+          }
+        } catch {
+          // Coarse location failed — fall through to precise GPS
+        }
+
+        if (wentOnlineWithCoarse) return;
+
+        // ── Fallback: Precise GPS with full timeout ────────────────────────
+        // Only reached when coarse location is truly unavailable.
         const pos = await getLocationWithTimeout(DRIVER_ONLINE_GPS_TIMEOUT_MS, true);
         if (!hasValidCoords(pos)) {
           throw new Error('Live location was unavailable.');
@@ -520,11 +598,37 @@ export const useDriverRealtime = ({
           if (socketRef.current && !socketRef.current.connected) {
             socketRef.current.connect();
           }
-          setAvailabilityIssue(
-            'We could not refresh live location yet. Please wait a moment and try going online again.',
-          );
+          
           useConnectivityStore.getState().setLocationStatus('timeout');
-          markOfflineConfirmed();
+
+          if (isOnline) {
+            const rideState = useRideStore.getState().rideState;
+            const hasActiveTrip = rideState === 'ASSIGNED' || rideState === 'IN_PROGRESS';
+            
+            console.warn(
+              `[initLocation] Location refresh failed (transient). Retaining online status (Active trip: ${hasActiveTrip}).`
+            );
+            
+            setAvailabilityIssue(
+              hasActiveTrip 
+                ? '⚠️ Weak GPS signal. Your trip is active, please stay in areas with clear sky access.'
+                : 'Weak GPS signal. Retrying to find your precise location...'
+            );
+            
+            // Resubmit online state heartbeat using last known coordinates to prevent session expiry on the backend
+            if (driverPos && driverPos[0] !== DEFAULT_DRIVER_POS[0]) {
+              api.patch('/users/online', {
+                isOnline: true,
+                lat: driverPos[0],
+                lng: driverPos[1],
+              }).catch(() => {});
+            }
+          } else {
+            setAvailabilityIssue(
+              'We could not refresh live location yet. Please wait a moment and try going online again.',
+            );
+            markOfflineConfirmed();
+          }
         }
       } finally {
         isInitializing.current = false;

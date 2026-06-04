@@ -39,6 +39,12 @@ export const useAuthStore = create<AuthState>()(
         // Clear any stale ride data that may belong to a previous user on this device
         const { useRideStore } = await import('./rideStore');
         useRideStore.getState().resetRide();
+        // 🛡️ Stamp the incoming user's identity immediately after reset.
+        // This ensures the session guard in RequestRideScreen always has a valid
+        // user reference even before syncCurrentRide() runs or returns a trip.
+        // Without this, lastUserId stays null and the guard never fires, meaning
+        // stale persisted rideStore state from a previous session could bleed through.
+        useRideStore.getState().setLastUserId(user.id);
 
         saveToken(token);
         if (refreshToken) saveRefreshToken(refreshToken);
